@@ -9,6 +9,8 @@ namespace MAF.Agents.Comprehension;
 public sealed class ProjectTools
 {
     public string Root { get; }
+    private int successfulCalls;
+    public int SuccessfulCalls => Volatile.Read(ref successfulCalls);
     private const int MaxBytes = 256 * 1024;
     private const int MaxFiles = 2000;
     private static readonly HashSet<string> Ignored = new(StringComparer.OrdinalIgnoreCase)
@@ -77,7 +79,7 @@ public sealed class ProjectTools
     public static string Redact(string text)
     {
         if (text.Contains("PRIVATE KEY", StringComparison.OrdinalIgnoreCase)) return "[REDACTED private key content]";
-        text = Regex.Replace(text, @"(?im)^.*(?:api[_-]?key|password|passwd|pwd|secret|credential|access[_-]?token|refresh[_-]?token|authorization|bearer|connectionstring|accountkey|sig=)\s*[""']?\s*[:=].*$", "[REDACTED sensitive line]");
+        text = Regex.Replace(text, @"(?im)^.*(?:api[_-]?key|password|passwd|pwd|secret|credential|token|authorization|bearer|connectionstring|accountkey|sig=)\s*[""']?\s*[:=].*$", "[REDACTED sensitive line]");
         text = Regex.Replace(text, @"(?i)\b(?:sk-[a-z0-9_-]{8,}|gh[pousr]_[a-z0-9]{10,}|AKIA[A-Z0-9]{16}|eyJ[a-z0-9_-]+\.[a-z0-9_-]+\.[a-z0-9_-]+)\b", "[REDACTED credential]");
         text = Regex.Replace(text, @"(?i)\b(?:https?|postgres(?:ql)?|mysql|mongodb)://[^\s/@]+:[^\s/@]+@", "[REDACTED credential URL]@");
         foreach (var name in new[] { "AI_API_KEY", "AI_BASE_URL" })
@@ -98,7 +100,11 @@ public sealed class ProjectTools
     }
 
     [Description("List readable project-relative files. Excluded directories and sensitive files are omitted; output is bounded.")]
-    public string ListFiles() => Redact(string.Join('\n', Files().Take(MaxFiles)) + "\n[limit: 2000 files; ignored files omitted]");
+    public string ListFiles()
+    {
+        var result = Redact(string.Join('\n', Files().Take(MaxFiles)) + "\n[limit: 2000 files; ignored files omitted]");
+        Interlocked.Increment(ref successfulCalls); return result;
+    }
 
     [Description("Read a UTF-8 source file with original 1-based line numbers. Use a project-relative path, startLine >= 1, maxLines <= 200.")]
     public string ReadFile(string path, int startLine = 1, int maxLines = 120)
@@ -106,6 +112,7 @@ public sealed class ProjectTools
         if (startLine < 1 || maxLines < 1 || maxLines > 200) throw new ArgumentOutOfRangeException(nameof(startLine));
         var lines = Lines(path);
         var result = Redact(string.Join('\n', lines.Skip(startLine - 1).Take(maxLines).Select((line, i) => $"{path}:{startLine + i}: {line}")));
+        Interlocked.Increment(ref successfulCalls);
         return result.Length <= 24000 ? result : result[..24000] + "\n[truncated]";
     }
 
@@ -113,6 +120,7 @@ public sealed class ProjectTools
     public string SearchCode(string keyword)
     {
         if (string.IsNullOrWhiteSpace(keyword) || keyword.Length > 200) throw new ArgumentException("Use a keyword of 1-200 characters.");
+        Interlocked.Increment(ref successfulCalls);
         var result = new StringBuilder(); var hits = 0;
         foreach (var file in Files().Take(MaxFiles))
         {
@@ -140,7 +148,7 @@ public sealed class ProjectTools
         start.Environment["GIT_CONFIG_NOSYSTEM"] = "1";
         start.Environment["GIT_CONFIG_GLOBAL"] = OperatingSystem.IsWindows() ? "NUL" : "/dev/null";
         start.Environment["GIT_OPTIONAL_LOCKS"] = "0";
-        foreach (var arg in new[] { "--no-pager", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=", "-c", "diff.external=" }.Concat(arguments)) start.ArgumentList.Add(arg);
+        foreach (var arg in new[] { "--git-dir=" + metadata, "--work-tree=" + Root, "--no-pager", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=", "-c", "diff.external=" }.Concat(arguments)) start.ArgumentList.Add(arg);
         using var process = Process.Start(start) ?? throw new InvalidOperationException("Git unavailable.");
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
         async Task<string> Bounded(StreamReader reader)
@@ -168,6 +176,7 @@ public sealed class ProjectTools
     {
         var allowed = Files().Take(MaxFiles).ToHashSet(StringComparer.Ordinal);
         var raw = await Git("status", "--porcelain=v1", "-z", "--untracked-files=all", "--no-renames");
+        Interlocked.Increment(ref successfulCalls);
         return Redact(string.Join('\n', raw.Split('\0').Where(row => row.Length > 3 && allowed.Contains(row[3..])).Select(row => row[..2] + " " + row[3..])));
     }
 
@@ -178,6 +187,7 @@ public sealed class ProjectTools
         var readable = Files().Take(MaxFiles).ToHashSet(StringComparer.Ordinal);
         // Include deleted source paths only when their parent still passes the same path checks.
         var changes = await Git("status", "--porcelain=v1", "-z", "--untracked-files=all", "--no-renames");
+        Interlocked.Increment(ref successfulCalls);
         foreach (var row in changes.Split('\0').Where(r => r.Length > 3 && !r.StartsWith("??")))
         {
             var file = row[3..];

@@ -30,6 +30,7 @@ try
     services.AddSingleton<IAgentFactory, ComprehensionAgentFactory>();
     using var provider = services.BuildServiceProvider();
     AIAgent agent = provider.GetRequiredService<IAgentFactory>().Create();
+    var tools = provider.GetRequiredService<ProjectTools>();
     var session = await agent.CreateSessionAsync();
     Console.WriteLine($"PCA Agent Ready\nProject: {project}");
     using var stop = new CancellationTokenSource();
@@ -44,7 +45,14 @@ try
         if (string.IsNullOrWhiteSpace(question)) continue;
         using var turn = CancellationTokenSource.CreateLinkedTokenSource(stop.Token);
         turn.CancelAfter(TimeSpan.FromMinutes(2));
-        try { Console.WriteLine($"Agent > {await agent.RunAsync(question, session, cancellationToken: turn.Token)}"); }
+        try
+        {
+            var before = tools.SuccessfulCalls;
+            var answer = await agent.RunAsync(question, session, cancellationToken: turn.Token);
+            Console.WriteLine($"Agent > {answer}");
+            if (tools.SuccessfulCalls == before)
+                Console.WriteLine("[本回合未成功取得新工具證據。若詢問專案內容，請確認模型支援 Function Calling；回答可能僅依據先前對話。]");
+        }
         catch (OperationCanceledException) { Console.Error.WriteLine("Turn cancelled or timed out; session reset."); session = await agent.CreateSessionAsync(); }
         catch (Exception) { Console.Error.WriteLine("Model request failed. Check endpoint, credentials, model and Function Calling support. Session reset."); session = await agent.CreateSessionAsync(); if (once) return 1; }
         if (once) break;
