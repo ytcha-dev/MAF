@@ -1,0 +1,54 @@
+using MAF.Agents.Comprehension;
+using MAF.Core;
+using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
+using OpenAI;
+using System.ClientModel;
+
+if (args.Contains("--help") || args.Length == 0)
+{
+    Console.WriteLine("pca --project <directory> [--ask <question>]\nEnvironment: AI_BASE_URL, AI_API_KEY, AI_MODEL\nExit: /exit; reset session: /reset");
+    return 0;
+}
+try
+{
+    string Option(string name) => Array.IndexOf(args, name) is var index && index >= 0 && index + 1 < args.Length
+        ? args[index + 1] : throw new ArgumentException($"Missing {name}");
+    var project = Path.GetFullPath(Option("--project"));
+    if (!Directory.Exists(project)) throw new ArgumentException("Project directory does not exist.");
+    string Required(string name) => Environment.GetEnvironmentVariable(name) is { Length: > 0 } value
+        ? value : throw new ArgumentException($"Please set {name}.");
+    var endpoint = new Uri(Required("AI_BASE_URL"));
+    if (endpoint.Scheme != "https" && !(endpoint.Scheme == "http" && endpoint.IsLoopback))
+        throw new ArgumentException("AI_BASE_URL requires HTTPS, or HTTP on localhost.");
+    var client = new OpenAIClient(new ApiKeyCredential(Required("AI_API_KEY")),
+        new OpenAIClientOptions { Endpoint = endpoint }).GetChatClient(Required("AI_MODEL")).AsIChatClient();
+    var services = new ServiceCollection();
+    services.AddSingleton<IChatClient>(client);
+    services.AddSingleton<IAgentFactory, ComprehensionAgentFactory>();
+    using var provider = services.BuildServiceProvider();
+    AIAgent agent = provider.GetRequiredService<IAgentFactory>().Create();
+    var session = await agent.CreateSessionAsync();
+    Console.WriteLine($"PCA Agent Ready\nProject: {project}");
+    using var stop = new CancellationTokenSource();
+    Console.CancelKeyPress += (_, e) => { e.Cancel = true; stop.Cancel(); };
+    var once = args.Contains("--ask");
+    while (!stop.IsCancellationRequested)
+    {
+        if (!once) Console.Write("You > ");
+        var question = once ? Option("--ask") : Console.ReadLine();
+        if (question is null || question == "/exit") break;
+        if (question == "/reset") { session = await agent.CreateSessionAsync(); continue; }
+        if (string.IsNullOrWhiteSpace(question)) continue;
+        using var turn = CancellationTokenSource.CreateLinkedTokenSource(stop.Token);
+        turn.CancelAfter(TimeSpan.FromMinutes(2));
+        try { Console.WriteLine($"Agent > {await agent.RunAsync(question, session, cancellationToken: turn.Token)}"); }
+        catch (OperationCanceledException) { Console.Error.WriteLine("Turn cancelled or timed out; session reset."); session = await agent.CreateSessionAsync(); }
+        catch (Exception) { Console.Error.WriteLine("Model request failed. Check endpoint, credentials, model and Function Calling support. Session reset."); session = await agent.CreateSessionAsync(); if (once) return 1; }
+        if (once) break;
+    }
+    return 0;
+}
+catch (ArgumentException e) { Console.Error.WriteLine(e.Message); return 2; }
+catch (Exception) { Console.Error.WriteLine("PCA could not start. Check configuration and project access."); return 1; }
