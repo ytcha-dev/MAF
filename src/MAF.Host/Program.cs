@@ -26,6 +26,7 @@ try
         new OpenAIClientOptions { Endpoint = endpoint }).GetChatClient(Required("AI_MODEL")).AsIChatClient();
     var services = new ServiceCollection();
     services.AddSingleton<IChatClient>(client);
+    services.AddSingleton(new ProjectTools(project));
     services.AddSingleton<IAgentFactory, ComprehensionAgentFactory>();
     using var provider = services.BuildServiceProvider();
     AIAgent agent = provider.GetRequiredService<IAgentFactory>().Create();

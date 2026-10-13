@@ -10,7 +10,7 @@ public sealed class AgentTests
     public async Task OfficialAgentRunsAndKeepsSession()
     {
         using var client = new RecordingClient();
-        var agent = new ComprehensionAgentFactory(client).Create();
+        var agent = new ComprehensionAgentFactory(client, new ProjectTools(AppContext.BaseDirectory)).Create();
         Assert.IsType<ChatClientAgent>(agent);
         var session = await agent.CreateSessionAsync();
         Assert.Contains("fixture reply", (await agent.RunAsync("first", session)).Text);
