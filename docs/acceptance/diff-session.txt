@@ -1,0 +1,31 @@
+PCA Agent Ready
+Project: C:\WK\MAF
+You > Agent > 結論
+- staged: src/MAF.Agents.Comprehension/ProjectTools.cs 新增更完整的 PEM 與敏感參數 redaction 邏輯（取代簡單 contains 判斷）。
+- unstaged: tests/MAF.Tests/ToolTests.cs 新增多個測試（驗證 PEM 保留行號、取消 Token 可讀性、diff 前綴 PEM 等）。
+
+程式流程（推測）
+- Redact 先以 regex 偵測 PEM block 並以相同數量的 “[REDACTED private key content]” 換行取代，接著用另一 regex 擷取 key/secret 類行並遮掩。
+
+背後原理（推測）
+- 用多行/不區分大小寫的 regex 處理實際 PEM block，保留原始換行數以維持來源行號；再用變數名/格式模式遮蔽常見祕密字串。
+
+程式碼證據（僅顯示新增行）
+staged (src/.../ProjectTools.cs) 新增：
++        // Redact actual PEM blocks...
++        text = Regex.Replace(text,
++            @"(?ims)^[ +\-]?-----BEGIN (?:RSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY-----.*?(?:^[ +\-]?-----END (?:RSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY-----[^\r\n]*|\z)",
++            match => string.Join('\n', Enumerable.Repeat("[REDACTED private key content]", match.Value.Count(c => c == '\n') + 1)));
++        text = Regex.Replace(text, @"(?im)^.*\b(?:api[_-]?key|password|...)\s*[""']?\s*[:=].*$", "[REDACTED sensitive line]");
+
+unstaged (tests/.../ToolTests.cs) 新增測試片段：
++    [Fact] public void PrivateKeyRedactionPreservesCodeMentionsAndLineNumbers() { ... File.WriteAllText(... \"before\n-----BEGIN PRIVATE KEY-----\nhidden\n-----END PRIVATE KEY-----\nafter\"); ... Assert.Contains(\"pem.txt:5: after\", content); }
++    [Fact] public void CancellationTokenArgumentsRemainReadable() { const string code = "await agent.RunAsync(..., cancellationToken: turn.Token);"; Assert.Equal(code, ProjectTools.Redact(code)); }
++    [Theory] [InlineData("+-----BEGIN PRIVATE KEY-----\n+hidden\n+-----END PRIVATE KEY-----")] ... public void RedactsDiffPrefixedAndIncompletePem(string content) => Assert.DoesNotContain("hidden", ProjectTools.Redact(content));
+
+注意事項
+- 修改目的為推測；未讀取其他檔案以驗證行為。GetGitDiff 已揭示變更；有未追蹤檔案存在（未含於此說明）。
+You > Agent > - Staged：src/MAF.Agents.Comprehension/ProjectTools.cs
+- Unstaged：tests/MAF.Tests/ToolTests.cs
+[本回合未成功取得新工具證據。若詢問專案內容，請確認模型支援 Function Calling；回答可能僅依據先前對話。]
+You > 

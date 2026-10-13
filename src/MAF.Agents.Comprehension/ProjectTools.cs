@@ -78,8 +78,12 @@ public sealed class ProjectTools
 
     public static string Redact(string text)
     {
-        if (text.Contains("PRIVATE KEY", StringComparison.OrdinalIgnoreCase)) return "[REDACTED private key content]";
-        text = Regex.Replace(text, @"(?im)^.*(?:api[_-]?key|password|passwd|pwd|secret|credential|token|authorization|bearer|connectionstring|accountkey|sig=)\s*[""']?\s*[:=].*$", "[REDACTED sensitive line]");
+        // Redact actual PEM blocks, not code/documentation that mentions private keys.
+        // Preserve newlines so citations after a block retain original source line numbers.
+        text = Regex.Replace(text,
+            @"(?ims)^[ +\-]?-----BEGIN (?:RSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY-----.*?(?:^[ +\-]?-----END (?:RSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY-----[^\r\n]*|\z)",
+            match => string.Join('\n', Enumerable.Repeat("[REDACTED private key content]", match.Value.Count(c => c == '\n') + 1)));
+        text = Regex.Replace(text, @"(?im)^.*\b(?:api[_-]?key|password|passwd|pwd|(?:client[_-]?)?secret|credential|(?:(?:access|refresh|auth|session)[_-]?)?token|authorization|bearer|connectionstring|accountkey|sig)\s*[""']?\s*[:=].*$", "[REDACTED sensitive line]");
         text = Regex.Replace(text, @"(?i)\b(?:sk-[a-z0-9_-]{8,}|gh[pousr]_[a-z0-9]{10,}|AKIA[A-Z0-9]{16}|eyJ[a-z0-9_-]+\.[a-z0-9_-]+\.[a-z0-9_-]+)\b", "[REDACTED credential]");
         text = Regex.Replace(text, @"(?i)\b(?:https?|postgres(?:ql)?|mysql|mongodb)://[^\s/@]+:[^\s/@]+@", "[REDACTED credential URL]@");
         foreach (var name in new[] { "AI_API_KEY", "AI_BASE_URL" })

@@ -1,0 +1,26 @@
+PCA Agent Ready
+Project: C:\WK\MAF
+Agent > 結論
+本專案以 Microsoft.Extensions.DependencyInjection 做簡單 DI：在 Program.cs 建立 ServiceCollection、註冊 IChatClient、ProjectTools 與 IAgentFactory（由 ComprehensionAgentFactory 實作），再由 ServiceProvider 解析並建立 Agent（合理且符合單一入口與可替換實作需求；但需確認 ProjectTools 的執行續安全與 singleton 生存期是否合適，以下皆依程式碼推測）。
+
+程式流程（簡要）
+- 主程式建立 OpenAI chat client (Program.cs:25-26)。
+- 建立 ServiceCollection 並註冊服務 (Program.cs:27-31)。
+- BuildServiceProvider 後由 IAgentFactory.Create() 建立 AIAgent 並執行問答迴圈 (Program.cs:31-35, 51)。
+
+背後原理（DI 如何被用）
+- ComprehensionAgentFactory 以建構子注入 IChatClient 與 ProjectTools，並組裝 ChatClientAgent 與一組 tools (ComprehensionAgentFactory.cs:5-11)。
+- IAgentFactory 抽象化 agent 建立，讓 Program 只依賴介面 (IAgentFactory.cs:3)。
+
+程式碼證據（部分引用）
+- 註冊與解析：src/MAF.Host/Program.cs:27-33（services.AddSingleton..., provider.GetRequiredService<IAgentFactory>().Create();）。
+- Factory 定義與注入：src/MAF.Agents.Comprehension/ComprehensionAgentFactory.cs:5-11（class ComprehensionAgentFactory(IChatClient chatClient, ProjectTools projectTools) ... AIFunctionFactory.Create(projectTools.ListFiles) ...）。
+- 介面：src/MAF.Core/IAgentFactory.cs:3（public interface IAgentFactory { AIAgent Create(); }）。
+
+不使用的差異 / 替代方式（根據程式碼推測）
+- 若不使用 DI，可直接 new ComprehensionAgentFactory(client, tools)（較少抽象、較難測試）。
+- 可用更完整的容器（Autofac）、或更細分生存期（Transient/Scoped）或 UseHost/GenericHost 模式來管理生命週期與設定（更成熟的配置與延伸性）。
+
+注意事項
+- 程式碼註冊為 singleton（Program.cs:28-30），需確認 ProjectTools 與 ChatClient 是否為執行緒安全與長壽命物件（未在目前檔案中找到證據，待確認 ProjectTools 實作）。
+- 所有結論均依上述程式碼片段推測；未讀取 ProjectTools 內部細節，故部分行為為待確認。

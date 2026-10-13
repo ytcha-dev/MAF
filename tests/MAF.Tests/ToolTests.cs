@@ -92,6 +92,24 @@ public sealed class ToolTests : IDisposable
     [InlineData("postgres://user:hidden@localhost/db")]
     [InlineData("-----BEGIN PRIVATE KEY-----\nhidden\n-----END PRIVATE KEY-----")]
     public void RedactsCommonCredentials(string content) => Assert.DoesNotContain("hidden", ProjectTools.Redact(content));
+    [Fact] public void PrivateKeyRedactionPreservesCodeMentionsAndLineNumbers()
+    {
+        Assert.Equal("// Detect PRIVATE KEY markers", ProjectTools.Redact("// Detect PRIVATE KEY markers"));
+        File.WriteAllText(Path.Combine(root, "pem.txt"), "before\n-----BEGIN PRIVATE KEY-----\nhidden\n-----END PRIVATE KEY-----\nafter");
+        var content = tools.ReadFile("pem.txt");
+        Assert.DoesNotContain("hidden", content);
+        Assert.Contains("pem.txt:5: after", content);
+    }
+    [Fact] public void CancellationTokenArgumentsRemainReadable()
+    {
+        const string code = "await agent.RunAsync(question, session, cancellationToken: turn.Token);";
+        Assert.Equal(code, ProjectTools.Redact(code));
+        Assert.DoesNotContain("hidden", ProjectTools.Redact("accessToken = \"hidden\""));
+    }
+    [Theory]
+    [InlineData("+-----BEGIN PRIVATE KEY-----\n+hidden\n+-----END PRIVATE KEY-----")]
+    [InlineData("-----BEGIN RSA PRIVATE KEY-----\nhidden")]
+    public void RedactsDiffPrefixedAndIncompletePem(string content) => Assert.DoesNotContain("hidden", ProjectTools.Redact(content));
     public void Dispose()
     {
         // Git objects are read-only on Windows. Only clean this test's owned temporary directory.

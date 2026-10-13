@@ -1,0 +1,24 @@
+PCA Agent Ready
+Project: C:\WK\MAF
+Agent > 結論
+- staged：src/MAF.Agents.Comprehension/ProjectTools.cs 已 stage，加入更精準的 PEM 與關鍵字 redaction。見 diff hunk @@ -78,8 +78,12 @@。
+- unstaged：tests/MAF.Tests/ToolTests.cs 有未 stage 的測試新增（包含檔案寫入與行號斷言）。見 diff hunk @@ -92,6 +92,20 @@。另有未追蹤檔案 (.vscode, docs...)。(來源：GetGitStatus 與 GetGitDiff)
+
+程式流程（簡要）
+- ProjectTools.Redact 現在用 Regex 取代簡單 Contains，先用一個多行 regex 抓 PEM block 並以相同數量 newline 替換，再用另一 regex 攔截常見 secret 宣告，最後再其它 pattern 取代（staged diff）。
+
+背後原理
+- 透過多行與不區分大小寫的 regex 捕捉整個 PEM 區塊並保留換行數，以維持原始檔案行號對引用的影響（避免改變 citation 行數）。
+- 新增的 credential regex 用來匹配多種 key/token 格式與帶密碼的 URL。
+
+程式碼證據（diff 引用）
+- staged: src/MAF.Agents.Comprehension/ProjectTools.cs @@ -78,8 +78,12 @@ 增加：
+  - Regex.Replace(... @"(?ims)^-----BEGIN (?:RSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY-----.*?^-----END ...", match => string.Join('\n', Enumerable.Repeat("[REDACTED private key content]", match.Value.Count(c => c == '\n') + 1)));
+  - 及另一行 Regex.Replace(... @"(?im)^.*\b(?:api[_-]?key|password|...)\s*[:=].*$", "[REDACTED sensitive line]").
+- unstaged: tests/MAF.Tests/ToolTests.cs @@ -92,6 +92,20 @@ 新增測試：
+  - PrivateKeyRedactionPreservesCodeMentionsAndLineNumbers()（寫入 pem.txt、檢查 line citation）與 CancellationTokenArgumentsRemainReadable() 等。GetGitStatus 顯示此檔為 M（unstaged diff 區塊顯示為 unstaged）。
+
+影響與風險
+- 正面：更完整的 redaction，能刪除整段 PEM 並保留換行以維持行號一致性，減少洩密風險。
+- 風險：regex 可能過度或不足匹配（false positives/negatives）；大型輸入可能影響效能；未 stage 的測試代表目前 commit 未包含回歸測試，若 push 只有 ProjectTools.cs，會造成測試與行為不同步（測試改動尚未成為 repo 歷史）。
+- 推測：修改目的是為了「在 redaction 時保留行號並更可靠地移除 PEM / 常見憑證」，但此為根據 diff 推測，非開發者陳述。

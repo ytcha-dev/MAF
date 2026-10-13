@@ -1,0 +1,25 @@
+PCA Agent Ready
+Project: C:\WK\MAF
+Agent > 結論
+- CLI -> agent.RunAsync 路徑：Program 解析 CLI、建立 DI、取出 IAgent (MAF AIAgent) 並在迴圈中呼叫 agent.RunAsync(question, session)（程式事實）。agent 內部如何執行已註冊的 Function Calling 為 MAF/SDK 行為，專案程式碼無法直接證實（標為 SDK 內部未確認）。
+
+程式流程（簡述）
+1. CLI 啟動與 DI 建置：Program 讀取參數、建立 OpenAI chat client、註冊 ProjectTools 與 ComprehensionAgentFactory（src/MAF.Host/Program.cs:16-33）。
+2. 建立 Agent 與 Session：從 IAgentFactory.Create() 取得 AIAgent，建立 session（src/MAF.Host/Program.cs:31-35）。
+3. 互動迴圈：讀取輸入後呼叫 agent.RunAsync(...) 並檢查 tools.SuccessfulCalls 前後差異（src/MAF.Host/Program.cs:41-52）。
+4. 工具註冊：ComprehensionAgentFactory 以 AIFunctionFactory.Create(...) 將 ProjectTools 的五個方法註冊為 tools（src/MAF.Agents.Comprehension/ComprehensionAgentFactory.cs:7-11）。
+5. ProjectTools.ReadFile：參數驗證→Resolve() 路徑安全檢查→以 FileStream 讀取 Byte 限制並轉 UTF-8→Redact 敏感資訊→回傳帶原始行號的內容，並遞增 successfulCalls（src/MAF.Agents.Comprehension/ProjectTools.cs:113-121；Resolve:40-56；Lines:94-104；ListFiles 成功計數參考:109-111）。
+
+背後原理（證據與未確認）
+- 註冊為 Function Tools：程式將 ProjectTools 的方法包給 AIFunctionFactory.Create(...)（src/.../ComprehensionAgentFactory.cs:7-11）—這證明工具被暴露給 AIAgent。
+- SDK 何時、如何自動執行工具（function calling flow）、模型如何決定呼叫參數與回傳整合、以及 agent.RunAsync 內部的呼叫循環屬於 MAF / Microsoft.Agents.AI 實作，專案沒有展示其內部；因此標為「SDK 內部未確認」。
+
+程式碼證據（重要行）
+- DI 與 agent.RunAsync：src/MAF.Host/Program.cs:28-35, 41-52
+- tools 註冊：src/MAF.Agents.Comprehension/ComprehensionAgentFactory.cs:7-11
+- ReadFile 實作：src/MAF.Agents.Comprehension/ProjectTools.cs:113-121
+- 路徑解析與檢查：src/MAF.Agents.Comprehension/ProjectTools.cs:40-56
+- 讀取與轉換：src/MAF.Agents.Comprehension/ProjectTools.cs:98-104
+
+注意事項
+- 關於模型觸發工具與 AIAgent.RunAsync 的具體行為（何時呼叫、傳入參數結構、工具回傳如何被模型包含於回答）為 SDK/模型端責任，專案程式碼只負責註冊與安全邊界驗證，無內部證據可驗證該運作細節（未確認）。

@@ -71,4 +71,5 @@ Git 工具要求根目錄直接擁有普通 `.git` 目錄；v0.1 不支援 linke
 
 ## 驗證狀態
 
-詳見 [TEST_RESULTS.md](TEST_RESULTS.md)。建置成功；Phase 1／2 曾通過 17 項測試。最新版本的 Agent 執行受此電腦 Windows Code Integrity 企業簽章政策阻擋，無法宣稱完成真實模型品質驗收。需要管理者允許開發產物或使用組織核准的簽章流程後，重跑測試及四個詢問。
+詳見 [TEST_RESULTS.md](TEST_RESULTS.md)。建置成功，22／22 測試通過；原先系統封鎖已解除。已以 PCA 自身專案完成真實模型架構、功能流程、Git Diff 與 DI 概念驗收，回答保存於 `docs/acceptance`。驗收範圍為本專案與目前設定模型，回答細節仍需核對程式碼。
+
