@@ -19,6 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\MAF.Agents.Review\MAF.Agents.Review.csproj" />
     <ProjectReference Include="..\..\src\MAF.Agents.Comprehension\MAF.Agents.Comprehension.csproj" />
     <ProjectReference Include="..\..\src\MAF.Core\MAF.Core.csproj" />
   </ItemGroup>

@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/MAF.Agents.Review/MAF.Agents.Review.csproj" />
     <Project Path="src/MAF.Agents.Comprehension/MAF.Agents.Comprehension.csproj" />
     <Project Path="src/MAF.Core/MAF.Core.csproj" />
     <Project Path="src/MAF.Host/MAF.Host.csproj" />

@@ -1,6 +1,6 @@
-# Project Comprehension Agent v0.1
+# MAF — Comprehension / Code Review Agents
 
-C# / .NET 10 的單一 Microsoft Agent Framework Agent，以唯讀 Function Tools 解釋本機程式碼。沒有 OpenCode Harness、Adapter、向量資料庫或自製 Agent Loop。
+C# / .NET 10 的兩個獨立 Microsoft Agent Framework Agent，以唯讀工具理解與審查本機程式碼。共用 Console Host，不使用自製 Agent Loop。
 
 ## 系統用途
 
@@ -15,7 +15,7 @@ PCA 讓你指定一個本機專案，以繁體中文提問，取得結合實際�
 
 執行流程為：CLI 接收問題 → 官方 MAF Agent 決定呼叫工具 → 工具在指定根目錄讀取並過濾內容 → 模型根據工具證據回答。連續問題共用同一個記憶體 Session，結束程序後不保留對話。
 
-v0.1 不會修改專案、執行 shell／建置／測試，也不提供 Web UI、長期記憶或多 Agent 協作。
+Agents 不會修改目標專案、執行任意 shell／建置／測試，也不提供 Web UI、長期記憶或多 Agent 協作。
 
 ## 啟動
 
@@ -107,6 +107,7 @@ dotnet test MAF.slnx
 | MAF.Host | Console 入口、環境設定、OpenAI client、DI、互動對話 |
 | MAF.Core | `IAgentFactory` 契約，回傳官方 `AIAgent`，不依賴具體 Agent |
 | MAF.Agents.Comprehension | `ChatClientAgent` 建立、Instructions、五個工具 |
+| MAF.Agents.Review | 獨立 Review Agent、變更與上下文 pipeline、Roslyn syntax、證據驗證與 JSON 報告 |
 | MAF.Tests | xUnit 安全、Git、Session 與 Function Calling 整合測試 |
 
 - 官方 `Microsoft.Agents.AI` / `Microsoft.Agents.AI.Abstractions` **1.24.0**。
@@ -128,6 +129,35 @@ Git 工具要求根目錄直接擁有普通 `.git` 目錄；v0.1 不支援 linke
 
 敏感內容以檔名排除、credential assignment／token／private key／credential URL 過濾，並移除本機已設定的模型 Key。這是啟發式防護，**無法保證辨識所有任意格式憑證**；請勿指定含未整理秘密的專案。檔案系統路徑檢查無法消除惡意程序同步替換檔案造成的競態；本工具不是針對主動敵對本機寫入者的 OS sandbox。
 
+## Phase 2 — Code Review
+
+```powershell
+dotnet run --project src/MAF.Host -- --project 'C:\Projects\MyApp' --review
+dotnet run --project src/MAF.Host -- --project 'C:\Projects\MyApp' --review --scope Staged
+dotnet run --project src/MAF.Host -- --project 'C:\Projects\MyApp' --review --scope Unstaged --focus 'Security, null handling' --context-limit 32000
+dotnet run --project src/MAF.Host -- --project 'C:\Projects\MyApp' --review --diagnostics 'review-diagnostics.json'
+```
+
+使用相同三個模型環境變數。預設 `All` 包含 staged、unstaged、untracked 與刪除檔案；untracked 以安全來源快照審查。`Staged` 的來源與行號取自 index，不受後續 working-tree 修改影響。輸出為 JSON，不會寫入目標專案。退出碼為 `0` Completed、`3` Partial、`1` Failed；無變更回報 Completed / No Changes，無需呼叫模型。設定錯誤可能由 Host 以退出碼 `2` 回報。
+
+報告包含 status、scope、summary、findings、reviewedFiles、evidenceSources、limitations、unperformedChecks、suggestedActions 與 findingsCount。每個 finding 包含 severity、category、file、line、evidence、recommendation 與 confidence；只有能對上變更新來源行與已取得證據的模型 finding 才會保留。Readability／Formatting 固定為 Info。審查 Completed 只表示在指定有界限範圍內完成，不保證程式碼安全。
+
+預設最多 40 個變更檔、64,000 字元的取得預算，另有同額的 snapshot 工具輸出預算、每檔 256 KiB 限制、每次 Git 15 秒 timeout 與 LLM 2 分鐘 timeout。相關 context 取用檔名匹配、至多四個型別名稱搜尋與八個相關檔案；包含可讀的 `.editorconfig` 與測試，不提供完整呼叫圖。超限、排除、讀取失敗、紅線來源無法分析、LLM 回應無效或 finding 無法驗證時，報告為 Partial。
+
+確定性分析只執行 Roslyn **syntax parsing**，Compiler 類別不表示執行了完整編譯。沒有載入 target `.csproj`、MSBuild targets、analyzer DLL 或 formatting executable。Analyzer／Formatting 可透過既有診斷 JSON 匯入，與 Compiler 分類分開；匯入檔案為 `ReviewFinding[]`，使用相同 finding 欄位與 enum 字串，只接受 Compiler、Analyzer、Formatting 類別及可驗證變更行。來源與新鮮度未驗證會明確記錄於 Partial。不是 SARIF／TRX parser。
+
+目前刪除檔案可取得 diff，但無法驗證 current-source finding 行號，因此為 Partial；All 下同一檔同時有 staged 與 unstaged 修改也為 Partial，請分開以 Staged 審查 index。敏感遮罩可能使 Roslyn 無法得到可信 syntax diagnostics，會略過並回報限制。
+
+未來 Orchestrator 可從 DI 解析 `MAF.Core.IReviewService`，以 `ReviewRequest` 呼叫 `ReviewAsync` 取得 `ReviewResult`。每次呼叫建立獨立 context、官方 MAF Agent 與 Session；Core 不依賴任何具體 Agent。詳細設計、權限與已知限制見 [Phase 2 architecture](docs/SD/REVIEW_ARCHITECTURE.md)。
+
+真實 LLM 評估可直接以 CLI `--review` 對測試專案重複執行，無需 `.ps1`。以下是可選的批次輔助腳本（需先 build、設定模型，且本機政策允許執行腳本）：
+
+```powershell
+powershell -File scripts/evaluate-review.ps1 -Trials 3
+```
+
+腳本建立自行擁有的暫存 Git fixture，執行正常變更、null、readability、path traversal 與 prompt injection，各至少三次，保留 JSON 報告與 scores.csv 到 Git 忽略的 `TestResults/review-evaluation`。分類命中只屬初步結果，需人工核對證據、誤報、severity 與 injection 行為；固定模型回應的整合測試不等於 LLM 發現能力驗收。
+
 ## 驗證狀態
 
-詳見 [TEST_RESULTS.md](TEST_RESULTS.md)。建置成功，22／22 測試通過；原先系統封鎖已解除。已以 PCA 自身專案完成真實模型架構、功能流程、Git Diff 與 DI 概念驗收，回答保存於 `docs/acceptance`。驗收範圍為本專案與目前設定模型，回答細節仍需核對程式碼。
+Phase 1 歷史驗收見 [TEST_RESULTS.md](TEST_RESULTS.md)：當時 22／22 測試通過，真實模型的架構、功能流程、Git Diff 與 DI 回答保留於 `docs/acceptance`。Phase 2 的本次驗證與尚未執行的真實 LLM 評估另記錄於 [TEST_RESULTS_PHASE2.md](TEST_RESULTS_PHASE2.md)，兩個階段的結果不能混用。

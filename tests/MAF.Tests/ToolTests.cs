@@ -1,3 +1,4 @@
+using MAF.Core.Tools;
 using MAF.Agents.Comprehension;
 using System.Diagnostics;
 
@@ -110,6 +111,16 @@ public sealed class ToolTests : IDisposable
     [InlineData("+-----BEGIN PRIVATE KEY-----\n+hidden\n+-----END PRIVATE KEY-----")]
     [InlineData("-----BEGIN RSA PRIVATE KEY-----\nhidden")]
     public void RedactsDiffPrefixedAndIncompletePem(string content) => Assert.DoesNotContain("hidden", ProjectTools.Redact(content));
+    [Fact]
+    public void RedactionKeepsDiffPrefixesAndSubsequentHunkLocations()
+    {
+        const string diff = "+-----BEGIN PRIVATE KEY-----\n+hidden\n+-----END PRIVATE KEY-----\n+var password = \"hidden\";\n+return value.Length;";
+        var lines = ProjectTools.Redact(diff).Split('\n');
+        Assert.Equal(5, lines.Length);
+        Assert.All(lines, line => Assert.StartsWith("+", line));
+        Assert.DoesNotContain("hidden", string.Join('\n', lines));
+        Assert.Equal("+return value.Length;", lines[4]);
+    }
     public void Dispose()
     {
         // Git objects are read-only on Windows. Only clean this test's owned temporary directory.

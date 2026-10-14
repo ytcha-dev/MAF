@@ -1,3 +1,5 @@
+using MAF.Core.Tools;
+using MAF.Agents.Review;
 using MAF.Agents.Comprehension;
 using MAF.Core;
 using Microsoft.Agents.AI;
@@ -8,7 +10,7 @@ using System.ClientModel;
 
 if (args.Contains("--help") || args.Length == 0)
 {
-    Console.WriteLine("pca --project <directory> [--ask <question>]\nEnvironment: AI_BASE_URL, AI_API_KEY, AI_MODEL\nExit: /exit; reset session: /reset");
+    Console.WriteLine("pca --project <directory> [--ask <question>]\npca --project <directory> --review [--scope All|Staged|Unstaged] [--focus <text>] [--context-limit <characters>] [--diagnostics <relative.json>]\nReview emits JSON; exit codes: 0 Completed, 3 Partial, 1 Failed.\nEnvironment: AI_BASE_URL, AI_API_KEY, AI_MODEL\nExit: /exit; reset session: /reset");
     return 0;
 }
 try
@@ -28,7 +30,25 @@ try
     services.AddSingleton<IChatClient>(client);
     services.AddSingleton(new ProjectTools(project));
     services.AddSingleton<IAgentFactory, ComprehensionAgentFactory>();
+    services.AddSingleton<IReviewService, ReviewService>();
     using var provider = services.BuildServiceProvider();
+    if (args.Contains("--review"))
+    {
+        var scope = args.Contains("--scope") ? Enum.Parse<ReviewScope>(Option("--scope"), ignoreCase: true) : ReviewScope.All;
+        var focus = args.Contains("--focus") ? Option("--focus") : "Correctness, Security, Maintainability, Readability";
+        var limit = args.Contains("--context-limit") ? int.Parse(Option("--context-limit")) : 64000;
+        var diagnostics = args.Contains("--diagnostics") ? Option("--diagnostics") : null;
+        using var reviewStop = new CancellationTokenSource();
+        Console.CancelKeyPress += (_, e) =>
+        {
+            e.Cancel = true;
+            reviewStop.Cancel();
+        };
+        var result = await provider.GetRequiredService<IReviewService>()
+            .ReviewAsync(new(project, scope, focus, limit, DiagnosticsFile: diagnostics), reviewStop.Token);
+        Console.WriteLine(result.ToJson());
+        return result.Status == ReviewStatus.Completed ? 0 : result.Status == ReviewStatus.Partial ? 3 : 1;
+    }
     AIAgent agent = provider.GetRequiredService<IAgentFactory>().Create();
     var tools = provider.GetRequiredService<ProjectTools>();
     var session = await agent.CreateSessionAsync();

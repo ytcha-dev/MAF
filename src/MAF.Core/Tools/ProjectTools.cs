@@ -3,10 +3,10 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace MAF.Agents.Comprehension;
+namespace MAF.Core.Tools;
 
 /// <summary>All model-visible project data passes through this read-only boundary.</summary>
-public sealed class ProjectTools
+public sealed partial class ProjectTools
 {
     public string Root { get; }
     private int successfulCalls;
@@ -50,7 +50,7 @@ public sealed class ProjectTools
         var current = Root;
         RejectLink(Root);
         foreach (var part in parts) { current = Path.Combine(current, part); RejectLink(current); }
-        if (!directory && (!Extensions.Contains(Path.GetExtension(full)) || new FileInfo(full).Length > MaxBytes))
+        if (!directory && (!ReadableExtension(full) || new FileInfo(full).Length > MaxBytes))
             throw new UnauthorizedAccessException("Unsupported or oversized file.");
         return full;
     }
@@ -70,7 +70,7 @@ public sealed class ProjectTools
                 var attributes = File.GetAttributes(path);
                 if (Ignored.Contains(name) || Sensitive(name) || (attributes & FileAttributes.ReparsePoint) != 0) continue;
                 if ((attributes & FileAttributes.Directory) != 0) pending.Push(path);
-                else if (Extensions.Contains(Path.GetExtension(path)) && new FileInfo(path).Length <= MaxBytes)
+                else if (ReadableExtension(path) && new FileInfo(path).Length <= MaxBytes)
                     yield return Path.GetRelativePath(Root, path).Replace('\\', '/');
             }
         }
@@ -82,8 +82,10 @@ public sealed class ProjectTools
         // Preserve newlines so citations after a block retain original source line numbers.
         text = Regex.Replace(text,
             @"(?ims)^[ +\-]?-----BEGIN (?:RSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY-----.*?(?:^[ +\-]?-----END (?:RSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY-----[^\r\n]*|\z)",
-            match => string.Join('\n', Enumerable.Repeat("[REDACTED private key content]", match.Value.Count(c => c == '\n') + 1)));
-        text = Regex.Replace(text, @"(?im)^.*\b(?:api[_-]?key|password|passwd|pwd|(?:client[_-]?)?secret|credential|(?:(?:access|refresh|auth|session)[_-]?)?token|authorization|bearer|connectionstring|accountkey|sig)\s*[""']?\s*[:=].*$", "[REDACTED sensitive line]");
+            match => string.Join('\n', match.Value.Split('\n').Select(line =>
+                (line.Length > 0 && line[0] is '+' or '-' or ' ' ? line[..1] : "") + "[REDACTED private key content]")));
+        text = Regex.Replace(text, @"(?im)^.*\b(?:api[_-]?key|password|passwd|pwd|(?:client[_-]?)?secret|credential|(?:(?:access|refresh|auth|session)[_-]?)?token|authorization|bearer|connectionstring|accountkey|sig)\s*[""']?\s*[:=].*$",
+            match => (match.Value.Length > 0 && match.Value[0] is '+' or '-' or ' ' ? match.Value[..1] : "") + "[REDACTED sensitive line]");
         text = Regex.Replace(text, @"(?i)\b(?:sk-[a-z0-9_-]{8,}|gh[pousr]_[a-z0-9]{10,}|AKIA[A-Z0-9]{16}|eyJ[a-z0-9_-]+\.[a-z0-9_-]+\.[a-z0-9_-]+)\b", "[REDACTED credential]");
         text = Regex.Replace(text, @"(?i)\b(?:https?|postgres(?:ql)?|mysql|mongodb)://[^\s/@]+:[^\s/@]+@", "[REDACTED credential URL]@");
         foreach (var name in new[] { "AI_API_KEY", "AI_BASE_URL" })
@@ -197,7 +199,7 @@ public sealed class ProjectTools
             var file = row[3..];
             if (!readable.Contains(file))
             {
-                if (!row[..2].Contains('D') || Sensitive(Path.GetFileName(file)) || !Extensions.Contains(Path.GetExtension(file))) continue;
+                if (!row[..2].Contains('D') || Sensitive(Path.GetFileName(file)) || !ReadableExtension(file)) continue;
                 try
                 {
                     if (Path.IsPathRooted(file) || file.Contains(':') || file.Split(['/', '\\']).Any(p => p is ".." or "." || Ignored.Contains(p) || Sensitive(p))) continue;
