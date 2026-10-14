@@ -41,10 +41,19 @@ public sealed class ExternalWorkflow(IExternalHarnessClient client, TimeSpan? po
 
     private async Task<ExternalWorkflowRun> ExecuteAsync(ExternalTaskRequest request, CancellationToken cancellationToken)
     {
-        await slots.WaitAsync(cancellationToken);
+        var workflowRunId = Guid.NewGuid().ToString("N");
         try
         {
-            var workflowRunId = Guid.NewGuid().ToString("N");
+            await slots.WaitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            return new(new(request.TaskId, workflowRunId, ExternalExecutionStatus.Cancelled,
+                new(Guid.NewGuid().ToString("N"), client.Provider), "Cancelled before external execution started.",
+                [], [new("CancelledBeforeLaunch", DateTimeOffset.UtcNow)], ErrorCode: "CancelledBeforeLaunch"), []);
+        }
+        try
+        {
             var executor = new OpenCodeExecutor(client, workflowRunId, pollInterval ?? TimeSpan.FromSeconds(1), cancellationToken);
             var workflow = new WorkflowBuilder(executor).WithOutputFrom(executor).Build();
             // Cancellation reaches the provider through the executor; keep the engine alive to emit the typed abort result.

@@ -96,6 +96,19 @@ public sealed class ExternalWorkflowTests
         stop.Cancel();
         Assert.Equal(ExternalExecutionStatus.Cancelled, (await run).Result.Status);
     }
+
+    [Fact]
+    public async Task CancellationBeforeLaunchDoesNotCreateRemoteWork()
+    {
+        var fake = new FakeHarness();
+        using var stop = new CancellationTokenSource();
+        stop.Cancel();
+        var run = await new ExternalWorkflow(fake).RunAsync(Request(), stop.Token);
+        Assert.Equal(ExternalExecutionStatus.Cancelled, run.Result.Status);
+        Assert.False(run.Result.AbortRequested);
+        Assert.Equal(0, fake.Submissions);
+        Assert.Empty(run.WorkflowEvents);
+    }
 }
 
 internal sealed class FakeHarness : IExternalHarnessClient

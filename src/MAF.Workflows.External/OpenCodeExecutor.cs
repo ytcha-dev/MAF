@@ -120,6 +120,10 @@ public sealed class OpenCodeExecutor(IExternalHarnessClient client, string workf
         }
         catch (ExternalHarnessException error)
         {
+            if (error.Handle is not null)
+            {
+                handle = error.Handle;
+            }
             var status = error.Ambiguous || submitted ? ExternalExecutionStatus.Unknown : ExternalExecutionStatus.Failed;
             limitations.Add("Provider operation failed; no automatic POST retry or permission escalation was performed.");
             return Result(status, "External harness request could not complete safely.", error.Code);

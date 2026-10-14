@@ -13,6 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\MAF.Workflows.External\MAF.Workflows.External.csproj" />
     <ProjectReference Include="..\MAF.Agents.Review\MAF.Agents.Review.csproj" />
     <ProjectReference Include="..\MAF.Core\MAF.Core.csproj" />
     <ProjectReference Include="..\MAF.Agents.Comprehension\MAF.Agents.Comprehension.csproj" />

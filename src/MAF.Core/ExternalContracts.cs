@@ -50,8 +50,9 @@ public interface IExternalHarnessClient
     Task<bool> AbortAsync(ExternalExecutionHandle handle, CancellationToken cancellationToken);
 }
 
-public sealed class ExternalHarnessException(string code, bool ambiguous = false) : Exception(code)
+public sealed class ExternalHarnessException(string code, bool ambiguous = false, ExternalExecutionHandle? handle = null) : Exception(code)
 {
     public string Code { get; } = code;
     public bool Ambiguous { get; } = ambiguous;
+    public ExternalExecutionHandle? Handle { get; } = handle;
 }
