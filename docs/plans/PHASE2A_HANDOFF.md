@@ -1,5 +1,7 @@
 # Phase 2A 關機前工作盤點
 
+> 2026-10-15 接續更新：三次真實唯讀委派 Completed，permission 與 cancellation 已驗證；Phase 2A PoC 驗收通過。完整最新結論、失敗紀錄與進入 2B 的限制見 [PHASE2A_RESULTS](../acceptance/PHASE2A_RESULTS.md)。以下保留 2026-10-14 關機時的歷史狀態。
+
 日期：2026-10-14。此文件是接續紀錄，不是完成驗收報告。
 
 ## 已完成

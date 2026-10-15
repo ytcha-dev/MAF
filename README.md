@@ -148,7 +148,7 @@ dotnet run --project src/MAF.Host -- --project 'C:\Projects\MyApp' --review --di
 
 目前刪除檔案可取得 diff，但無法驗證 current-source finding 行號，因此為 Partial；All 下同一檔同時有 staged 與 unstaged 修改也為 Partial，請分開以 Staged 審查 index。敏感遮罩可能使 Roslyn 無法得到可信 syntax diagnostics，會略過並回報限制。
 
-未來 Orchestrator 可從 DI 解析 `MAF.Core.IReviewService`，以 `ReviewRequest` 呼叫 `ReviewAsync` 取得 `ReviewResult`。每次呼叫建立獨立 context、官方 MAF Agent 與 Session；Core 不依賴任何具體 Agent。詳細設計、權限與已知限制見 [Phase 2 architecture](docs/SD/REVIEW_ARCHITECTURE.md)。
+未來 Orchestrator 可從 DI 解析 `MAF.Core.IReviewService`，以 `ReviewRequest` 呼叫 `ReviewAsync` 取得 `ReviewResult`。每次呼叫建立獨立 context、官方 MAF Agent 與 Session；Core 不依賴任何具體 Agent。詳細設計、權限與已知限制見 [Phase 2 architecture](docs/plans/REVIEW_ARCHITECTURE.md)。
 
 真實 LLM 評估可直接以 CLI `--review` 對測試專案重複執行，無需 `.ps1`。以下是可選的批次輔助腳本（需先 build、設定模型，且本機政策允許執行腳本）：
 
@@ -160,4 +160,45 @@ powershell -File scripts/evaluate-review.ps1 -Trials 3
 
 ## 驗證狀態
 
-Phase 1 歷史驗收見 [TEST_RESULTS.md](TEST_RESULTS.md)：當時 22／22 測試通過，真實模型的架構、功能流程、Git Diff 與 DI 回答保留於 `docs/acceptance`。Phase 2 的本次驗證與尚未執行的真實 LLM 評估另記錄於 [TEST_RESULTS_PHASE2.md](TEST_RESULTS_PHASE2.md)，兩個階段的結果不能混用。
+Phase 1 歷史驗收見 [TEST_RESULTS.md](TEST_RESULTS.md)：當時 22／22 測試通過，真實模型的架構、功能流程、Git Diff 與 DI 回答保留於 `docs/acceptance`。Phase 2 的確定性測試及已執行的真實 LLM 評估記錄於 [TEST_RESULTS_PHASE2.md](TEST_RESULTS_PHASE2.md)，兩個階段的結果不能混用。
+
+## Phase 2A — OpenCode 外部 Workflow
+
+執行路徑為 **官方 MAF Workflow → OpenCodeExecutor → OpenCode Server**。這個模式不呼叫 PCA／Review，不需要 Host 的模型設定；模型由 OpenCode 配置。使用者須自行啟動或明確授權啟動 server。本機原生 CLI 範例：`opencode serve --hostname 127.0.0.1 --port 4096`；本公司環境請使用原生 executable，不執行 `.ps1` shim。
+
+先在**獲授權、無機密的拋棄式專案**放入下列 `opencode.json`，並在 OpenCode 設定可用模型。不要在設定檔填入憑證；可使用 OpenCode 支援的程序環境引用。其他專案／全域設定可能影響有效配置，client 會檢查最終 agent 及 session 權限。
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": { "*": "deny", "read": "allow", "glob": "allow", "grep": "allow", "external_directory": "deny" },
+  "agent": {
+    "maf_readonly": {
+      "description": "Approved read-only repository analysis",
+      "mode": "primary",
+      "permission": { "*": "deny", "read": "allow", "glob": "allow", "grep": "allow", "external_directory": "deny" }
+    }
+  },
+  "lsp": false,
+  "formatter": false,
+  "share": "disabled"
+}
+```
+
+在 PowerShell 互動命令列設定本次程序環境並執行（不需要腳本）：
+
+```powershell
+$env:OPENCODE_BASE_URL = 'http://127.0.0.1:4096'
+$env:OPENCODE_ALLOW_LOOPBACK_HTTP = '1'
+$env:OPENCODE_PROJECT_ROOT = 'C:\Temp\approved-fixture'
+$env:OPENCODE_AGENT = 'maf_readonly'
+dotnet run --project src/MAF.Host -- --project $env:OPENCODE_PROJECT_ROOT --external-task 'Read README.md and explain the entry point with filenames.' --external-timeout 120
+```
+
+可選 `OPENCODE_SERVER_USERNAME`／`OPENCODE_SERVER_PASSWORD` 用於已啟用 Basic auth 的 server；不要將密碼放在命令參數、URL 或 Git。Phase 2A 僅允許明確配置的 loopback origin；HTTP 需 opt-in。client 以 deny-by-default session policy 額外排除秘密檔名與 `.git`，不允許 shell、寫入、網路或 subagent 工具。
+
+stdout 是 typed result 與官方 Workflow event 名稱的 JSON，stderr 顯示 graph。退出碼：`0` Completed、`3` Partial、`4` Unknown、`5` WaitingForApproval、`130` Cancelled、`1` Failed；設定錯誤為 `2`。Ctrl+C 會嘗試 remote abort；沒有終態證據時回報 Unknown。WaitingForApproval 不會自動放行。
+
+`--task-id` 可指定程序內的提交識別；相同 TaskId 只共享相同請求，不能當成跨 CLI 程序的去重保證。Unknown 時先檢查結果中的原 ExternalSessionId，切勿盲目重跑。預設 1 秒輪詢、最多 200 次，最多 3 頁各 100 筆 messages、1 MiB HTTP body 與 32,000 字元 summary；超限明確標示限制。artifact／diff、token 與成本尚未收集。
+
+一般 `dotnet test` 不呼叫 OpenCode，live tests 預設略過。真實測試須指定 `MAF_LIVE_OPENCODE=1`、`MAF_OPENCODE_TEST_ROOT`（Temp 下 `maf-phase2a-*` fixture）、`MAF_OPENCODE_RESULTS_DIR`，且明確授權 server／模型與 fixture。詳見 [執行計畫](docs/plans/PHASE2A_EXECUTION_PLAN.md)、[架構決策](docs/architecture/ADR-003_OPENCODE_WORKFLOW_EXECUTOR.md)與[實際驗收紀錄](docs/acceptance/PHASE2A_RESULTS.md)。

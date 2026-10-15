@@ -83,13 +83,21 @@ public sealed class OpenCodeLiveTests
         for (var trial = 1; trial <= 3; trial++)
         {
             var request = new ExternalTaskRequest(Guid.NewGuid().ToString("N"), root,
-                "Read README.md and Program.cs. Summarize the repository structure, name its entry point, and cite both filenames. Do not edit files, run commands, or access other directories.",
-                TimeSpan.FromSeconds(120));
+                "Read README.md and Program.cs. In at most 120 words summarize the repository structure, name its entry point, and cite both filenames. Do not edit files, run commands, or access other directories.",
+                TimeSpan.FromSeconds(180));
             var run = await workflow.RunAsync(request);
             var unchanged = before.OrderBy(pair => pair.Key).SequenceEqual(Hashes(root).OrderBy(pair => pair.Key))
                 && index.SequenceEqual(File.ReadAllBytes(Path.Combine(root, ".git", "index")))
                 && status == await GitStatus(root);
-            Save("read-only-" + trial, new { client.ServerVersion, run, unchanged });
+            Save("read-only-" + trial, new
+            {
+                client.ServerVersion,
+                run,
+                unchanged,
+                sourceHashes = before,
+                indexHash = Convert.ToHexString(SHA256.HashData(index)),
+                gitStatus = status
+            });
             Assert.True(unchanged);
             Assert.Equal(ExternalExecutionStatus.Completed, run.Result.Status);
             Assert.Contains("README.md", run.Result.Summary);
@@ -104,23 +112,48 @@ public sealed class OpenCodeLiveTests
     {
         var root = Root();
         var before = Hashes(root);
+        var indexHash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(root, ".git", "index"))));
+        var status = await GitStatus(root);
         using var http = new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = false });
         var client = new OpenCodeClient(http, Options(root, approval: true));
         var request = new ExternalTaskRequest(Guid.NewGuid().ToString("N"), root,
-            "Use the read tool to read Program.cs before replying. Do not infer its contents. Do not edit or run commands.", TimeSpan.FromSeconds(90));
+            "Use the read tool to read Program.cs before replying. Do not infer its contents. Do not edit or run commands.", TimeSpan.FromSeconds(180));
         var run = await new ExternalWorkflow(client).RunAsync(request);
-        Save("permission", new { run, unchanged = before.OrderBy(pair => pair.Key).SequenceEqual(Hashes(root).OrderBy(pair => pair.Key)) });
         try
         {
+            var unchanged = before.OrderBy(pair => pair.Key).SequenceEqual(Hashes(root).OrderBy(pair => pair.Key))
+                && indexHash == Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(root, ".git", "index"))))
+                && status == await GitStatus(root);
+            Save("permission", new { run, unchanged, sourceHashes = before, indexHash, gitStatus = status });
+            Assert.True(unchanged);
             Assert.Equal(ExternalExecutionStatus.WaitingForApproval, run.Result.Status);
-            Assert.Equal(before.OrderBy(pair => pair.Key), Hashes(root).OrderBy(pair => pair.Key));
         }
         finally
         {
             if (run.Result.Handle.ExternalSessionId is not null)
             {
-                using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-                await client.AbortAsync(run.Result.Handle, cleanup.Token);
+                var acknowledged = false;
+                string? cleanupError = null;
+                var observed = ExternalExecutionStatus.Unknown;
+                using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+                try
+                {
+                    acknowledged = await client.AbortAsync(run.Result.Handle, cleanup.Token);
+                }
+                catch (Exception error) when (error is ExternalHarnessException or OperationCanceledException)
+                {
+                    cleanupError = error is ExternalHarnessException providerError ? providerError.Code : "CleanupTimeout";
+                }
+                using var reconcile = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                try
+                {
+                    observed = (await client.ObserveAsync(run.Result.Handle, reconcile.Token)).Status;
+                }
+                catch (Exception error) when (error is ExternalHarnessException or OperationCanceledException)
+                {
+                    cleanupError ??= error is ExternalHarnessException providerError ? providerError.Code : "ReconcileTimeout";
+                }
+                Save("permission-cleanup", new { run.Result.Handle, abortRequested = true, acknowledged, observed, cleanupError });
             }
         }
     }
@@ -130,6 +163,8 @@ public sealed class OpenCodeLiveTests
     {
         var root = Root();
         var before = Hashes(root);
+        var indexHash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(root, ".git", "index"))));
+        var status = await GitStatus(root);
         using var http = new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = false });
         var client = new OpenCodeClient(http, Options(root));
         var request = new ExternalTaskRequest(Guid.NewGuid().ToString("N"), root,
@@ -143,9 +178,12 @@ public sealed class OpenCodeLiveTests
         }
         stop.Cancel();
         var run = await task;
-        Save("cancellation", new { run, unchanged = before.OrderBy(pair => pair.Key).SequenceEqual(Hashes(root).OrderBy(pair => pair.Key)) });
+        var unchanged = before.OrderBy(pair => pair.Key).SequenceEqual(Hashes(root).OrderBy(pair => pair.Key))
+            && indexHash == Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(root, ".git", "index"))))
+            && status == await GitStatus(root);
+        Save("cancellation", new { run, unchanged, sourceHashes = before, indexHash, gitStatus = status });
         Assert.True(run.Result.AbortRequested);
         Assert.Contains(run.Result.Status, new[] { ExternalExecutionStatus.Cancelled, ExternalExecutionStatus.Unknown, ExternalExecutionStatus.Completed });
-        Assert.Equal(before.OrderBy(pair => pair.Key), Hashes(root).OrderBy(pair => pair.Key));
+        Assert.True(unchanged);
     }
 }

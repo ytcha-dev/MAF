@@ -37,6 +37,46 @@ public sealed class ExternalWorkflowTests
         Assert.NotEqual(results[0].Result.Handle.ExternalSessionId, other.Result.Handle.ExternalSessionId);
     }
 
+    [Fact]
+    public async Task DistinctConcurrentTasksRespectLimitAndKeepSeparateSessions()
+    {
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var twoStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var active = 0;
+        var observed = new ConcurrentBag<int>();
+        var fake = new FakeHarness
+        {
+            BeforeSubmit = async cancellationToken =>
+            {
+                var count = Interlocked.Increment(ref active);
+                observed.Add(count);
+                if (count == 2)
+                {
+                    twoStarted.TrySetResult();
+                }
+                await release.Task.WaitAsync(cancellationToken);
+                Interlocked.Decrement(ref active);
+            }
+        };
+        var workflow = new ExternalWorkflow(fake, TimeSpan.FromMilliseconds(5), maxConcurrency: 2);
+        var tasks = Enumerable.Range(0, 6).Select(index => workflow.RunAsync(Request("parallel-" + index, 5000))).ToArray();
+        try
+        {
+            await twoStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+            Assert.Equal(2, fake.Submissions);
+        }
+        finally
+        {
+            release.TrySetResult();
+        }
+        var runs = await Task.WhenAll(tasks);
+        Assert.Equal(6, fake.Submissions);
+        Assert.All(observed, count => Assert.InRange(count, 1, 2));
+        Assert.All(runs, run => Assert.Equal(ExternalExecutionStatus.Completed, run.Result.Status));
+        Assert.Equal(6, runs.Select(run => run.Result.Handle.ExternalSessionId).Distinct().Count());
+        Assert.Equal(6, runs.Select(run => run.Result.WorkflowRunId).Distinct().Count());
+    }
+
     [Theory]
     [InlineData(ExternalExecutionStatus.WaitingForApproval)]
     [InlineData(ExternalExecutionStatus.Partial)]
@@ -125,6 +165,7 @@ internal sealed class FakeHarness : IExternalHarnessClient
     public bool FailFirstRead { get; init; }
     public bool NeverComplete { get; init; }
     public bool ConfirmAbort { get; init; }
+    public Func<CancellationToken, Task>? BeforeSubmit { get; init; }
     public TaskCompletionSource Submitted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public Task ValidateAsync(ExternalTaskRequest request, CancellationToken cancellationToken)
@@ -140,15 +181,18 @@ internal sealed class FakeHarness : IExternalHarnessClient
         ExternalExecutionHandle handle, CancellationToken cancellationToken)
         => Task.FromResult(handle with { ExternalSessionId = "ses_" + Guid.NewGuid().ToString("N") });
 
-    public Task SubmitAsync(ExternalTaskRequest request, ExternalExecutionHandle handle, CancellationToken cancellationToken)
+    public async Task SubmitAsync(ExternalTaskRequest request, ExternalExecutionHandle handle, CancellationToken cancellationToken)
     {
         Interlocked.Increment(ref Submissions);
         Submitted.TrySetResult();
+        if (BeforeSubmit is not null)
+        {
+            await BeforeSubmit(cancellationToken);
+        }
         if (AmbiguousSubmit)
         {
             throw new ExternalHarnessException("LostSubmitResponse", true);
         }
-        return Task.CompletedTask;
     }
 
     public Task<ExternalObservation> ObserveAsync(ExternalExecutionHandle handle, CancellationToken cancellationToken)
