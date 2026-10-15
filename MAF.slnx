@@ -8,6 +8,7 @@
     <Project Path="src/MAF.Host/MAF.Host.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/MAF.Acceptance/MAF.Acceptance.csproj" />
     <Project Path="tests/MAF.Tests/MAF.Tests.csproj" />
   </Folder>
 </Solution>

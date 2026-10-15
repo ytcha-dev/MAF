@@ -26,15 +26,15 @@ Existing modules:
 - Native PCA (Comprehension) and separate Review service.
 - `MAF.Workflows.External`: official custom Workflow executor and OpenCode API client, read-only and bounded.
 
-**Not yet delivered:** durable cross-process run state, reliable restart recovery, an operator approval interface, authorized write execution, PCA → external harness → Reviewer as one automatic workflow, a connector registry/activation switch, a remote gateway, Hybrid LLM routing, additional production harness adapters, A2A integration. Registry rules below are target requirements; current external-task execution uses explicit approved endpoint/workspace configuration and read-only provider checks, not an implemented registry.
+**Not yet delivered:** an operator approval interface, authorized write execution, PCA → external harness → Reviewer as one automatic workflow, a connector registry/activation switch, a remote gateway, Hybrid LLM routing, additional production harness adapters, A2A integration. Durable cross-process state and same-session recovery are implemented and have controlled home acceptance evidence below. Registry rules remain target requirements; current execution uses explicit approved endpoint/workspace configuration and read-only provider checks.
 
 Known observations: long-running tasks may generate hundreds of HTTP observations; current OpenCode permission cancellation can leave a pending permission even after abort acknowledgment; completed execution does not guarantee accurate repository analysis.
 
-Current boundaries: run mapping/single-flight is in memory (100 retained task identities, default concurrency 2), not cross-process deduplication. The provider is loopback-only with explicit HTTP opt-in, one approved root and read-only permissions; no automatic permission/question replies. Request timeout and remote cancellation differ, and abort acknowledgment alone is not a confirmed terminal state. Harness permissions are not an OS sandbox; redaction is best effort. See [ADR-003](architecture/ADR-003_OPENCODE_WORKFLOW_EXECUTOR.md) and the acceptance report for exact budgets and provider limitations.
+Current boundaries: ephemeral mode keeps in-memory run mapping/single-flight (100 retained identities, default concurrency 2). Opt-in durable mode adds SQLite identity/state and same-machine, same-DB-path OS ownership; copying/changing the DB does not deduplicate. The provider remains loopback-only with explicit HTTP opt-in, one approved root and read-only permissions; no automatic permission/question replies. Timeout and remote cancellation differ; abort acknowledgment is not terminal evidence. Harness permissions are not an OS sandbox; redaction is best effort. See [ADR-003](architecture/ADR-003_OPENCODE_WORKFLOW_EXECUTOR.md) and [ADR-004](architecture/ADR-004_DURABLE_EXECUTION_RECOVERY.md).
 
-Phase 2B-1 implementation progress (2026-10-15): opt-in durable storage/recovery source and offline test cases have been authored, but are **not built, executed or accepted**. The validated baseline above remains Phase 2A. A formal Symantec security event terminated the baseline testhost; build/test/live execution is on hold pending operator authorization and required IT/security clearance. See [security event](acceptance/PHASE2B1_SECURITY_EVENT.md), [pending coverage/results](acceptance/PHASE2B1_RESULTS.md) and [ADR-004](architecture/ADR-004_DURABLE_EXECUTION_RECOVERY.md). Dedicated process-crash/live recovery acceptance runners remain outstanding; do not advance automatically to Phase 2B-2 or Phase 2C.
+Phase 2B-1 home acceptance (2026-10-15): the separately authorized personal environment passed build, 43 focused tests, 155 offline regression cases, six cross-process SQLite checkpoints, seven actual Host-crash fake-provider variants and three live OpenCode 1.19.0 / opencode/big-pickle variants. Same run/execution/session/message IDs survive recovery; each live variant has session/prompt POST counts 1/1 and unchanged source/index/status. See [home results and reliability limits](acceptance/PHASE2B1_HOME_RESULTS.md). This satisfies the bounded home technical gate, not production readiness or corporate compatibility. The [corporate security event](acceptance/PHASE2B1_SECURITY_EVENT.md) and [historical pending results](acceptance/PHASE2B1_RESULTS.md) remain unchanged; corporate execution hold requires its own clearance. Do not advance automatically to Phase 2B-2 or Phase 2C.
 
-Portable preparation only: [Windows validation setup](setup/WINDOWS_VALIDATION_SETUP.md) and [home validation sequence](acceptance/PHASE2B1_HOME_VALIDATION_PLAN.md) document clean-machine dependencies, data-transfer gates and missing acceptance runners. They neither authorize moving corporate material nor lift the corporate execution hold; no home validation results exist yet.
+The [Windows setup](setup/WINDOWS_VALIDATION_SETUP.md) and [original home validation sequence](acceptance/PHASE2B1_HOME_VALIDATION_PLAN.md) retain the preparation-time Pending statuses and runner specifications. Actual home evidence now exists in [PHASE2B1_HOME_RESULTS](acceptance/PHASE2B1_HOME_RESULTS.md), with reproducible [test-only runners](../tests/MAF.Acceptance/README.md). Neither the preparation nor home results authorize corporate material transfer or lift the corporate execution hold.
 
 Historical evidence and reading path:
 
@@ -51,7 +51,7 @@ Retain PCA/Reviewer as educational and regression references for `IChatClient` v
 |---|---|---|---|
 | Phase 1 — Agent fundamentals | Learn native MAF agents and tool boundaries | PCA + independent Reviewer | Evidence-backed selected tests; retain baselines |
 | Phase 2A — External harness proof | Verify whole-task delegation | MAF Workflow → OpenCode read-only | **Passed for controlled local PoC**; see acceptance report |
-| **Phase 2B-1 — Durable execution** | Recover without duplicate submissions | `IExecutionStore` + SQLite pilot + reconciliation | Crash/restart finds same remote session; ambiguous submissions never blindly retried |
+| **Phase 2B-1 — Durable execution** | Recover without duplicate submissions | `IExecutionStore` + SQLite + reconciliation + test-only acceptance runners | Controlled home technical gate passed; same-session/no-extra-POST evidence; corporate clearance separate |
 | **Phase 2B-2 — Policy & approvals** | Trustworthy state / safety transitions | Explicit human approval states; lifecycle cleanup | Pending approvals and cancellation remain honest; default deny |
 | **Phase 2B-3 — Diagnostics & artifacts** | Understand cost, latency, outcome | Correlated trace and trusted provenance | Distinguishable provider calls, model usage where supported, and verified result limits |
 | **Phase 2B-4 — Deterministic multi-agent path** | Join specialists safely | PCA → OpenCode → Reviewer → human gate | Typed handoff and failure boundaries; first read-only, write pilot separately approved |
@@ -165,13 +165,13 @@ This is a future conceptual registry example, **not** an existing `appsettings.j
 
 ### 2B-0 — Feasibility / engineering baseline (short)
 
-**SQLite feasibility portion passed on 2026-10-15:** the [disposable .NET 10 smoke](acceptance/SQLITE_SMOKE_RESULTS.md) created a Temp database, committed one row, reopened it in a separate process, deleted the row and confirmed zero rows in another process. The project/database were removed. Remaining baseline/API confirmation must precede any separately authorized 2B implementation; no store was added to MAF.
+**Historical SQLite feasibility smoke passed on 2026-10-15:** the [disposable .NET 10 smoke](acceptance/SQLITE_SMOKE_RESULTS.md) created a Temp database, committed one row, reopened it in a separate process, deleted the row and confirmed zero rows in another process. That throwaway project/database were removed; no store was added by the smoke itself. The subsequent authorized implementation and home acceptance are recorded above. Corporate baseline/API/endpoint clearance remains separate.
 
 - Confirm `Microsoft.Data.Sqlite` package and native library work under company-managed Windows app-control policies on a throwaway fixture; no admin install or policy bypass.
 - Confirm current code/tests, record actual OpenCode API and version, save controlled baseline.
 - If SQLite native package is blocked, pause and choose an approved alternative. Do **not** redirect internal task data to personal Supabase simply to bypass local restrictions.
 
-### 2B-1 — Durable execution and restart reconciliation (next implementation)
+### 2B-1 — Durable execution and restart reconciliation (implemented; controlled home gate passed)
 
 - Add a small `IExecutionStore` contract with a SQLite implementation. Store stable TaskId, workflow/execution/session/message IDs, request digest, submission phase, status, timestamps, and concurrency/lease metadata as warranted.
 - Serialize durable state transitions around side effects. Before submit, persist submission intent and correlation identifier; after remote response, persist observable result. Recognize the **uncertain POST window**; local transactions cannot make a remote POST exactly-once.
@@ -270,4 +270,4 @@ ADR-001/002 are decision-log entries; no standalone files currently exist. ADR-0
 
 ### Immediate next action
 
-**SQLite feasibility smoke is complete; reconcile the remaining Phase 2B-0 baseline before separately authorized Phase 2B-1 durable mapping / restart recovery.** Connector architecture is planned now; registry implementation is Phase 2C, after safe execution and approval foundations. This documentation update implements neither Phase 2B nor the registry and does not authorize write-enabled or live external runs.
+**Phase 2B-1 controlled home technical acceptance is complete within the documented reliability boundary.** Corporate endpoint clearance remains separate. Phase 2B-2 policy/approval/cancellation is the next owner decision, not started by this acceptance work. Connector Registry remains Phase 2C; no write-enabled execution or new provider is authorized by this roadmap.

@@ -1,5 +1,7 @@
 # Phase 2B-1：個人 Windows 驗證計畫（未執行）
 
+後續狀態：本檔保留原準備計畫與當時 Pending 標記；2026-10-15 家用實測及 runner 完成情況以 [HOME_RESULTS](PHASE2B1_HOME_RESULTS.md) 為準。這不解除公司 execution hold。
+
 日期：2026-10-15。Implementation baseline：`95c963205b742de21cb302f9fea02041921501f5`。本計畫只準備 handoff；**沒有個人機器實測結果，也沒有解除公司 execution hold**。安裝／變數／可執行命令見 [Windows setup](../setup/WINDOWS_VALIDATION_SETUP.md)。
 
 ## Gate 0：授權、來源與證據範圍

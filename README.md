@@ -2,7 +2,7 @@
 
 C# / .NET 10 的兩個獨立 Microsoft Agent Framework Agent，以唯讀工具理解與審查本機程式碼。共用 Console Host，不使用自製 Agent Loop。
 
-目前已完成 Phase 2A 的受控本機唯讀 OpenCode Workflow PoC 與 CLI 輸出改善；原生 PCA／Review 保留為基線。後續階段以 [Roadmap v0.2](docs/ROADMAP.md) 為準：SQLite [基本可行性 smoke](docs/acceptance/SQLITE_SMOKE_RESULTS.md) 已通過，尚需核對其餘 Phase 2B-0 基線；Phase 2B-1 持久化／重啟對帳與 Phase 2C Connector Registry 仍是規劃，未實作。完整證據與限制見 [Phase 2A 驗收](docs/acceptance/PHASE2A_RESULTS.md)。
+已完成 Phase 2A 唯讀 OpenCode Workflow PoC 與 Phase 2B-1 持久化／重啟對帳實作。另行授權的家用 Windows 驗證已涵蓋 build、155 個離線測試、跨程序 SQLite／Host crash，以及 OpenCode 1.19.0 免費模型的 same-session recovery；證據與限制見 [家用驗收](docs/acceptance/PHASE2B1_HOME_RESULTS.md)。這不解除公司端安全事件的 execution hold。原生 PCA／Review 保留為基線；Phase 2B-2 與 Phase 2C 尚未開始，後續依 [Roadmap v0.2](docs/ROADMAP.md)。
 
 ## 系統用途
 
@@ -213,9 +213,9 @@ stdout 是 typed result 與官方 Workflow event 名稱的 JSON，stderr 顯示 
 
 一般 `dotnet test` 不呼叫 OpenCode，live tests 預設略過。真實測試須指定 `MAF_LIVE_OPENCODE=1`、`MAF_OPENCODE_TEST_ROOT`（Temp 下 `maf-phase2a-*` fixture）、`MAF_OPENCODE_RESULTS_DIR`，且明確授權 server／模型與 fixture。詳見 [執行計畫](docs/plans/PHASE2A_EXECUTION_PLAN.md)、[架構決策](docs/architecture/ADR-003_OPENCODE_WORKFLOW_EXECUTOR.md)與[實際驗收紀錄](docs/acceptance/PHASE2A_RESULTS.md)。
 
-## Phase 2B-1 — Durable execution（未驗證）
+## Phase 2B-1 — Durable execution（家用受控驗收）
 
-**2026-10-15 Symantec 正式事件後，build／restore／自動測試／Live Test 全部暫停。以下僅為安全 clearance 後的使用說明，不是目前的執行授權。** 新增程式與 fake／SQLite 測試尚未編譯或執行；不能宣稱 Phase 2B-1 已驗收。見 [安全事件](docs/acceptance/PHASE2B1_SECURITY_EVENT.md)、[待驗證結果與 coverage matrix](docs/acceptance/PHASE2B1_RESULTS.md)、[ADR-004](docs/architecture/ADR-004_DURABLE_EXECUTION_RECOVERY.md)。
+家用環境在 owner 另行授權下完成 build、離線 regression、真實 OS process crash／SQLite 檢查與 synthetic-only live recovery。詳見 [實際家用結果](docs/acceptance/PHASE2B1_HOME_RESULTS.md) 與 [ADR-004](docs/architecture/ADR-004_DURABLE_EXECUTION_RECOVERY.md)。**公司端仍受原 Symantec 事件 hold 約束；家用結果不代表公司 endpoint compatibility clearance。** [公司端歷史結果](docs/acceptance/PHASE2B1_RESULTS.md) 與 [安全事件](docs/acceptance/PHASE2B1_SECURITY_EVENT.md) 保留原紀錄。
 
 透過 `--execution-db <absolute-local-file>` 或 `MAF_EXECUTION_DB` 明確啟用 durable service；不設定時保留 Phase 2A ephemeral 路徑。DB 必須位於獲准的本機持久資料目錄，**不可放 Temp、目標 source repo 或任何 Git/SVN repo**；Host 拒絕 network drive、已知 reparse point。以下路徑是使用範例，實際位置由 operator／IT 核准，不會自動設定 ACL 或安全排除。
 
@@ -235,6 +235,6 @@ Durable 模式先保存穩定 run/execution/message IDs、session ID 與提交�
 
 本機 DB 只存 identity、fingerprint、state、timestamps 與固定診斷，**不存 prompt、完整結果或 tool transcript**。重新讀摘要仍依賴 OpenCode 保留原 session/message；沒有 provider 證據就回 Unknown，不能從本機生成答案。資料庫旁 `.locks` 是空的 ownership files；持有中的 OS handle 防止同機、同 DB 的相同 TaskId 並行提交，程序結束後釋放 handle，不需自動刪鎖檔。
 
-尚待驗證：新 dependency graph／vulnerability audit、build、離線 regression、真實 process crash／SQLite recovery，以及 OpenCode active Host restart／provider outage 後恢復與 fixture 不變。新 dedicated live／separate-process acceptance runner 尚缺，既有 Phase 2A live tests 不能取代。
+獨立的 [test-only acceptance runner](tests/MAF.Acceptance/README.md) 驗證六個 SQLite commit checkpoint、七個 controlled-provider Host crash 情境，以及三個真 OpenCode 情境。Live request counter 位於 test-owned loopback proxy；outage 是 Host→OpenCode 的受控 503，不是模型供應商 outage。僅驗證所列本機單 DB／版本／情境，不宣稱 power-loss、distributed exactly-once 或任意 provider 相容。
 
-另行授權的個人 Windows 環境準備見 [Windows validation setup](docs/setup/WINDOWS_VALIDATION_SETUP.md) 與 [Phase 2B-1 home validation plan](docs/acceptance/PHASE2B1_HOME_VALIDATION_PLAN.md)。文件含實際 dependency matrix、安裝／preflight checklist、Stage A–E 與尚缺的 runner 規格；不是公司程式／資料移轉授權，也不解除公司 execution hold。本次只有文件準備，沒有執行個人環境驗收。
+個人 Windows 準備流程見 [Windows validation setup](docs/setup/WINDOWS_VALIDATION_SETUP.md) 與 [原始家用驗證計畫](docs/acceptance/PHASE2B1_HOME_VALIDATION_PLAN.md)；其中 Pending／missing runner 是準備時的歷史狀態，最新實測以 [家用結果](docs/acceptance/PHASE2B1_HOME_RESULTS.md) 為準。沒有自動開始 Phase 2B-2 或 Connector Registry。

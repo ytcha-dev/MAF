@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Compile Include="../MAF.Acceptance/OpenCodeLauncher.cs" Link="Acceptance/OpenCodeLauncher.cs" />
   </ItemGroup>
 
   <ItemGroup>

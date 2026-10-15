@@ -1,6 +1,6 @@
 # ADR-004：本機 durable execution 與明確 recovery
 
-日期：2026-10-15。狀態：**實作與測試原始碼已撰寫，未 build／未執行驗證；決策待驗證及 owner 接受**。安全事件後的靜態開發不代表 Phase 2B-1 已驗收。
+日期：2026-10-15。狀態：**實作保留；另行授權的受控家用 technical gate 已驗證，待 owner 接受；公司 endpoint clearance 仍未解除。** 下文「尚未驗證／暫停」保留最初公司事件後的決策背景；最新執行證據見文末補記。
 
 ## 範圍與依據
 
@@ -58,3 +58,13 @@ TaskId 對應 DB 旁 `.locks/<SHA256(TaskId)>.lock`，FileShare.None，空內容
 Fake provider 與 temporary SQLite 測試已撰寫，包括新 service/store、fault injection、post response loss、並行 TaskId、錯誤 transition、provider outage、waiting/cancellation、敏感內容排除、future schema rejection；不能將 exception injection 當成真的 process crash。Separate-process crash、live restart、source/index/status unchanged，以及真實 provider unavailable/recovery **未實作驗收 runner、未執行**，須取得安全許可後補足。
 
 實際證據／限制見 [results](../acceptance/PHASE2B1_RESULTS.md)、[security event](../acceptance/PHASE2B1_SECURITY_EVENT.md)。所有新增程式的編譯、API 相容性、native dependency loading、concurrency 及 durable guarantees 仍待執行驗證。
+
+## 家用驗證補記（2026-10-15）
+
+另行授權的家用執行已完成 build、155 個 offline tests、六個 cross-process SQLite checkpoints、七個 actual Host crash controlled-provider variants，及三個 OpenCode 1.19.0／免費 opencode/big-pickle live variants。Production contracts、transition rules、policy checks 與實作未因測試修改。詳見 [home results](../acceptance/PHASE2B1_HOME_RESULTS.md) 與 [test-only runner](../../tests/MAF.Acceptance/README.md)。
+
+Live request accounting 採 test-owned transparent loopback forwarder；每個 session/prompt POST 僅 forward 一次，不改寫 policy/body、不記錄 headers/transcripts。503 gate 模擬 Host→OpenCode 不可用，scope不變，真實 server 與原 session 保留。這不是模型服務 outage 的證據，也不是新的 production adapter。
+
+環境限制：MSIX 下 AppData 可能由 native OpenCode 與 .NET 解析為不同位置，既有 scope validation 會拒絕。測試改用普通非 AppData local directory，沒有放寬安全驗證。隔離 XDG data 使用既有 cache allowlist 支援的 `.local/share/opencode/tool-output` layout；其他 cache layout 仍可能被保守拒絕。OpenCode 缺 `$schema` 時會自行補寫 config；第一次完整 manifest check 捕捉並判失敗，保留原 fixture，新 fixture 自建立即提供 schema。這些相容性條件應保留在可攜驗證準備中。
+
+仍不保證 power-loss durability、distributed ownership、remote exactly-once、任意 provider/version、模型服務失聯後本身持續執行或公司安全相容。公司歷史事件文件未修改；本次不實作 Phase 2B-2。

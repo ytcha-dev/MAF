@@ -1,0 +1,1072 @@
+{
+  "sourceRevision": "676350c plus test-only changes in this commit",
+  "processRun": "process-final-20261015",
+  "liveRun": "live-final-20261015",
+  "process": [
+    {
+      "stage": "C",
+      "checkpoint": "Created",
+      "writer": {
+        "pid": 53288,
+        "startTimeUtc": "2026-10-15T15:19:28.9164638Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Acceptance.dll"
+      },
+      "reader": {
+        "pid": 55844,
+        "startTimeUtc": "2026-10-15T15:19:29.2386361Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Acceptance.dll"
+      },
+      "snapshot": {
+        "taskId": "synthetic-task",
+        "requestFingerprint": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "providerScope": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+        "workflowRunId": "synthetic-run",
+        "handle": {
+          "executionId": "synthetic-execution",
+          "provider": "OpenCode",
+          "externalSessionId": null,
+          "externalRequestId": "msg_synthetic"
+        },
+        "state": "Created",
+        "submissionPhase": "None",
+        "version": 0,
+        "updatedAt": "2026-10-15T23:19:28.9744502+08:00",
+        "errorCode": null
+      },
+      "integrity": "ok",
+      "schema": 1,
+      "rowCount": 1,
+      "consistentRows": 1,
+      "sqliteVersion": "3.53.4",
+      "exclusive": true,
+      "releasedAfterKill": true,
+      "outcome": "Passed"
+    },
+    {
+      "stage": "C",
+      "checkpoint": "SessionCreating",
+      "writer": {
+        "pid": 52096,
+        "startTimeUtc": "2026-10-15T15:19:29.3973193Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Acceptance.dll"
+      },
+      "reader": {
+        "pid": 54016,
+        "startTimeUtc": "2026-10-15T15:19:29.6635233Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Acceptance.dll"
+      },
+      "snapshot": {
+        "taskId": "synthetic-task",
+        "requestFingerprint": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "providerScope": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+        "workflowRunId": "synthetic-run",
+        "handle": {
+          "executionId": "synthetic-execution",
+          "provider": "OpenCode",
+          "externalSessionId": null,
+          "externalRequestId": "msg_synthetic"
+        },
+        "state": "SessionCreating",
+        "submissionPhase": "SessionCreationIntended",
+        "version": 1,
+        "updatedAt": "2026-10-15T23:19:29.5239846+08:00",
+        "errorCode": null
+      },
+      "integrity": "ok",
+      "schema": 1,
+      "rowCount": 1,
+      "consistentRows": 1,
+      "sqliteVersion": "3.53.4",
+      "exclusive": true,
+      "releasedAfterKill": true,
+      "outcome": "Passed"
+    },
+    {
+      "stage": "C",
+      "checkpoint": "ReadyToSubmit",
+      "writer": {
+        "pid": 35680,
+        "startTimeUtc": "2026-10-15T15:19:29.802771Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Acceptance.dll"
+      },
+      "reader": {
+        "pid": 55160,
+        "startTimeUtc": "2026-10-15T15:19:30.0625107Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Acceptance.dll"
+      },
+      "snapshot": {
+        "taskId": "synthetic-task",
+        "requestFingerprint": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "providerScope": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+        "workflowRunId": "synthetic-run",
+        "handle": {
+          "executionId": "synthetic-execution",
+          "provider": "OpenCode",
+          "externalSessionId": "ses_synthetic",
+          "externalRequestId": "msg_synthetic"
+        },
+        "state": "ReadyToSubmit",
+        "submissionPhase": "SessionKnown",
+        "version": 2,
+        "updatedAt": "2026-10-15T23:19:29.9324715+08:00",
+        "errorCode": null
+      },
+      "integrity": "ok",
+      "schema": 1,
+      "rowCount": 1,
+      "consistentRows": 1,
+      "sqliteVersion": "3.53.4",
+      "exclusive": true,
+      "releasedAfterKill": true,
+      "outcome": "Passed"
+    },
+    {
+      "stage": "C",
+      "checkpoint": "SubmissionIntended",
+      "writer": {
+        "pid": 55596,
+        "startTimeUtc": "2026-10-15T15:19:30.2000772Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Acceptance.dll"
+      },
+      "reader": {
+        "pid": 2584,
+        "startTimeUtc": "2026-10-15T15:19:30.4742964Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Acceptance.dll"
+      },
+      "snapshot": {
+        "taskId": "synthetic-task",
+        "requestFingerprint": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "providerScope": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+        "workflowRunId": "synthetic-run",
+        "handle": {
+          "executionId": "synthetic-execution",
+          "provider": "OpenCode",
+          "externalSessionId": "ses_synthetic",
+          "externalRequestId": "msg_synthetic"
+        },
+        "state": "SubmissionIntended",
+        "submissionPhase": "PromptIntended",
+        "version": 3,
+        "updatedAt": "2026-10-15T23:19:30.3374536+08:00",
+        "errorCode": null
+      },
+      "integrity": "ok",
+      "schema": 1,
+      "rowCount": 1,
+      "consistentRows": 1,
+      "sqliteVersion": "3.53.4",
+      "exclusive": true,
+      "releasedAfterKill": true,
+      "outcome": "Passed"
+    },
+    {
+      "stage": "C",
+      "checkpoint": "Running",
+      "writer": {
+        "pid": 56028,
+        "startTimeUtc": "2026-10-15T15:19:30.6151228Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Acceptance.dll"
+      },
+      "reader": {
+        "pid": 48016,
+        "startTimeUtc": "2026-10-15T15:19:30.8876476Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Acceptance.dll"
+      },
+      "snapshot": {
+        "taskId": "synthetic-task",
+        "requestFingerprint": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "providerScope": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+        "workflowRunId": "synthetic-run",
+        "handle": {
+          "executionId": "synthetic-execution",
+          "provider": "OpenCode",
+          "externalSessionId": "ses_synthetic",
+          "externalRequestId": "msg_synthetic"
+        },
+        "state": "Running",
+        "submissionPhase": "Acknowledged",
+        "version": 4,
+        "updatedAt": "2026-10-15T23:19:30.7536748+08:00",
+        "errorCode": null
+      },
+      "integrity": "ok",
+      "schema": 1,
+      "rowCount": 1,
+      "consistentRows": 1,
+      "sqliteVersion": "3.53.4",
+      "exclusive": true,
+      "releasedAfterKill": true,
+      "outcome": "Passed"
+    },
+    {
+      "stage": "C",
+      "checkpoint": "Completed",
+      "writer": {
+        "pid": 55272,
+        "startTimeUtc": "2026-10-15T15:19:31.0348279Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Acceptance.dll"
+      },
+      "reader": {
+        "pid": 54140,
+        "startTimeUtc": "2026-10-15T15:19:31.3153263Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Acceptance.dll"
+      },
+      "snapshot": {
+        "taskId": "synthetic-task",
+        "requestFingerprint": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "providerScope": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+        "workflowRunId": "synthetic-run",
+        "handle": {
+          "executionId": "synthetic-execution",
+          "provider": "OpenCode",
+          "externalSessionId": "ses_synthetic",
+          "externalRequestId": "msg_synthetic"
+        },
+        "state": "Completed",
+        "submissionPhase": "Acknowledged",
+        "version": 5,
+        "updatedAt": "2026-10-15T23:19:31.179953+08:00",
+        "errorCode": null
+      },
+      "integrity": "ok",
+      "schema": 1,
+      "rowCount": 1,
+      "consistentRows": 1,
+      "sqliteVersion": "3.53.4",
+      "exclusive": true,
+      "releasedAfterKill": true,
+      "outcome": "Passed"
+    },
+    {
+      "stage": "D",
+      "variant": "active",
+      "original": {
+        "pid": 22376,
+        "startTimeUtc": "2026-10-15T15:19:31.4743215Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Host.dll"
+      },
+      "recovered": {
+        "pid": 49616,
+        "startTimeUtc": "2026-10-15T15:19:31.7848603Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Host.dll"
+      },
+      "checkpoint": {
+        "taskId": "synthetic-task",
+        "requestFingerprint": "B9F49894F37C87DBD704FB9EF10BEB98AC4C435B7AF94A7CFAA0993A7766374D",
+        "providerScope": "4BE7E5EB23FBB6C432E5A3C305720B22AE6458CCADC220E62D3ADF7883CCFED7",
+        "workflowRunId": "0fb816703b5d4dec8ebdd4a361d1dbd1",
+        "handle": {
+          "executionId": "3b7431795f0d4407b6bf219679f70780",
+          "provider": "OpenCode",
+          "externalSessionId": "ses_controlled",
+          "externalRequestId": "msg_01a14025a62450f7923e21d3"
+        },
+        "state": "Running",
+        "submissionPhase": "Acknowledged",
+        "version": 4,
+        "updatedAt": "2026-10-15T23:19:31.76923+08:00",
+        "errorCode": null
+      },
+      "recoveredSnapshot": {
+        "taskId": "synthetic-task",
+        "requestFingerprint": "B9F49894F37C87DBD704FB9EF10BEB98AC4C435B7AF94A7CFAA0993A7766374D",
+        "providerScope": "4BE7E5EB23FBB6C432E5A3C305720B22AE6458CCADC220E62D3ADF7883CCFED7",
+        "workflowRunId": "0fb816703b5d4dec8ebdd4a361d1dbd1",
+        "handle": {
+          "executionId": "3b7431795f0d4407b6bf219679f70780",
+          "provider": "OpenCode",
+          "externalSessionId": "ses_controlled",
+          "externalRequestId": "msg_01a14025a62450f7923e21d3"
+        },
+        "state": "Completed",
+        "submissionPhase": "Acknowledged",
+        "version": 6,
+        "updatedAt": "2026-10-15T23:19:33.0534645+08:00",
+        "errorCode": null
+      },
+      "status": "Completed",
+      "exit": 0,
+      "countersBefore": {
+        "sessions": 1,
+        "prompts": 1
+      },
+      "countersAfter": {
+        "sessions": 1,
+        "prompts": 1,
+        "aborts": 0
+      },
+      "subsequent": null,
+      "integrity": "ok",
+      "rowCount": 1,
+      "outcome": "Passed"
+    },
+    {
+      "stage": "D",
+      "variant": "lost-response",
+      "original": {
+        "pid": 7972,
+        "startTimeUtc": "2026-10-15T15:19:33.2432042Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Host.dll"
+      },
+      "recovered": {
+        "pid": 46284,
+        "startTimeUtc": "2026-10-15T15:19:33.5161025Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Host.dll"
+      },
+      "checkpoint": {
+        "taskId": "synthetic-task",
+        "requestFingerprint": "B9F49894F37C87DBD704FB9EF10BEB98AC4C435B7AF94A7CFAA0993A7766374D",
+        "providerScope": "8FC35E8366B91D6E30347DBDD0CD5627DA3E968EBF56926ECACABE791F120EC6",
+        "workflowRunId": "ef26061715e9420c81a00014b3ade194",
+        "handle": {
+          "executionId": "55abcd6ea59c435b87778b7add4fadcd",
+          "provider": "OpenCode",
+          "externalSessionId": "ses_controlled",
+          "externalRequestId": "msg_01a14025ad1337a0a0cd99fc"
+        },
+        "state": "SubmissionIntended",
+        "submissionPhase": "PromptIntended",
+        "version": 3,
+        "updatedAt": "2026-10-15T23:19:33.5034156+08:00",
+        "errorCode": null
+      },
+      "recoveredSnapshot": {
+        "taskId": "synthetic-task",
+        "requestFingerprint": "B9F49894F37C87DBD704FB9EF10BEB98AC4C435B7AF94A7CFAA0993A7766374D",
+        "providerScope": "8FC35E8366B91D6E30347DBDD0CD5627DA3E968EBF56926ECACABE791F120EC6",
+        "workflowRunId": "ef26061715e9420c81a00014b3ade194",
+        "handle": {
+          "executionId": "55abcd6ea59c435b87778b7add4fadcd",
+          "provider": "OpenCode",
+          "externalSessionId": "ses_controlled",
+          "externalRequestId": "msg_01a14025ad1337a0a0cd99fc"
+        },
+        "state": "Completed",
+        "submissionPhase": "PromptIntended",
+        "version": 5,
+        "updatedAt": "2026-10-15T23:19:34.7775577+08:00",
+        "errorCode": null
+      },
+      "status": "Completed",
+      "exit": 0,
+      "countersBefore": {
+        "sessions": 1,
+        "prompts": 1
+      },
+      "countersAfter": {
+        "sessions": 1,
+        "prompts": 1,
+        "aborts": 0
+      },
+      "subsequent": null,
+      "integrity": "ok",
+      "rowCount": 1,
+      "outcome": "Passed"
+    },
+    {
+      "stage": "D",
+      "variant": "unavailable",
+      "original": {
+        "pid": 48536,
+        "startTimeUtc": "2026-10-15T15:19:34.9617129Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Host.dll"
+      },
+      "recovered": {
+        "pid": 47956,
+        "startTimeUtc": "2026-10-15T15:19:35.2612546Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Host.dll"
+      },
+      "checkpoint": {
+        "taskId": "synthetic-task",
+        "requestFingerprint": "B9F49894F37C87DBD704FB9EF10BEB98AC4C435B7AF94A7CFAA0993A7766374D",
+        "providerScope": "E82E5D8DF1A8EAD567E06F5D42ACEF44817B75C24EF6A2C8421F1A22D58ABFA5",
+        "workflowRunId": "02481aa7598048108f980c275b3174b8",
+        "handle": {
+          "executionId": "668b5ff883c74bbd88cc4834ee1f18a5",
+          "provider": "OpenCode",
+          "externalSessionId": "ses_controlled",
+          "externalRequestId": "msg_01a14025b3c6e57e88ec71d0"
+        },
+        "state": "Running",
+        "submissionPhase": "Acknowledged",
+        "version": 5,
+        "updatedAt": "2026-10-15T23:19:35.2388137+08:00",
+        "errorCode": null
+      },
+      "recoveredSnapshot": {
+        "taskId": "synthetic-task",
+        "requestFingerprint": "B9F49894F37C87DBD704FB9EF10BEB98AC4C435B7AF94A7CFAA0993A7766374D",
+        "providerScope": "E82E5D8DF1A8EAD567E06F5D42ACEF44817B75C24EF6A2C8421F1A22D58ABFA5",
+        "workflowRunId": "02481aa7598048108f980c275b3174b8",
+        "handle": {
+          "executionId": "668b5ff883c74bbd88cc4834ee1f18a5",
+          "provider": "OpenCode",
+          "externalSessionId": "ses_controlled",
+          "externalRequestId": "msg_01a14025b3c6e57e88ec71d0"
+        },
+        "state": "Completed",
+        "submissionPhase": "Acknowledged",
+        "version": 7,
+        "updatedAt": "2026-10-15T23:19:35.722394+08:00",
+        "errorCode": null
+      },
+      "status": "Unknown",
+      "exit": 4,
+      "countersBefore": {
+        "sessions": 1,
+        "prompts": 1
+      },
+      "countersAfter": {
+        "sessions": 1,
+        "prompts": 1,
+        "aborts": 0
+      },
+      "subsequent": {
+        "process": {
+          "pid": 51604,
+          "startTimeUtc": "2026-10-15T15:19:35.483364Z",
+          "executable": "dotnet.exe",
+          "argumentTarget": "MAF.Host.dll"
+        },
+        "status": "Completed"
+      },
+      "integrity": "ok",
+      "rowCount": 1,
+      "outcome": "Passed"
+    },
+    {
+      "stage": "D",
+      "variant": "completed-while-stopped",
+      "original": {
+        "pid": 31748,
+        "startTimeUtc": "2026-10-15T15:19:35.9065837Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Host.dll"
+      },
+      "recovered": {
+        "pid": 54936,
+        "startTimeUtc": "2026-10-15T15:19:36.1977702Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Host.dll"
+      },
+      "checkpoint": {
+        "taskId": "synthetic-task",
+        "requestFingerprint": "B9F49894F37C87DBD704FB9EF10BEB98AC4C435B7AF94A7CFAA0993A7766374D",
+        "providerScope": "C9B1E422C069C1F05AC6EF7B4E893FA81D217D0F6686CE4BA503B1AF5A59BF5E",
+        "workflowRunId": "6139ffa1db25421e819669e1bc214c1a",
+        "handle": {
+          "executionId": "b465d2d307094030a11d8fc2b4b1135d",
+          "provider": "OpenCode",
+          "externalSessionId": "ses_controlled",
+          "externalRequestId": "msg_01a14025b77096ce33a535f1"
+        },
+        "state": "Running",
+        "submissionPhase": "Acknowledged",
+        "version": 5,
+        "updatedAt": "2026-10-15T23:19:36.1739969+08:00",
+        "errorCode": null
+      },
+      "recoveredSnapshot": {
+        "taskId": "synthetic-task",
+        "requestFingerprint": "B9F49894F37C87DBD704FB9EF10BEB98AC4C435B7AF94A7CFAA0993A7766374D",
+        "providerScope": "C9B1E422C069C1F05AC6EF7B4E893FA81D217D0F6686CE4BA503B1AF5A59BF5E",
+        "workflowRunId": "6139ffa1db25421e819669e1bc214c1a",
+        "handle": {
+          "executionId": "b465d2d307094030a11d8fc2b4b1135d",
+          "provider": "OpenCode",
+          "externalSessionId": "ses_controlled",
+          "externalRequestId": "msg_01a14025b77096ce33a535f1"
+        },
+        "state": "Completed",
+        "submissionPhase": "Acknowledged",
+        "version": 6,
+        "updatedAt": "2026-10-15T23:19:36.4321625+08:00",
+        "errorCode": null
+      },
+      "status": "Completed",
+      "exit": 0,
+      "countersBefore": {
+        "sessions": 1,
+        "prompts": 1
+      },
+      "countersAfter": {
+        "sessions": 1,
+        "prompts": 1,
+        "aborts": 0
+      },
+      "subsequent": null,
+      "integrity": "ok",
+      "rowCount": 1,
+      "outcome": "Passed"
+    },
+    {
+      "stage": "D",
+      "variant": "running",
+      "original": {
+        "pid": 45352,
+        "startTimeUtc": "2026-10-15T15:19:36.6174289Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Host.dll"
+      },
+      "recovered": {
+        "pid": 49192,
+        "startTimeUtc": "2026-10-15T15:19:36.9100318Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Host.dll"
+      },
+      "checkpoint": {
+        "taskId": "synthetic-task",
+        "requestFingerprint": "B9F49894F37C87DBD704FB9EF10BEB98AC4C435B7AF94A7CFAA0993A7766374D",
+        "providerScope": "7815C9F46A65DDCFDCE433B4CC85ADBD2CFF9893F44E7C96559A9032BFF531EE",
+        "workflowRunId": "1d0e4692a35846d6aadc1d99e94f4b04",
+        "handle": {
+          "executionId": "34fef570f870479a99fdbd1093694a24",
+          "provider": "OpenCode",
+          "externalSessionId": "ses_controlled",
+          "externalRequestId": "msg_01a14025ba3a256a6267dc06"
+        },
+        "state": "Running",
+        "submissionPhase": "Acknowledged",
+        "version": 5,
+        "updatedAt": "2026-10-15T23:19:36.8924715+08:00",
+        "errorCode": null
+      },
+      "recoveredSnapshot": {
+        "taskId": "synthetic-task",
+        "requestFingerprint": "B9F49894F37C87DBD704FB9EF10BEB98AC4C435B7AF94A7CFAA0993A7766374D",
+        "providerScope": "7815C9F46A65DDCFDCE433B4CC85ADBD2CFF9893F44E7C96559A9032BFF531EE",
+        "workflowRunId": "1d0e4692a35846d6aadc1d99e94f4b04",
+        "handle": {
+          "executionId": "34fef570f870479a99fdbd1093694a24",
+          "provider": "OpenCode",
+          "externalSessionId": "ses_controlled",
+          "externalRequestId": "msg_01a14025ba3a256a6267dc06"
+        },
+        "state": "Completed",
+        "submissionPhase": "Acknowledged",
+        "version": 7,
+        "updatedAt": "2026-10-15T23:19:39.4415292+08:00",
+        "errorCode": null
+      },
+      "status": "Unknown",
+      "exit": 4,
+      "countersBefore": {
+        "sessions": 1,
+        "prompts": 1
+      },
+      "countersAfter": {
+        "sessions": 1,
+        "prompts": 1,
+        "aborts": 0
+      },
+      "subsequent": {
+        "process": {
+          "pid": 32720,
+          "startTimeUtc": "2026-10-15T15:19:39.2029135Z",
+          "executable": "dotnet.exe",
+          "argumentTarget": "MAF.Host.dll"
+        },
+        "status": "Completed"
+      },
+      "integrity": "ok",
+      "rowCount": 1,
+      "outcome": "Passed"
+    },
+    {
+      "stage": "D",
+      "variant": "permission",
+      "original": {
+        "pid": 46496,
+        "startTimeUtc": "2026-10-15T15:19:39.6223452Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Host.dll"
+      },
+      "recovered": {
+        "pid": 50888,
+        "startTimeUtc": "2026-10-15T15:19:39.9196601Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Host.dll"
+      },
+      "checkpoint": {
+        "taskId": "synthetic-task",
+        "requestFingerprint": "B9F49894F37C87DBD704FB9EF10BEB98AC4C435B7AF94A7CFAA0993A7766374D",
+        "providerScope": "8507F7401FEE2B62A10A2A36E3BDAD748572678DC6533788ABDB01B047A82BDA",
+        "workflowRunId": "7f6a152ab38c48fc8f4c7e5e5bfa794c",
+        "handle": {
+          "executionId": "fc045da489444146b48dab1c6001a4e6",
+          "provider": "OpenCode",
+          "externalSessionId": "ses_controlled",
+          "externalRequestId": "msg_01a14025c5fd3caa9044dba8"
+        },
+        "state": "Running",
+        "submissionPhase": "Acknowledged",
+        "version": 5,
+        "updatedAt": "2026-10-15T23:19:39.9004875+08:00",
+        "errorCode": null
+      },
+      "recoveredSnapshot": {
+        "taskId": "synthetic-task",
+        "requestFingerprint": "B9F49894F37C87DBD704FB9EF10BEB98AC4C435B7AF94A7CFAA0993A7766374D",
+        "providerScope": "8507F7401FEE2B62A10A2A36E3BDAD748572678DC6533788ABDB01B047A82BDA",
+        "workflowRunId": "7f6a152ab38c48fc8f4c7e5e5bfa794c",
+        "handle": {
+          "executionId": "fc045da489444146b48dab1c6001a4e6",
+          "provider": "OpenCode",
+          "externalSessionId": "ses_controlled",
+          "externalRequestId": "msg_01a14025c5fd3caa9044dba8"
+        },
+        "state": "Completed",
+        "submissionPhase": "Acknowledged",
+        "version": 8,
+        "updatedAt": "2026-10-15T23:19:40.4354435+08:00",
+        "errorCode": null
+      },
+      "status": "WaitingForApproval",
+      "exit": 5,
+      "countersBefore": {
+        "sessions": 1,
+        "prompts": 1
+      },
+      "countersAfter": {
+        "sessions": 1,
+        "prompts": 1,
+        "aborts": 0
+      },
+      "subsequent": {
+        "process": {
+          "pid": 50936,
+          "startTimeUtc": "2026-10-15T15:19:40.197Z",
+          "executable": "dotnet.exe",
+          "argumentTarget": "MAF.Host.dll"
+        },
+        "status": "Completed"
+      },
+      "integrity": "ok",
+      "rowCount": 1,
+      "outcome": "Passed"
+    },
+    {
+      "stage": "D",
+      "variant": "cancelled",
+      "original": {
+        "pid": 49364,
+        "startTimeUtc": "2026-10-15T15:19:40.6201278Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Host.dll"
+      },
+      "recovered": {
+        "pid": 45408,
+        "startTimeUtc": "2026-10-15T15:19:40.920303Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Host.dll"
+      },
+      "checkpoint": {
+        "taskId": "synthetic-task",
+        "requestFingerprint": "B9F49894F37C87DBD704FB9EF10BEB98AC4C435B7AF94A7CFAA0993A7766374D",
+        "providerScope": "96D95CC4EDA77BF1C04A3684BDFE5C167A9F9760777CDBA24ADE9854070A76B8",
+        "workflowRunId": "ab54bcae9e0e4b7f8759da4e443fe5a8",
+        "handle": {
+          "executionId": "22214f3f506e48b1af7c81e4a669043f",
+          "provider": "OpenCode",
+          "externalSessionId": "ses_controlled",
+          "externalRequestId": "msg_01a14025c9e30cc9a34f0282"
+        },
+        "state": "Running",
+        "submissionPhase": "Acknowledged",
+        "version": 5,
+        "updatedAt": "2026-10-15T23:19:40.8984356+08:00",
+        "errorCode": null
+      },
+      "recoveredSnapshot": {
+        "taskId": "synthetic-task",
+        "requestFingerprint": "B9F49894F37C87DBD704FB9EF10BEB98AC4C435B7AF94A7CFAA0993A7766374D",
+        "providerScope": "96D95CC4EDA77BF1C04A3684BDFE5C167A9F9760777CDBA24ADE9854070A76B8",
+        "workflowRunId": "ab54bcae9e0e4b7f8759da4e443fe5a8",
+        "handle": {
+          "executionId": "22214f3f506e48b1af7c81e4a669043f",
+          "provider": "OpenCode",
+          "externalSessionId": "ses_controlled",
+          "externalRequestId": "msg_01a14025c9e30cc9a34f0282"
+        },
+        "state": "Cancelled",
+        "submissionPhase": "Acknowledged",
+        "version": 6,
+        "updatedAt": "2026-10-15T23:19:41.1739565+08:00",
+        "errorCode": "ProviderReportedError"
+      },
+      "status": "Cancelled",
+      "exit": 130,
+      "countersBefore": {
+        "sessions": 1,
+        "prompts": 1
+      },
+      "countersAfter": {
+        "sessions": 1,
+        "prompts": 1,
+        "aborts": 0
+      },
+      "subsequent": null,
+      "integrity": "ok",
+      "rowCount": 1,
+      "outcome": "Passed"
+    }
+  ],
+  "live": [
+    {
+      "stage": "E",
+      "variant": "active",
+      "server": {
+        "pid": 30496,
+        "startTimeUtc": "2026-10-15T15:19:41.6479626Z",
+        "executable": "opencode.exe",
+        "argumentTarget": "serve"
+      },
+      "version": "1.19.0",
+      "requestedModel": "opencode/big-pickle",
+      "observedModels": [
+        {
+          "provider": "opencode",
+          "model": "big-pickle"
+        }
+      ],
+      "original": {
+        "pid": 50812,
+        "startTimeUtc": "2026-10-15T15:19:42.7139833Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Host.dll"
+      },
+      "recovered": {
+        "pid": 16344,
+        "startTimeUtc": "2026-10-15T15:19:44.5796058Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Host.dll"
+      },
+      "finalProcess": {
+        "pid": 54956,
+        "startTimeUtc": "2026-10-15T15:19:45.9625142Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Host.dll"
+      },
+      "checkpoint": {
+        "taskId": "live-active",
+        "requestFingerprint": "A7C302AAA0AF4DFFC79D9BA104C1479EE6C8CE606189A8F4CD41FBAB6B0C9EC4",
+        "providerScope": "C30E155CA243A85A95209CDAAC8B2FE3BE400FC067F84F14411E95A2E2C12456",
+        "workflowRunId": "0c94e8cb9dc743e4a5fec4c05d27f453",
+        "handle": {
+          "executionId": "d1b13382e6854752948946b9b61eea2a",
+          "provider": "OpenCode",
+          "externalSessionId": "ses_ebfda28d3ffeptEFwzRRIOFT1R",
+          "externalRequestId": "msg_01a14025d2140415904a0303"
+        },
+        "state": "Running",
+        "submissionPhase": "Acknowledged",
+        "version": 4,
+        "updatedAt": "2026-10-15T23:19:44.2241928+08:00",
+        "errorCode": null
+      },
+      "firstSnapshot": {
+        "taskId": "live-active",
+        "requestFingerprint": "A7C302AAA0AF4DFFC79D9BA104C1479EE6C8CE606189A8F4CD41FBAB6B0C9EC4",
+        "providerScope": "C30E155CA243A85A95209CDAAC8B2FE3BE400FC067F84F14411E95A2E2C12456",
+        "workflowRunId": "0c94e8cb9dc743e4a5fec4c05d27f453",
+        "handle": {
+          "executionId": "d1b13382e6854752948946b9b61eea2a",
+          "provider": "OpenCode",
+          "externalSessionId": "ses_ebfda28d3ffeptEFwzRRIOFT1R",
+          "externalRequestId": "msg_01a14025d2140415904a0303"
+        },
+        "state": "Unknown",
+        "submissionPhase": "Acknowledged",
+        "version": 6,
+        "updatedAt": "2026-10-15T23:19:45.8945855+08:00",
+        "errorCode": "ExecutionObservationIncomplete"
+      },
+      "recoveredSnapshot": {
+        "taskId": "live-active",
+        "requestFingerprint": "A7C302AAA0AF4DFFC79D9BA104C1479EE6C8CE606189A8F4CD41FBAB6B0C9EC4",
+        "providerScope": "C30E155CA243A85A95209CDAAC8B2FE3BE400FC067F84F14411E95A2E2C12456",
+        "workflowRunId": "0c94e8cb9dc743e4a5fec4c05d27f453",
+        "handle": {
+          "executionId": "d1b13382e6854752948946b9b61eea2a",
+          "provider": "OpenCode",
+          "externalSessionId": "ses_ebfda28d3ffeptEFwzRRIOFT1R",
+          "externalRequestId": "msg_01a14025d2140415904a0303"
+        },
+        "state": "Completed",
+        "submissionPhase": "Acknowledged",
+        "version": 8,
+        "updatedAt": "2026-10-15T23:20:02.0088478+08:00",
+        "errorCode": null
+      },
+      "activeAtCrash": true,
+      "firstStatus": "Unknown",
+      "firstErrorCode": "ObservationTimedOut",
+      "stillBusyAfterRecovery": true,
+      "finalStatus": "Completed",
+      "exit": 0,
+      "sessionPosts": 1,
+      "promptPosts": 1,
+      "sourceIndexStatusUnchanged": true,
+      "outcome": "Passed"
+    },
+    {
+      "stage": "E",
+      "variant": "completed-while-stopped",
+      "server": {
+        "pid": 30496,
+        "startTimeUtc": "2026-10-15T15:19:41.6479626Z",
+        "executable": "opencode.exe",
+        "argumentTarget": "serve"
+      },
+      "version": "1.19.0",
+      "requestedModel": "opencode/big-pickle",
+      "observedModels": [
+        {
+          "provider": "opencode",
+          "model": "big-pickle"
+        }
+      ],
+      "original": {
+        "pid": 53592,
+        "startTimeUtc": "2026-10-15T15:20:02.1082332Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Host.dll"
+      },
+      "recovered": {
+        "pid": 49764,
+        "startTimeUtc": "2026-10-15T15:20:25.7133439Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Host.dll"
+      },
+      "finalProcess": {
+        "pid": 49764,
+        "startTimeUtc": "2026-10-15T15:20:25.7133439Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Host.dll"
+      },
+      "checkpoint": {
+        "taskId": "live-completed-while-stopped",
+        "requestFingerprint": "A7C302AAA0AF4DFFC79D9BA104C1479EE6C8CE606189A8F4CD41FBAB6B0C9EC4",
+        "providerScope": "C30E155CA243A85A95209CDAAC8B2FE3BE400FC067F84F14411E95A2E2C12456",
+        "workflowRunId": "b94985cc56c84f7a9639e3fd78a8922a",
+        "handle": {
+          "executionId": "d79df8d5d2b44392a8a0b8f39dc3c697",
+          "provider": "OpenCode",
+          "externalSessionId": "ses_ebfd9e1a9ffejd6YLyK0kpL2nz",
+          "externalRequestId": "msg_01a140261dd2db8bbd8a9f3f"
+        },
+        "state": "Running",
+        "submissionPhase": "Acknowledged",
+        "version": 4,
+        "updatedAt": "2026-10-15T23:20:02.4305564+08:00",
+        "errorCode": null
+      },
+      "firstSnapshot": {
+        "taskId": "live-completed-while-stopped",
+        "requestFingerprint": "A7C302AAA0AF4DFFC79D9BA104C1479EE6C8CE606189A8F4CD41FBAB6B0C9EC4",
+        "providerScope": "C30E155CA243A85A95209CDAAC8B2FE3BE400FC067F84F14411E95A2E2C12456",
+        "workflowRunId": "b94985cc56c84f7a9639e3fd78a8922a",
+        "handle": {
+          "executionId": "d79df8d5d2b44392a8a0b8f39dc3c697",
+          "provider": "OpenCode",
+          "externalSessionId": "ses_ebfd9e1a9ffejd6YLyK0kpL2nz",
+          "externalRequestId": "msg_01a140261dd2db8bbd8a9f3f"
+        },
+        "state": "Completed",
+        "submissionPhase": "Acknowledged",
+        "version": 5,
+        "updatedAt": "2026-10-15T23:20:25.9931045+08:00",
+        "errorCode": null
+      },
+      "recoveredSnapshot": {
+        "taskId": "live-completed-while-stopped",
+        "requestFingerprint": "A7C302AAA0AF4DFFC79D9BA104C1479EE6C8CE606189A8F4CD41FBAB6B0C9EC4",
+        "providerScope": "C30E155CA243A85A95209CDAAC8B2FE3BE400FC067F84F14411E95A2E2C12456",
+        "workflowRunId": "b94985cc56c84f7a9639e3fd78a8922a",
+        "handle": {
+          "executionId": "d79df8d5d2b44392a8a0b8f39dc3c697",
+          "provider": "OpenCode",
+          "externalSessionId": "ses_ebfd9e1a9ffejd6YLyK0kpL2nz",
+          "externalRequestId": "msg_01a140261dd2db8bbd8a9f3f"
+        },
+        "state": "Completed",
+        "submissionPhase": "Acknowledged",
+        "version": 5,
+        "updatedAt": "2026-10-15T23:20:25.9931045+08:00",
+        "errorCode": null
+      },
+      "activeAtCrash": true,
+      "firstStatus": "Completed",
+      "firstErrorCode": null,
+      "stillBusyAfterRecovery": false,
+      "finalStatus": "Completed",
+      "exit": 0,
+      "sessionPosts": 1,
+      "promptPosts": 1,
+      "sourceIndexStatusUnchanged": true,
+      "outcome": "Passed"
+    },
+    {
+      "stage": "E",
+      "variant": "unavailable",
+      "server": {
+        "pid": 30496,
+        "startTimeUtc": "2026-10-15T15:19:41.6479626Z",
+        "executable": "opencode.exe",
+        "argumentTarget": "serve"
+      },
+      "version": "1.19.0",
+      "requestedModel": "opencode/big-pickle",
+      "observedModels": [
+        {
+          "provider": "opencode",
+          "model": "big-pickle"
+        }
+      ],
+      "original": {
+        "pid": 49856,
+        "startTimeUtc": "2026-10-15T15:20:26.0887159Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Host.dll"
+      },
+      "recovered": {
+        "pid": 48692,
+        "startTimeUtc": "2026-10-15T15:20:26.416503Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Host.dll"
+      },
+      "finalProcess": {
+        "pid": 25276,
+        "startTimeUtc": "2026-10-15T15:20:26.6467227Z",
+        "executable": "dotnet.exe",
+        "argumentTarget": "MAF.Host.dll"
+      },
+      "checkpoint": {
+        "taskId": "live-unavailable",
+        "requestFingerprint": "A7C302AAA0AF4DFFC79D9BA104C1479EE6C8CE606189A8F4CD41FBAB6B0C9EC4",
+        "providerScope": "C30E155CA243A85A95209CDAAC8B2FE3BE400FC067F84F14411E95A2E2C12456",
+        "workflowRunId": "8f837a1ae3184dd4a3476b4bbbf02b6c",
+        "handle": {
+          "executionId": "4762d7e1f0374f1d94956bef99fd13ba",
+          "provider": "OpenCode",
+          "externalSessionId": "ses_ebfd9840bffer5ObeOk5hOdqQB",
+          "externalRequestId": "msg_01a140267b7770158ee91f03"
+        },
+        "state": "Running",
+        "submissionPhase": "Acknowledged",
+        "version": 4,
+        "updatedAt": "2026-10-15T23:20:26.389438+08:00",
+        "errorCode": null
+      },
+      "firstSnapshot": {
+        "taskId": "live-unavailable",
+        "requestFingerprint": "A7C302AAA0AF4DFFC79D9BA104C1479EE6C8CE606189A8F4CD41FBAB6B0C9EC4",
+        "providerScope": "C30E155CA243A85A95209CDAAC8B2FE3BE400FC067F84F14411E95A2E2C12456",
+        "workflowRunId": "8f837a1ae3184dd4a3476b4bbbf02b6c",
+        "handle": {
+          "executionId": "4762d7e1f0374f1d94956bef99fd13ba",
+          "provider": "OpenCode",
+          "externalSessionId": "ses_ebfd9840bffer5ObeOk5hOdqQB",
+          "externalRequestId": "msg_01a140267b7770158ee91f03"
+        },
+        "state": "Unknown",
+        "submissionPhase": "Acknowledged",
+        "version": 5,
+        "updatedAt": "2026-10-15T23:20:26.6113771+08:00",
+        "errorCode": "ReconciliationUnavailable"
+      },
+      "recoveredSnapshot": {
+        "taskId": "live-unavailable",
+        "requestFingerprint": "A7C302AAA0AF4DFFC79D9BA104C1479EE6C8CE606189A8F4CD41FBAB6B0C9EC4",
+        "providerScope": "C30E155CA243A85A95209CDAAC8B2FE3BE400FC067F84F14411E95A2E2C12456",
+        "workflowRunId": "8f837a1ae3184dd4a3476b4bbbf02b6c",
+        "handle": {
+          "executionId": "4762d7e1f0374f1d94956bef99fd13ba",
+          "provider": "OpenCode",
+          "externalSessionId": "ses_ebfd9840bffer5ObeOk5hOdqQB",
+          "externalRequestId": "msg_01a140267b7770158ee91f03"
+        },
+        "state": "Completed",
+        "submissionPhase": "Acknowledged",
+        "version": 7,
+        "updatedAt": "2026-10-15T23:20:44.3021793+08:00",
+        "errorCode": null
+      },
+      "activeAtCrash": true,
+      "firstStatus": "Unknown",
+      "firstErrorCode": "ReconciliationUnavailable",
+      "stillBusyAfterRecovery": true,
+      "finalStatus": "Completed",
+      "exit": 0,
+      "sessionPosts": 1,
+      "promptPosts": 1,
+      "sourceIndexStatusUnchanged": true,
+      "outcome": "Passed"
+    }
+  ],
+  "liveBaseline": {
+    "files": {
+      "Program.cs": "DCE3FF9BD31E9E7DF9DFAF4953CDB56B1F893215CEABD0286AB36C74D9302ED0",
+      "README.md": "A85DB22AB7EE9B9B44F1980881EBBCBFC0D446736120BF80BD8D76EC60A202A8",
+      "opencode.json": "CEC6A91B9764D2B1C15CD139E7B3663415DF10BC67D7C1BFF8E32CB4001E0D00"
+    },
+    "index": "2FB3A7EA4226522BCBFD9DCAAB8A7AC263946856717A22EA49D416419B52B664",
+    "status": ""
+  },
+  "liveFinalManifests": [
+    {
+      "file": "live-active-manifest-after.json",
+      "manifest": {
+        "files": {
+          "Program.cs": "DCE3FF9BD31E9E7DF9DFAF4953CDB56B1F893215CEABD0286AB36C74D9302ED0",
+          "README.md": "A85DB22AB7EE9B9B44F1980881EBBCBFC0D446736120BF80BD8D76EC60A202A8",
+          "opencode.json": "CEC6A91B9764D2B1C15CD139E7B3663415DF10BC67D7C1BFF8E32CB4001E0D00"
+        },
+        "index": "2FB3A7EA4226522BCBFD9DCAAB8A7AC263946856717A22EA49D416419B52B664",
+        "status": ""
+      }
+    },
+    {
+      "file": "live-completed-while-stopped-manifest-after.json",
+      "manifest": {
+        "files": {
+          "Program.cs": "DCE3FF9BD31E9E7DF9DFAF4953CDB56B1F893215CEABD0286AB36C74D9302ED0",
+          "README.md": "A85DB22AB7EE9B9B44F1980881EBBCBFC0D446736120BF80BD8D76EC60A202A8",
+          "opencode.json": "CEC6A91B9764D2B1C15CD139E7B3663415DF10BC67D7C1BFF8E32CB4001E0D00"
+        },
+        "index": "2FB3A7EA4226522BCBFD9DCAAB8A7AC263946856717A22EA49D416419B52B664",
+        "status": ""
+      }
+    },
+    {
+      "file": "live-unavailable-manifest-after.json",
+      "manifest": {
+        "files": {
+          "Program.cs": "DCE3FF9BD31E9E7DF9DFAF4953CDB56B1F893215CEABD0286AB36C74D9302ED0",
+          "README.md": "A85DB22AB7EE9B9B44F1980881EBBCBFC0D446736120BF80BD8D76EC60A202A8",
+          "opencode.json": "CEC6A91B9764D2B1C15CD139E7B3663415DF10BC67D7C1BFF8E32CB4001E0D00"
+        },
+        "index": "2FB3A7EA4226522BCBFD9DCAAB8A7AC263946856717A22EA49D416419B52B664",
+        "status": ""
+      }
+    }
+  ]
+}
