@@ -98,5 +98,11 @@ internal static class ExternalConsoleOutput
         }
     }
 
+    public static void WriteMany(TextWriter output, IReadOnlyList<ExternalWorkflowRun> runs, ExternalOutputFormat format)
+    {
+        if (format == ExternalOutputFormat.Json) output.WriteLine(JsonSerializer.Serialize(runs, JsonOptions));
+        else foreach (var run in runs) Write(output, run, format);
+    }
+
     private static string Available(string? value) => string.IsNullOrWhiteSpace(value) ? "(unavailable)" : value;
 }

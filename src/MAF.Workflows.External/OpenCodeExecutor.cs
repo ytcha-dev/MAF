@@ -6,20 +6,21 @@ using Microsoft.Agents.AI.Workflows;
 namespace MAF.Workflows.External;
 
 public sealed class OpenCodeExecutor(IExternalHarnessClient client, string workflowRunId, TimeSpan pollInterval,
-    CancellationToken ownerCancellation = default)
+    CancellationToken ownerCancellation = default, ExternalExecutionHandle? initialHandle = null,
+    bool recoveryOnly = false, bool abortOnTimeout = true, bool observeOnce = false)
     : Executor<ExternalTaskRequest, ExternalTaskResult>("OpenCodeExecutor")
 {
     public override async ValueTask<ExternalTaskResult> HandleAsync(ExternalTaskRequest request,
         IWorkflowContext context, CancellationToken cancellationToken = default)
     {
         var watch = Stopwatch.StartNew();
-        var handle = new ExternalExecutionHandle(Guid.NewGuid().ToString("N"), client.Provider);
+        var handle = initialHandle ?? new ExternalExecutionHandle(Guid.NewGuid().ToString("N"), client.Provider);
         var trace = new List<ExternalTraceEvent>();
         var limitations = new List<string>();
         using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, ownerCancellation);
         budget.CancelAfter(request.Timeout);
-        var submitted = false;
-        var created = false;
+        var submitted = recoveryOnly;
+        var created = recoveryOnly;
 
         void Record(string kind) => trace.Add(new(kind, DateTimeOffset.UtcNow));
         ExternalTaskResult Result(ExternalExecutionStatus status, string summary, string? errorCode = null, bool abort = false)
@@ -32,23 +33,27 @@ public sealed class OpenCodeExecutor(IExternalHarnessClient client, string workf
 
         try
         {
-            await client.ValidateAsync(request, budget.Token);
-            Record("PolicyVerified");
-            handle = await client.CreateAsync(request, workflowRunId, handle, budget.Token);
-            created = true;
-            Record("SessionCreated");
-            // Mark before calling: loss of an acknowledgment cannot authorize another submission.
-            submitted = true;
-            try
+            if (!recoveryOnly)
             {
-                await client.SubmitAsync(request, handle, budget.Token);
-                Record("Submitted");
+                await client.ValidateAsync(request, budget.Token);
+                Record("PolicyVerified");
+                handle = await client.CreateAsync(request, workflowRunId, handle, budget.Token);
+                created = true;
+                Record("SessionCreated");
+                // Mark before calling: loss of an acknowledgment cannot authorize another submission.
+                submitted = true;
+                try
+                {
+                    await client.SubmitAsync(request, handle, budget.Token);
+                    Record("Submitted");
+                }
+                catch (ExternalHarnessException error) when (error.Ambiguous)
+                {
+                    Record("SubmissionUncertain");
+                    limitations.Add("Submission acknowledgment was lost; original session was reconciled without resubmitting.");
+                }
             }
-            catch (ExternalHarnessException error) when (error.Ambiguous)
-            {
-                Record("SubmissionUncertain");
-                limitations.Add("Submission acknowledgment was lost; original session was reconciled without resubmitting.");
-            }
+            else Record("RecoveryOriginalSession");
 
             var readFailures = 0;
             ExternalExecutionStatus? previous = null;
@@ -74,6 +79,7 @@ public sealed class OpenCodeExecutor(IExternalHarnessClient client, string workf
                 }
                 if (observation.Status is ExternalExecutionStatus.Pending or ExternalExecutionStatus.Running)
                 {
+                    if (observeOnce) return Result(observation.Status, "Original external task is still active.");
                     await Task.Delay(pollInterval, budget.Token);
                     continue;
                 }
@@ -96,6 +102,8 @@ public sealed class OpenCodeExecutor(IExternalHarnessClient client, string workf
         catch (OperationCanceledException)
         {
             limitations.Add("Cancellation or time/observation budget expired; remote work may still be active.");
+            if (!abortOnTimeout && !ownerCancellation.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+                return Result(ExternalExecutionStatus.Unknown, "Observation budget expired; recover the original session later.", "ObservationTimedOut");
             if (!created)
             {
                 return Result(ExternalExecutionStatus.Unknown, "Execution interrupted before session identity was confirmed.", "Interrupted");

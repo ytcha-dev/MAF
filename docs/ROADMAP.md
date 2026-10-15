@@ -32,6 +32,8 @@ Known observations: long-running tasks may generate hundreds of HTTP observation
 
 Current boundaries: run mapping/single-flight is in memory (100 retained task identities, default concurrency 2), not cross-process deduplication. The provider is loopback-only with explicit HTTP opt-in, one approved root and read-only permissions; no automatic permission/question replies. Request timeout and remote cancellation differ, and abort acknowledgment alone is not a confirmed terminal state. Harness permissions are not an OS sandbox; redaction is best effort. See [ADR-003](architecture/ADR-003_OPENCODE_WORKFLOW_EXECUTOR.md) and the acceptance report for exact budgets and provider limitations.
 
+Phase 2B-1 implementation progress (2026-10-15): opt-in durable storage/recovery source and offline test cases have been authored, but are **not built, executed or accepted**. The validated baseline above remains Phase 2A. A formal Symantec security event terminated the baseline testhost; build/test/live execution is on hold pending operator authorization and required IT/security clearance. See [security event](acceptance/PHASE2B1_SECURITY_EVENT.md), [pending coverage/results](acceptance/PHASE2B1_RESULTS.md) and [ADR-004](architecture/ADR-004_DURABLE_EXECUTION_RECOVERY.md). Dedicated process-crash/live recovery acceptance runners remain outstanding; do not advance automatically to Phase 2B-2 or Phase 2C.
+
 Historical evidence and reading path:
 
 - [Phase 1 acceptance](../TEST_RESULTS.md) and [Review Agent acceptance](../TEST_RESULTS_PHASE2.md) retain the native agent baselines. The older documents call Review "Phase 2"; this roadmap groups both native agents under Phase 1 fundamentals.

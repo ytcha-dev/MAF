@@ -9,7 +9,7 @@ using MAF.Core.Tools;
 
 namespace MAF.Workflows.External.OpenCode;
 
-public sealed class OpenCodeClient : IExternalHarnessClient
+public sealed class OpenCodeClient : IResumableExternalHarnessClient
 {
     private sealed record PermissionRule(string Permission, string Pattern, string Action);
     private sealed record Binding(string TaskId, string Root, ExternalExecutionHandle Handle);
@@ -21,6 +21,29 @@ public sealed class OpenCodeClient : IExternalHarnessClient
     private readonly string approvedRoot;
     private readonly PermissionRule[] sessionRules;
     public string Provider => "OpenCode";
+    public string Scope => DurableExecution.Hash(System.Text.Json.JsonSerializer.Serialize(new
+    {
+        Origin = options.BaseUri.GetLeftPart(UriPartial.Authority), Root = DurableExecution.NormalizeRoot(approvedRoot),
+        options.Agent, options.RequireReadApproval, Rules = sessionRules
+    }));
+    public ExternalExecutionHandle PrepareExecution() => new(Guid.NewGuid().ToString("N"), Provider,
+        ExternalRequestId: NewMessageId());
+    private static string NewMessageId() => "msg_" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString("x12")
+        + Guid.NewGuid().ToString("N")[..12];
+
+    public async Task ReattachAsync(string taskId, string projectRoot, ExternalExecutionHandle handle, CancellationToken cancellationToken)
+    {
+        if (handle.Provider != Provider || handle.ExternalSessionId is null
+            || !Regex.IsMatch(handle.ExternalSessionId, "^ses_[a-zA-Z0-9_-]{1,120}$")
+            || handle.ExternalRequestId is null || !Regex.IsMatch(handle.ExternalRequestId, "^msg_[a-zA-Z0-9_-]{1,120}$"))
+            throw new ExternalHarnessException("InvalidRecoveryIdentity", true);
+        await ValidateAsync(new(taskId, projectRoot, "Recovery inspection", TimeSpan.FromSeconds(30)), cancellationToken);
+        var binding = new Binding(taskId, approvedRoot, handle);
+        using var session = await SendAsync(HttpMethod.Get, SessionPath(handle) + Query(approvedRoot), null, taskId, cancellationToken);
+        VerifySession(session.RootElement, binding);
+        bindings[handle.ExecutionId] = binding;
+        submitted[handle.ExecutionId] = 0; // Reattached executions can never submit again through this client.
+    }
     public string? ServerVersion { get; private set; }
     public int GetRequestCount(string taskId) => counts.GetValueOrDefault(taskId);
 
@@ -166,7 +189,7 @@ public sealed class OpenCodeClient : IExternalHarnessClient
     private async Task<ExternalExecutionHandle> CreateCoreAsync(ExternalTaskRequest request, string workflowRunId,
         ExternalExecutionHandle handle, CancellationToken cancellationToken)
     {
-        var messageId = "msg_" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString("x12") + Guid.NewGuid().ToString("N")[..12];
+        var messageId = handle.ExternalRequestId ?? NewMessageId();
         var body = new
         {
             title = "MAF " + handle.ExecutionId,

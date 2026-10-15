@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/MAF.Persistence.Sqlite/MAF.Persistence.Sqlite.csproj" />
     <Project Path="src/MAF.Workflows.External/MAF.Workflows.External.csproj" />
     <Project Path="src/MAF.Agents.Review/MAF.Agents.Review.csproj" />
     <Project Path="src/MAF.Agents.Comprehension/MAF.Agents.Comprehension.csproj" />

@@ -59,3 +59,10 @@ nunit-*.xml
 .dotnet/
 .env*
 TestResults/
+
+# Local durable execution data must never be committed.
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.db.locks/

@@ -209,6 +209,30 @@ stdout 是 typed result 與官方 Workflow event 名稱的 JSON，stderr 顯示 
 
 例如在上述指令尾端加上 `--output text` 或 `--output verbose` 即可切換，不必重設模型或權限。格式測試使用固定中文摘要 `## 中文摘要` 與兩段文字：JSON 顯示 `"summary": "## 中文摘要\n\n第一段。\n\n第二段。"`；text 顯示原始 Markdown 段落；verbose 再加入 `Status: Completed`、`Workflow run ID: workflow-1`、`HTTP requests: 12` 等診斷。JSON stdout 始終只有一份 document，graph 訊息仍在 stderr。
 
-`--task-id` 可指定程序內的提交識別；相同 TaskId 只共享相同請求，不能當成跨 CLI 程序的去重保證。Unknown 時先檢查結果中的原 ExternalSessionId，切勿盲目重跑。預設 1 秒輪詢、最多 200 次，最多 3 頁各 100 筆 messages、1 MiB HTTP body 與 32,000 字元 summary；超限明確標示限制。artifact／diff、token 與成本尚未收集。
+未配置 durable DB 時，`--task-id` 仍僅為程序內的提交識別，不能當成跨 CLI 程序的去重保證。Unknown 時先檢查結果中的原 ExternalSessionId，切勿盲目重跑。預設 1 秒輪詢、最多 200 次，最多 3 頁各 100 筆 messages、1 MiB HTTP body 與 32,000 字元 summary；超限明確標示限制。artifact／diff、token 與成本尚未收集。
 
 一般 `dotnet test` 不呼叫 OpenCode，live tests 預設略過。真實測試須指定 `MAF_LIVE_OPENCODE=1`、`MAF_OPENCODE_TEST_ROOT`（Temp 下 `maf-phase2a-*` fixture）、`MAF_OPENCODE_RESULTS_DIR`，且明確授權 server／模型與 fixture。詳見 [執行計畫](docs/plans/PHASE2A_EXECUTION_PLAN.md)、[架構決策](docs/architecture/ADR-003_OPENCODE_WORKFLOW_EXECUTOR.md)與[實際驗收紀錄](docs/acceptance/PHASE2A_RESULTS.md)。
+
+## Phase 2B-1 — Durable execution（未驗證）
+
+**2026-10-15 Symantec 正式事件後，build／restore／自動測試／Live Test 全部暫停。以下僅為安全 clearance 後的使用說明，不是目前的執行授權。** 新增程式與 fake／SQLite 測試尚未編譯或執行；不能宣稱 Phase 2B-1 已驗收。見 [安全事件](docs/acceptance/PHASE2B1_SECURITY_EVENT.md)、[待驗證結果與 coverage matrix](docs/acceptance/PHASE2B1_RESULTS.md)、[ADR-004](docs/architecture/ADR-004_DURABLE_EXECUTION_RECOVERY.md)。
+
+透過 `--execution-db <absolute-local-file>` 或 `MAF_EXECUTION_DB` 明確啟用 durable service；不設定時保留 Phase 2A ephemeral 路徑。DB 必須位於獲准的本機持久資料目錄，**不可放 Temp、目標 source repo 或任何 Git/SVN repo**；Host 拒絕 network drive、已知 reparse point。以下路徑是使用範例，實際位置由 operator／IT 核准，不會自動設定 ACL 或安全排除。
+
+```text
+dotnet run --project src/MAF.Host -- --project <approved-fixture> --execution-db D:\MAFData\executions.db --task-id recovery-demo-1 --external-task "Read README.md only." --external-timeout 120 --output verbose
+dotnet run --project src/MAF.Host -- --project <same-approved-fixture> --execution-db D:\MAFData\executions.db --recover recovery-demo-1 --external-timeout 120 --output text
+dotnet run --project src/MAF.Host -- --project <same-approved-fixture> --execution-db D:\MAFData\executions.db --recover-pending --output json
+```
+
+繼續使用原 OPENCODE 環境及唯讀 agent；endpoint、workspace、agent 或 session 權限不符會拒絕 recovery，不能換 provider 當成同一執行。恢復不需要原 task text，也不呼叫 PCA／Reviewer；同 TaskId 的新提交若 fingerprint 不同則拒絕。TaskId、root 與 IDs 會被保存，請勿將秘密填入識別欄位。
+
+Durable 模式先保存穩定 run/execution/message IDs、session ID 與提交意圖，再送出 prompt。重啟後只查原 session，沒有第二次 prompt 或替代 session。若 session creation 回應遺失或提交證據不完整，保留 Unknown 供調查，不自動重試。SQLite 無法與 HTTP atomic commit，沒有 exactly-once delivery 保證。
+
+等待逾時會回 Unknown（exit 4）並保留遠端工作；可稍後 `--recover` 取得仍在執行、等待授權、完成或失敗的實際證據。Ctrl+C 仍請求 abort，但只在遠端證實取消後回 Cancelled；不自動批准 permission/question。Completed 僅表示外部執行結束，並非內容獲接受。
+
+單筆 recovery 仍輸出既有 typed JSON／text／verbose；batch 最多 100 個非 terminal 記錄、依 TaskId 排序、每個 observe once（含受限 GET retry），JSON 為一份 array。超過 100 筆需逐筆 recovery；同一 DB 若有其他 workspace／scope，應逐筆指定正確環境。Running／Pending 的既有 exit code 1 保持不變；不等於 confirmed failure，應讀取 status。其他退出碼沿用 2A。
+
+本機 DB 只存 identity、fingerprint、state、timestamps 與固定診斷，**不存 prompt、完整結果或 tool transcript**。重新讀摘要仍依賴 OpenCode 保留原 session/message；沒有 provider 證據就回 Unknown，不能從本機生成答案。資料庫旁 `.locks` 是空的 ownership files；持有中的 OS handle 防止同機、同 DB 的相同 TaskId 並行提交，程序結束後釋放 handle，不需自動刪鎖檔。
+
+尚待驗證：新 dependency graph／vulnerability audit、build、離線 regression、真實 process crash／SQLite recovery，以及 OpenCode active Host restart／provider outage 後恢復與 fixture 不變。新 dedicated live／separate-process acceptance runner 尚缺，既有 Phase 2A live tests 不能取代。
