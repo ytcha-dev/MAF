@@ -5,6 +5,8 @@
 > **Decision retained:** deterministic Workflow-first (A), then bounded Hybrid orchestration (C).  
 > **Deployment preference:** company-local / offline-capable first; portability and optional remote access later, subject to organizational authorization.
 
+> **Architecture guardrails:** [Seven ownership boundaries and delivery discipline](architecture/ARCHITECTURE_GUARDRAILS.md). These are design constraints, not claims of implemented enforcement.
+
 ## 1. Vision and operating principles
 
 MAF is a **local-first, extensible orchestration platform** coordinating native agents, existing independent harnesses, and optional knowledge/tools/services. It must **not** recreate OpenCode's coding loop or a general-purpose RAG engine.
