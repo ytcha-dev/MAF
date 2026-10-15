@@ -17,7 +17,7 @@ MAF is the product/repository name; Microsoft Agent Framework is an implementati
 
 ## 2. Verified baseline and explicit limitations
 
-Evidence at 2026-10-15: `docs/acceptance/PHASE2A_RESULTS.md` records a completed **local, approved, read-only** end-to-end OpenCode delegation proof: CLI → official MAF Workflow → OpenCodeExecutor → OpenCode Server → typed result. Tested scenarios include successful runs, server unavailable, cancellation, ambiguous timeouts, permission waiting, and fake-provider concurrency. See that report for exact test runs and qualifications; these do **not** establish production readiness or coding quality.
+Evidence at 2026-10-15: [Phase 2A acceptance](acceptance/PHASE2A_RESULTS.md) records a completed **local, approved, read-only** end-to-end OpenCode delegation proof: CLI → official MAF Workflow → OpenCodeExecutor → OpenCode Server → typed result. Three runs completed with distinct sessions and unchanged source/index/status. Tested scenarios include server unavailable, cancellation, ambiguous timeouts, permission waiting, and fake-provider concurrency. Submit-response loss/reconnection was covered with fakes, not destructive live network fault injection. These checks do **not** establish production readiness or coding quality.
 
 Existing modules:
 
@@ -26,9 +26,20 @@ Existing modules:
 - Native PCA (Comprehension) and separate Review service.
 - `MAF.Workflows.External`: official custom Workflow executor and OpenCode API client, read-only and bounded.
 
-**Not yet delivered:** durable cross-process run state, reliable restart recovery, an operator approval interface, authorized write execution, PCA → external harness → Reviewer as one automatic workflow, a remote gateway, Hybrid LLM routing, additional production harness adapters, A2A integration.
+**Not yet delivered:** durable cross-process run state, reliable restart recovery, an operator approval interface, authorized write execution, PCA → external harness → Reviewer as one automatic workflow, a connector registry/activation switch, a remote gateway, Hybrid LLM routing, additional production harness adapters, A2A integration. Registry rules below are target requirements; current external-task execution uses explicit approved endpoint/workspace configuration and read-only provider checks, not an implemented registry.
 
 Known observations: long-running tasks may generate hundreds of HTTP observations; current OpenCode permission cancellation can leave a pending permission even after abort acknowledgment; completed execution does not guarantee accurate repository analysis.
+
+Current boundaries: run mapping/single-flight is in memory (100 retained task identities, default concurrency 2), not cross-process deduplication. The provider is loopback-only with explicit HTTP opt-in, one approved root and read-only permissions; no automatic permission/question replies. Request timeout and remote cancellation differ, and abort acknowledgment alone is not a confirmed terminal state. Harness permissions are not an OS sandbox; redaction is best effort. See [ADR-003](architecture/ADR-003_OPENCODE_WORKFLOW_EXECUTOR.md) and the acceptance report for exact budgets and provider limitations.
+
+Historical evidence and reading path:
+
+- [Phase 1 acceptance](../TEST_RESULTS.md) and [Review Agent acceptance](../TEST_RESULTS_PHASE2.md) retain the native agent baselines. The older documents call Review "Phase 2"; this roadmap groups both native agents under Phase 1 fundamentals.
+- [Phase 2A execution plan](plans/PHASE2A_EXECUTION_PLAN.md), [P0 API discovery](plans/PHASE2A_API_DISCOVERY.md), [external harness architecture](architecture/EXTERNAL_HARNESS_ARCHITECTURE.md) and [historical handoff](plans/PHASE2A_HANDOFF.md) preserve the original gates, verified SDK/API choices and failures. They are not new implementation authorization.
+- CLI output enhancement is delivered in commit `760f6c5`: 29 focused tests and 112 offline regression cases passed; three live tests were excluded. This later check does not replace the earlier [Phase 2A live evidence](acceptance/PHASE2A_RESULTS.md) or change its historical test counts. See [CLI usage](../README.md#phase-2a--opencode-外部-workflow).
+- [SQLite smoke evidence](acceptance/SQLITE_SMOKE_RESULTS.md) confirms basic local native-library loading and cross-process persistence only. It does not establish a durable execution store or complete Phase 2B-0.
+
+Retain PCA/Reviewer as educational and regression references for `IChatClient` versus `AIAgent`, tool execution, sessions, provenance and bounded evaluation. Stop broadening PCA without measured need; do not treat stale external knowledge as verified repository evidence. An external harness or service need not be wrapped in another LLM-powered `ChatClientAgent`.
 
 ## 3. Roadmap at a glance
 
@@ -48,6 +59,8 @@ Known observations: long-running tasks may generate hundreds of HTTP observation
 Stages are **outcome gates**, not fixed deadlines. Phase 2C is a logical milestone; small portions of its *contracts* may be implemented during 2B as needed, without creating a premature plugin marketplace.
 
 ## 4. Target architecture
+
+This diagram includes **unimplemented target components**: registry, execution store, approval gates and optional ingress. Local-first/offline-capable is a deployment goal, not evidence that the configured OpenCode model is local or that current tasks work without network access.
 
 ```mermaid
 flowchart TB
@@ -148,6 +161,8 @@ This is a future conceptual registry example, **not** an existing `appsettings.j
 
 ### 2B-0 — Feasibility / engineering baseline (short)
 
+**SQLite feasibility portion passed on 2026-10-15:** the [disposable .NET 10 smoke](acceptance/SQLITE_SMOKE_RESULTS.md) created a Temp database, committed one row, reopened it in a separate process, deleted the row and confirmed zero rows in another process. The project/database were removed. Remaining baseline/API confirmation must precede any separately authorized 2B implementation; no store was added to MAF.
+
 - Confirm `Microsoft.Data.Sqlite` package and native library work under company-managed Windows app-control policies on a throwaway fixture; no admin install or policy bypass.
 - Confirm current code/tests, record actual OpenCode API and version, save controlled baseline.
 - If SQLite native package is blocked, pause and choose an approved alternative. Do **not** redirect internal task data to personal Supabase simply to bypass local restrictions.
@@ -203,6 +218,7 @@ Start with **one routing choice**, compare against a deterministic baseline (qua
 
 - Add Codex or Claude Code **only via a verified adapter**, user/company-supported terms, safe session semantics and controlled scopes. OpenCode direct API is already the initial external harness.
 - Add MCP for exposed tools/context; A2A for genuine remote agent peers; do not conflate protocols or mandate them without a use case.
+- Direct OpenCode API integration is harness-specific, not A2A. Do not assume native OpenCode A2A support; reconsider a gateway only for a verified interoperability requirement.
 - Open WebUI can be a client or knowledge provider, not implicitly the central orchestrator.
 - Future GPT/ChatGPT connector: only through a supported integration, authenticated API, explicit user consent, and company data-governance approval. **No automatic personal cloud exposure of company source.**
 - Keep MAF local-first and network-closed by default. Cross-platform executability (.NET/SQLite), remote access, and distributed multi-worker execution are different milestones.
@@ -212,20 +228,26 @@ Start with **one routing choice**, compare against a deterministic baseline (qua
 
 1. OpenCode/Codex/Claude harnesses own their task/tool loops; MAF owns orchestration and policy.
 2. Provider-specific details stay in adapters; native agents need not masquerade as external harnesses.
-3. Distinct identities: MAF workflow, durable execution, provider session, external message.
+3. Distinct identities: native MAF `AgentSession`, workflow run, durable execution, provider session and external message. Workflow checkpoints do not persist or roll back OpenCode state; recovery still requires provider reconciliation.
 4. All **external connectors are disabled by default** until explicitly enabled; an enabled connector still requires workspace/action authorization.
 5. Disabled connectors cannot be routed to **or directly invoked**; no silent fallback or privilege escalation.
 6. Durable submission + reconciliation precedes autonomous retries or write access.
 7. `Completed` means execution finished; `Accepted` needs independent validation.
-8. Least privilege and human approval for risky actions; no secret or internal-source exfiltration to unauthorized services.
-9. Provenance and bounded budgets: time, retries, requests, concurrency, and where supported, token usage.
+8. Least privilege and human approval for risky actions; no secret or internal-source exfiltration to unauthorized services. Treat repository content, tool results and provider messages as untrusted data, not instructions that can alter tools or policy.
+9. Provenance and bounded budgets: time, retries, requests, concurrency, and where supported, token usage. Validate typed schemas, allowlisted capabilities and maximum depth/iterations before accepting planner recommendations.
 10. Portability through small contracts, not premature generalized adapter/plugin frameworks.
 11. Local-first; network exposure is an opt-in architecture/security decision.
 12. Document verified evidence, remaining limitations and explicit owner decisions separately.
 
 ## 10. Decision log and migration checklist
 
-Existing decisions remain: ADR-001 (integrate rather than reimplement), ADR-002 (A before C), ADR-003 (official Workflow Executor + OpenCode direct API; now adopted for 2A). Preserve historical evidence/links and update stale 'Phase 2A next action' text rather than rewriting prior acceptance results.
+Existing decisions remain:
+
+- **ADR-001 (2026-10-14):** integrate rather than reimplement harness/RAG internals.
+- **ADR-002 (2026-10-14):** deterministic A before bounded Hybrid C.
+- **[ADR-003](architecture/ADR-003_OPENCODE_WORKFLOW_EXECUTOR.md) (adopted 2026-10-15):** official Workflow Executor + OpenCode direct API; A2A remains optional. Compiled matching Agent/Workflow SDK 1.24.0 and verified OpenCode 1.18.35 API evidence is in [P0 discovery](plans/PHASE2A_API_DISCOVERY.md).
+
+ADR-001/002 are decision-log entries; no standalone files currently exist. ADR-003 has a standalone record. Preserve historical evidence/links and update stale 'Phase 2A next action' text rather than rewriting prior acceptance results. Future records must distinguish context, alternatives, decision, consequences, evidence and revisit trigger.
 
 **Proposed new ADRs:**
 
@@ -244,4 +266,4 @@ Existing decisions remain: ADR-001 (integrate rather than reimplement), ADR-002 
 
 ### Immediate next action
 
-**Phase 2B-0 SQLite feasibility smoke test, then Phase 2B-1 durable mapping / restart recovery.** Connector architecture is planned now; registry implementation comes only after safe execution and approval foundations exist.
+**SQLite feasibility smoke is complete; reconcile the remaining Phase 2B-0 baseline before separately authorized Phase 2B-1 durable mapping / restart recovery.** Connector architecture is planned now; registry implementation is Phase 2C, after safe execution and approval foundations. This documentation update implements neither Phase 2B nor the registry and does not authorize write-enabled or live external runs.

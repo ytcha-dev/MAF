@@ -3,7 +3,9 @@
 **版本：** v0.1 MVP  
 **技術：** C# / .NET 10 / Microsoft Agent Framework  
 **開發方式：** Codex 協助實作  
-**狀態：** Ready for Development
+**狀態：** 已有 PCA MVP 實作與選定驗收；保留原始需求作為歷史基線
+
+目前實作證據與限制見 [Phase 1 驗收](../../TEST_RESULTS.md)。現行階段以 [Roadmap v0.2](../ROADMAP.md) 為準；本 PRD 的未來式描述是當時需求，不表示仍應重新開始 Phase 1。
 
 ## 1. 專案背景
 

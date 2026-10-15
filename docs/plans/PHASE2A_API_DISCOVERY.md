@@ -1,5 +1,7 @@
 # Phase 2A P0 — verified API and minimal design delta
 
+> Historical P0/P1 snapshot from 2026-10-14: statements such as "no external executor yet" and pending gates below describe that checkpoint. Phase 2A is now implemented and accepted; see [actual acceptance](../acceptance/PHASE2A_RESULTS.md) and [ADR-003](../architecture/ADR-003_OPENCODE_WORKFLOW_EXECUTOR.md). Later work follows [Roadmap v0.2](../ROADMAP.md), not the original P0 next actions.
+
 Date: 2026-10-14. The three planning documents already exist in the local repository. Existing Core / Comprehension / Review / Host / Tests remain the baseline; there is no external executor or Workflow package reference yet.
 
 ## SDK evidence

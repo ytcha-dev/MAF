@@ -1,5 +1,7 @@
 # Phase 2 Review Agent MVP architecture
 
+> "Phase 2" is the historical Code Review stage name. The independent Review MVP is implemented; its [acceptance record](../../TEST_RESULTS_PHASE2.md) remains the evidence source. [Roadmap v0.2](../ROADMAP.md) groups PCA/Review as the native Phase 1 baseline; automatic cross-agent orchestration is still planned for Phase 2B-4, not implemented by this service.
+
 ## Existing architecture and reuse
 
 Inspection confirmed .NET 10, Microsoft.Agents.AI 1.24.0, official `ChatClientAgent`, `AIAgent.RunAsync`, and `CreateSessionAsync`. The implementation retains those APIs and the existing Host / DI / OpenAI-compatible `IChatClient`; no second host or agent loop was introduced. Official API reference: [ChatClientAgent](https://learn.microsoft.com/en-us/dotnet/api/microsoft.agents.ai.chatclientagent?view=agent-framework-dotnet-latest).

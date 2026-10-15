@@ -2,6 +2,8 @@
 
 C# / .NET 10 的兩個獨立 Microsoft Agent Framework Agent，以唯讀工具理解與審查本機程式碼。共用 Console Host，不使用自製 Agent Loop。
 
+目前已完成 Phase 2A 的受控本機唯讀 OpenCode Workflow PoC 與 CLI 輸出改善；原生 PCA／Review 保留為基線。後續階段以 [Roadmap v0.2](docs/ROADMAP.md) 為準：SQLite [基本可行性 smoke](docs/acceptance/SQLITE_SMOKE_RESULTS.md) 已通過，尚需核對其餘 Phase 2B-0 基線；Phase 2B-1 持久化／重啟對帳與 Phase 2C Connector Registry 仍是規劃，未實作。完整證據與限制見 [Phase 2A 驗收](docs/acceptance/PHASE2A_RESULTS.md)。
+
 ## 系統用途
 
 PCA 讓你指定一個本機專案，以繁體中文提問，取得結合實際程式碼與檔案行號的說明。

@@ -1,10 +1,12 @@
 # MAF — Review Agent MVP PRD
 
 **版本：** v0.1  
-**階段：** Phase 2 — Code Review Agent  
+**階段：** Phase 2 — Code Review Agent（歷史命名；現行 Roadmap 歸入 Phase 1 原生 Agent 基線）\
 **技術基礎：** C# / .NET / Microsoft Agent Framework  
 **開發方式：** Codex 自主分析、規劃、實作、測試  
 **核心原則：** Read-only、Evidence-based、Human-in-the-loop
+
+> 已有獨立 Review MVP 實作與選定驗收，見 [TEST_RESULTS_PHASE2](../../TEST_RESULTS_PHASE2.md) 與 [Review 架構](REVIEW_ARCHITECTURE.md)。本文保留原始需求與當時背景，並非 Phase 2B／Connector Registry 執行計畫；後續依 [Roadmap v0.2](../ROADMAP.md) 排序，已知未執行項目以驗收報告為準。
 
 ---
 

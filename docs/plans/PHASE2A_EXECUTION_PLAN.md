@@ -1,8 +1,10 @@
 # Phase 2A — External Harness Workflow-first Execution Plan
 
-> Version: 0.1 · 2026-10-14 · Status: Ready for implementation planning  
+> Version: 0.1 · 2026-10-14 · Status: Executed; controlled local read-only PoC accepted 2026-10-15\
 > Prerequisite: `docs/ROADMAP.md`  
 > Architecture: `docs/architecture/EXTERNAL_HARNESS_ARCHITECTURE.md`
+
+This is the retained Phase 2A plan and gate definition. Actual passes, failures and limitations are in [Phase 2A acceptance](../acceptance/PHASE2A_RESULTS.md). Current future-stage sequencing follows [Roadmap v0.2](../ROADMAP.md): 2B-1 durable execution, 2B-2 approvals, 2B-3 diagnostics, 2B-4 fixed multi-agent handoff, then 2C registry. This plan does not authorize rerunning live tests or starting those implementations.
 
 ## Objective
 

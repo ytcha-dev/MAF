@@ -1,7 +1,9 @@
 # MAF — External Harness Architecture, Contracts & Validation
 
-> Version 0.1 · 2026-10-14 · Status: proposed architecture / executable acceptance guidance  
+> Version 0.1 · 2026-10-14 · Status: Phase 2A design adopted; later stages remain proposed\
 > Decision: **MAF Workflow custom Executor + OpenCode direct API adapter** for the first PoC.
+
+Phase 2A was implemented and accepted for a controlled read-only PoC on 2026-10-15; see [ADR-003](ADR-003_OPENCODE_WORKFLOW_EXECUTOR.md), [verified API mapping](../plans/PHASE2A_API_DISCOVERY.md) and [acceptance evidence/limitations](../acceptance/PHASE2A_RESULTS.md). The contract sketches and pseudocode below remain design guidance, not exact SDK signatures. Future-stage names and sequence follow [Roadmap v0.2](../ROADMAP.md); no execution store or Connector Registry currently exists.
 
 ## 1. Scope and verified starting point
 
@@ -213,7 +215,11 @@ Adoption rule: reevaluate once a concrete remote A2A service exists, multi-orche
 
 ```text
 Phase 2A: Fixed Workflow → OpenCodeExecutor
-Phase 2B: Fixed Workflow → PCA → OpenCodeExecutor → Review → Human Gate
+Phase 2B-1: Durable mapping / restart reconciliation (planned)
+Phase 2B-2: Approval and cancellation semantics (planned)
+Phase 2B-3: Diagnostics / provenance (planned)
+Phase 2B-4: Fixed Workflow → PCA → OpenCodeExecutor → Review → Human Gate (planned)
+Phase 2C: Connector registry / activation policy (planned)
 Phase 3:  Typed Planner Recommendation → Policy Validator → Allowed Workflow Branch
                                                ├→ PCA
                                                ├→ OpenCodeExecutor
