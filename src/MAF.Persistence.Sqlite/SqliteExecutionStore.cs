@@ -33,7 +33,9 @@ public sealed class SqliteExecutionStore : IExecutionStore
     private async Task<SqliteConnection> OpenAsync(CancellationToken token)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
+        var schemaLease = ApprovalDatabase.SharedGate(databasePath);
         var connection = new SqliteConnection(connectionString);
+        connection.StateChange += (_, change) => { if (change.CurrentState == System.Data.ConnectionState.Closed) schemaLease.Dispose(); };
         try
         {
             await connection.OpenAsync(token);
@@ -62,13 +64,14 @@ public sealed class SqliteExecutionStore : IExecutionStore
             transaction.Commit();
             return connection;
         }
-        catch { await connection.DisposeAsync(); throw; }
+        catch { await connection.DisposeAsync(); schemaLease.Dispose(); throw; }
     }
 
     public ValueTask<IExecutionOwnership?> TryAcquireAsync(string taskId, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentException.ThrowIfNullOrWhiteSpace(taskId);
+        using var schemaLease = ApprovalDatabase.SharedGate(databasePath);
         var directory = databasePath + ".locks";
         Directory.CreateDirectory(directory);
         try

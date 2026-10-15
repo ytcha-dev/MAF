@@ -1,8 +1,10 @@
 # Phase 2B-2 驗收計畫：Policy／Approval／Cancellation
 
-日期：2026-10-16。狀態：**分層驗收計畫；M1部分U層已有增量結果，完整Phase 2B-2尚未通過。** 原計畫基準`64d3c36`。[ADR-005](../architecture/ADR-005_POLICY_APPROVAL_CANCELLATION.md)定義預期契約，[execution plan](../plans/PHASE2B2_EXECUTION_PLAN.md)定義里程碑。歷史2B-1證據不代替本階段結果，亦不解除[公司安全hold](PHASE2B1_SECURITY_EVENT.md)。
+日期：2026-10-16。狀態：**分層驗收計畫；M1的U層與M2-A資料層／process子集已有增量結果，完整Phase 2B-2尚未通過。** 原計畫基準`64d3c36`。[ADR-005](../architecture/ADR-005_POLICY_APPROVAL_CANCELLATION.md)定義預期契約，[execution plan](../plans/PHASE2B2_EXECUTION_PLAN.md)定義里程碑。歷史2B-1證據不代替本階段結果，亦不解除[公司安全hold](PHASE2B1_SECURITY_EVENT.md)。
 
 後續增量結果：[M1 results](PHASE2B2_M1_RESULTS.md)記錄獨立evaluator／binding的98個runtime cases及253個offline regression結果；只涵蓋下列部分U層行為，不是各列全部U/S/C/L或G0–G5通過。原矩陣為準備時的Planned標記，未完成能力維持未驗證；沒有啟動M2。
+
+再後續增量：[M2-A results](PHASE2B2_M2A_RESULTS.md)記錄51個新persistence/process cases與304個offline全通過，涵蓋migration、durable pending、CAS/decision/consume/cancel races與integrity的適用資料層子集；不是M3身份、live enforcement、provider cancellation或整列G2/G3完成。原Planned矩陣仍是完整target，不以fake身份當production authentication。
 
 ## 1. 測試分層與通用oracle
 

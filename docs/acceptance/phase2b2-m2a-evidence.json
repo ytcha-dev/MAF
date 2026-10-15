@@ -1,0 +1,59 @@
+{
+  "sourceBaseline": "9849933be9dcd33b6bb8b45c1c70f0e6141f9f02",
+  "milestone": "M2-A only",
+  "focused": {
+    "discovered": 51,
+    "executed": 51,
+    "passed": 51,
+    "failed": 0,
+    "skipped": 0,
+    "outcome": "Completed",
+    "start": "2026-10-16T01:25:00.5416743+08:00",
+    "finish": "2026-10-16T01:25:03.3570309+08:00"
+  },
+  "offline": {
+    "executed": 304,
+    "passed": 304,
+    "failed": 0,
+    "skipped": 0,
+    "existingPhase2B1": 155,
+    "existingM1": 98,
+    "newM2A": 51,
+    "outcome": "Completed",
+    "start": "2026-10-16T01:25:03.9585166+08:00",
+    "finish": "2026-10-16T01:25:10.4844150+08:00"
+  },
+  "observations": [
+    {
+      "test": "MAF.Tests.ApprovalPersistenceTests.AbruptMigrationProcessDeathRollsBack(checkpointName: \"SchemaVersionWritten\")",
+      "outcome": "Passed",
+      "observation": "Migration crash: PID=25428, startUTC=2026-10-15T17:25:02.9882978Z, checkpoint=SchemaVersionWritten, schema=1, snapshotBytesUnchanged=true, integrity=ok"
+    },
+    {
+      "test": "MAF.Tests.ApprovalPersistenceTests.CancellationRacingAdmissionHasAValidSerialOrderAndNeverDispatches",
+      "outcome": "Passed",
+      "observation": "Cancellation/admission race: admitted=False, controlVersion=1, cancelId=cancel, executionRows=0, providerDispatch=notImplemented"
+    },
+    {
+      "test": "MAF.Tests.ApprovalPersistenceTests.ConcurrentConsumptionHasOneWinner",
+      "outcome": "Passed",
+      "observation": "Consumption race: winners=1, executionRows=1, consumptionAuditRows=1"
+    },
+    {
+      "test": "MAF.Tests.ApprovalPersistenceTests.AbruptMigrationProcessDeathRollsBack(checkpointName: \"TablesCreated\")",
+      "outcome": "Passed",
+      "observation": "Migration crash: PID=55176, startUTC=2026-10-15T17:25:03.1430049Z, checkpoint=TablesCreated, schema=1, snapshotBytesUnchanged=true, integrity=ok"
+    },
+    {
+      "test": "MAF.Tests.ApprovalPersistenceTests.PendingSurvivesActualProcessTerminationAndFreshProcessRead",
+      "outcome": "Passed",
+      "observation": "Pending persisted: writer PID=36348, startUTC=2026-10-15T17:25:02.3216151Z, reader PID=39364, approval=approval-one, operation=operation-one, task=task-one, execution=execution-one, state=Pending, version=0, integrity=ok"
+    },
+    {
+      "test": "MAF.Tests.ApprovalPersistenceTests.ConcurrentApproveRejectHasExactlyOneWinnerAndDuplicateDecisionIsIdempotent",
+      "outcome": "Passed",
+      "observation": "Decision race: winner=Reject, version=1, decisionRows=1, executionRows=0"
+    }
+  ],
+  "providerActivity": "No provider process, POST, prompt, abort or permission reply was executed; helper contains storage operations only."
+}

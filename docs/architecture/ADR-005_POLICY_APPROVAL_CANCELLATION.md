@@ -1,8 +1,10 @@
 # ADR-005：Policy、人工核准與取消對帳
 
-日期：2026-10-16（Asia/Taipei）。狀態：**M1方向已獲owner核准並完成獨立實作／測試；其餘架構仍為Proposed，未實作或驗收完整Phase 2B-2。**
+日期：2026-10-16（Asia/Taipei）。狀態：**M1與另行批准的M2-A資料層已實作／驗證；runtime approval/enforcement、operator identity與其他架構仍為Proposed，完整Phase 2B-2未驗收。**
 
 後續增量：owner已明確批准M1的provider-neutral contracts、replaceable trusted context、單一immutable policy snapshot與deterministic evaluator；實測見 [M1 results](../acceptance/PHASE2B2_M1_RESULTS.md)。僅M1完成，不代表下述approval/persistence/cancellation/runtime enforcement提案已實作或全部獲准；M2與正式operator trust機制仍待另行授權。
+
+再後續增量：owner另批M2-A，已完成schema v2、IApprovalStore/窄transaction coordinator、sticky cancel intent與structured audit，以及51個focused／304個offline tests；[M2-A results](../acceptance/PHASE2B2_M2A_RESULTS.md)。本ADR下文保留完整target；實作差異與仍disabled的部分見文末補記，不能把資料列Approved當作runtime grant。
 
 檢視基準：`origin/main = 64d3c36`；2026-10-16 fetch 後沒有更新提交。[Roadmap](../ROADMAP.md)、[ADR-003](ADR-003_OPENCODE_WORKFLOW_EXECUTOR.md)、[ADR-004](ADR-004_DURABLE_EXECUTION_RECOVERY.md)、[家用結果](../acceptance/PHASE2B1_HOME_RESULTS.md) 與 [公司安全事件](../acceptance/PHASE2B1_SECURITY_EVENT.md) 為依據。家用 2B-1 通過不解除公司 execution hold。
 
@@ -150,7 +152,7 @@ Decision權限涵蓋具體operation/resource以及approval要求；能查詢不�
 
 ## 6. SQLite v2 提案與 atomic boundaries
 
-所有以下表／欄位均未實作。保留既有 `executions(task_id,version,terminal,snapshot)` 的格式與 enum值，不把未批准任務塞入該表。最小表：
+以下為原完整target表／欄位；M2-A實作的子集與差異見文末補記。保留既有 `executions(task_id,version,terminal,snapshot)` 的格式與 enum值，不把未批准任務塞入該表。最小表：
 
 | 表 | 必要資料與約束 |
 |---|---|
@@ -282,3 +284,14 @@ sequenceDiagram
 | deadlines／audit retention | 實作前核准具體有界值與可控clock策略；期限為grant與operation較早者，不提供unbounded approval |
 
 原設計輪建議先做 [execution plan](../plans/PHASE2B2_EXECUTION_PLAN.md) M1：純contract／evaluator與negative tests，無provider side effects、無schema migration。Owner後續已批准並完成此範圍，結果見開頭M1連結；approval/persistence/trust activation與M2仍待授權。完整矩陣見 [acceptance plan](../acceptance/PHASE2B2_ACCEPTANCE_PLAN.md)。原文件設計輪沒有build/test/live；M1輪僅執行build與offline tests，沒有live OpenCode，不開始2B-3、2C、Phase3。
+
+## 11. 已實作的M2-A決策與限制（2026-10-16）
+
+- 獨立IApprovalStore負責metadata read，IApprovalTransactionCoordinator承接固定mutation；SqliteApprovalStore同時實作兩者。與既有executions共用同DB格式，但一般Host/IExecutionStore維持v1-only，遷移不開啟runtime dispatch；M3再安全整合。沒有SQLite-specific type流入Core。
+- 顯式offline maintenance要求stop/backup attestations；exclusive schema file gate、持有既有TaskId locks與BEGIN EXCLUSIVE；原v1 layout/constraints與snapshot一致性fail closed，原BLOB bytes不reserialize。新v2只經maintenance建立，normal open不自動遷移。正式備份、rollback與舊Host停機責任見 [maintenance procedure](../setup/SQLITE_APPROVAL_MAINTENANCE.md)。
+- 實際v2表為policy_authority、authorization_operations、approval_requests、task_controls、control_audit。Request/scope metadata存在typed approval snapshot，SQL columns做key/FK/version/CAS一致性；沒有額外cancellation_requests表，因本輪只保存cancel intent，不dispatch/abort/reconcile provider。
+- M2-A approval狀態為Pending/Approved/Rejected/Expired/Revoked/Consumed。新policy revision讓舊record無法consume，但不自動把舊Approved改成Superseded；它仍只是資料。Superseded/Closed及完整provider cancellation outcome是後續target，不冒充已實作。
+- IProtectedPolicyAuthority是注入的protected boundary，無production resolver/implementation。Current source是唯一epoch來源；同DB持久high-water拒絕回退、不同authority、同revision內容改變與只升其中一個revision。Policy激活必須遵守受保護source與維護序列化契約；不信任request/repo配置。高水位獨立commit，所以失敗business mutation不會撤回已觀測revision；不是防惡意DB owner或backup rollback的安全服務。
+- Consume重新核對exact binding/current policy、operator仍有權、caller/control/cancel、execution/provider mapping；同transaction consume+Created+audit，**不返回dispatch continuation/ticket，不呼叫Workflow或provider**。只有M3建立完整identity與enforcement後才能接續。
+- task_controls版本由0開始，cancel intent提升version並保持sticky，同transaction revoke未consume批准；不覆寫execution terminal或假造Cancelled。Audit為有界固定欄位（含epoch/version），硬上限10000 rows、讀取最多100；滿額整筆business mutation拒絕，無自動prune。
+- 真實process驗證涵蓋Pending writer death/new reader與兩個migration precommit kill點；51 focused、304 offline全通過。沒有provider POST、live session或agent execution。完整證據與M2-B/M3 prerequisites見M2-A report；公司事件與舊結果不變。
