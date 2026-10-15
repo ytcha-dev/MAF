@@ -1,124 +1,247 @@
 # MAF — Product & Engineering Roadmap
 
-> Status: Living document · Version: 0.1 · Updated: 2026-10-14  
-> Project: `ytcha-dev/MAF` · Owner decision: **Workflow-first (A), then Hybrid (C)**
+> **Proposed v0.2** · 2026-10-15 · Project: `ytcha-dev/MAF`  
+> **Status:** Proposal for owner review, not an implementation authorization  
+> **Decision retained:** deterministic Workflow-first (A), then bounded Hybrid orchestration (C).  
+> **Deployment preference:** company-local / offline-capable first; portability and optional remote access later, subject to organizational authorization.
 
-## 1. Vision
+## 1. Vision and operating principles
 
-MAF is an extensible **multi-agent orchestration platform** built initially with Microsoft Agent Framework (.NET). Its purpose is to coordinate specialist agents, existing harnesses, and knowledge services—not to recreate mature coding tools, vector databases, or model runtimes.
+MAF is a **local-first, extensible orchestration platform** coordinating native agents, existing independent harnesses, and optional knowledge/tools/services. It must **not** recreate OpenCode's coding loop or a general-purpose RAG engine.
 
-**Principle: Build the orchestration. Integrate the execution. Reuse the infrastructure.**
+**Build the orchestration. Integrate the execution. Reuse the infrastructure.**
 
-The name MAF refers to this repository/project; Microsoft's Agent Framework is a chosen implementation technology, not a permanent requirement. Preserve boundaries so that agents, executors, models, protocols, and eventually orchestration engines can be replaced.
+Key distinction: **integration availability ≠ installation/configuration ≠ activation ≠ authorization to execute**. External integrations are plug-in sockets, not automatically trusted capabilities. A provider may be installed and configured but **disabled**, in which case it is invisible to routing and cannot be invoked through any execution path.
 
-## 2. Non-goals
+MAF is the product/repository name; Microsoft Agent Framework is an implementation dependency, not a permanent architectural lock-in.
 
-- Reimplement OpenCode's coding loop, tool permissions, terminal operations, context compaction, or file writer.
-- Build a full vector database or RAG platform merely to demonstrate retrieval.
-- Require every external service to be wrapped in another LLM-powered `ChatClientAgent`.
-- Adopt A2A, MCP, or any interface simply for fashion or architectural symmetry.
-- Give LLMs unrestricted decision, execution, filesystem, network, or approval privileges.
-- Promise production readiness based solely on a successful local demonstration.
+## 2. Verified baseline and explicit limitations
+
+Evidence at 2026-10-15: `docs/acceptance/PHASE2A_RESULTS.md` records a completed **local, approved, read-only** end-to-end OpenCode delegation proof: CLI → official MAF Workflow → OpenCodeExecutor → OpenCode Server → typed result. Tested scenarios include successful runs, server unavailable, cancellation, ambiguous timeouts, permission waiting, and fake-provider concurrency. See that report for exact test runs and qualifications; these do **not** establish production readiness or coding quality.
+
+Existing modules:
+
+- `MAF.Host`: CLI and DI, with independent PCA, Review and external-task modes; external CLI output supports `json`, `text`, `verbose`.
+- `MAF.Core`: provider-neutral contracts and shared bounded tools.
+- Native PCA (Comprehension) and separate Review service.
+- `MAF.Workflows.External`: official custom Workflow executor and OpenCode API client, read-only and bounded.
+
+**Not yet delivered:** durable cross-process run state, reliable restart recovery, an operator approval interface, authorized write execution, PCA → external harness → Reviewer as one automatic workflow, a remote gateway, Hybrid LLM routing, additional production harness adapters, A2A integration.
+
+Known observations: long-running tasks may generate hundreds of HTTP observations; current OpenCode permission cancellation can leave a pending permission even after abort acknowledgment; completed execution does not guarantee accurate repository analysis.
 
 ## 3. Roadmap at a glance
 
-| Stage | Goal | Main deliverable | Exit gate |
-| --- | --- | --- | --- |
-| Phase 1 — Agent fundamentals | Understand agent internals | PCA + independent Review Agent, evidence-based tests | Can explain model / agent / tool / session / harness boundaries; basic runs verified |
-| Phase 2A — Workflow-first integration | Prove delegation to an external harness | Official MAF workflow + OpenCode adapter/executor | Repeatable read-only E2E, state/cancellation/error validation |
-| Phase 2B — Workflow hardening | Make external execution trustworthy | Persistent mapping, reconnect, approval handling, observability | No silent duplicate execution; known failure paths tested |
-| Phase 3 — Hybrid orchestration | Introduce bounded LLM decisions | Planner/router proposing typed decisions under runtime policy | Deterministic gates remain authoritative; measured improvement |
-| Phase 4 — Ecosystem expansion | Plug-and-play services and cross-framework collaboration | Additional providers, optional A2A and knowledge retrieval | New backend through adapter with contract tests |
-| Phase 5 — Deployment maturity (optional) | Operate beyond localhost | Secure hosting, multi-user isolation, telemetry, audit | Security/operational readiness accepted explicitly |
+| Stage | Objective | Main output | Acceptance / gate |
+|---|---|---|---|
+| Phase 1 — Agent fundamentals | Learn native MAF agents and tool boundaries | PCA + independent Reviewer | Evidence-backed selected tests; retain baselines |
+| Phase 2A — External harness proof | Verify whole-task delegation | MAF Workflow → OpenCode read-only | **Passed for controlled local PoC**; see acceptance report |
+| **Phase 2B-1 — Durable execution** | Recover without duplicate submissions | `IExecutionStore` + SQLite pilot + reconciliation | Crash/restart finds same remote session; ambiguous submissions never blindly retried |
+| **Phase 2B-2 — Policy & approvals** | Trustworthy state / safety transitions | Explicit human approval states; lifecycle cleanup | Pending approvals and cancellation remain honest; default deny |
+| **Phase 2B-3 — Diagnostics & artifacts** | Understand cost, latency, outcome | Correlated trace and trusted provenance | Distinguishable provider calls, model usage where supported, and verified result limits |
+| **Phase 2B-4 — Deterministic multi-agent path** | Join specialists safely | PCA → OpenCode → Reviewer → human gate | Typed handoff and failure boundaries; first read-only, write pilot separately approved |
+| **Phase 2C — Connector registry & switches** | Optional integrations safely enabled | Registry + disabled-by-default lifecycle + policy checks | Disabled adapter cannot be listed as available to router or invoked via direct API |
+| Phase 3 — Bounded Hybrid | LLM recommends **only allowed** steps | Planner / router with validated typed decisions | Measurable gain against fixed workflow, no policy escalation |
+| Phase 4 — Ecosystem expansion | Multiple harnesses and protocols when justified | Optional Codex, Claude Code, MCP, A2A, knowledge adapters | Each connector has capability negotiation and contract tests |
+| Phase 5 — Operational / remote maturity (optional) | Enterprise-compliant, cross-platform operation | Protected API, identities, audit, multi-worker when needed | Approved security review; never expose company workspace by default |
 
-Stages are outcome gates, **not calendar commitments**. Future stages may be reordered, split, deleted, or replaced as tools mature.
+Stages are **outcome gates**, not fixed deadlines. Phase 2C is a logical milestone; small portions of its *contracts* may be implemented during 2B as needed, without creating a premature plugin marketplace.
 
-## 4. Phase 1 — Learn by building (current baseline)
+## 4. Target architecture
 
-**As of 2026-10-14:** The repository has a .NET Console Host, `IChatClient`, a PCA built using `ChatClientAgent`, `ProjectTools` with bounded read-only repository access, and a Review Agent service with structured findings. The repository includes test and live-model evaluation reports; these are evidence of selected checks, **not** a blanket quality certification.
+```mermaid
+flowchart TB
+    CLI[CLI / Local UI] --> H[MAF Host / application API]
+    WEB[Optional authorized clients: Open WebUI / GPT connector] -. gated future .-> H
+    H --> W[Deterministic workflow & policy engine]
+    W --> REG[Connector Registry & Activation Policy]
+    W --> STORE[(IExecutionStore: SQLite local-first)]
+    REG --> N[PCA / Reviewer native agents]
+    REG --> OC[OpenCode adapter / harness]
+    REG -. optional, disabled by default .-> CD[Codex / Claude adapter]
+    REG -. optional, disabled by default .-> MCP[MCP / A2A / Knowledge adapters]
+    W --> G[Human approval / verification gates]
+    STORE -. optional storage replacement .-> PG[(PostgreSQL / authorized deployment)]
+```
 
-Keep PCA and Reviewer as reference implementations and regression baselines. Study:
+Architecture boundaries:
 
-1. `IChatClient` versus `AIAgent` / `ChatClientAgent`.
-2. Function calling and trust boundaries (`AIFunctionFactory`, actual tool execution).
-3. Sessions, context growth, model errors and cancellation.
-4. Structured output, provenance, limitations and reproducible agent evaluations.
+1. **Host** owns auth/config/entrypoints; must not duplicate any harness tool loop.
+2. **Workflow** owns typed transitions, allowed routing, budgets, safety gates and recovery decisions.
+3. **Registry** owns connector identity, configuration status, admin activation and discoverable capabilities; it **does not** grant file/network privileges by itself.
+4. **Execution adapter** owns provider API translation and correlation, not global routing decisions.
+5. **Harness** owns its internal model, context, tools and task execution within permitted boundaries.
+6. **Storage** persists execution state, not raw credentials or unbounded tool transcripts.
+7. **Review / approvals** independently verify evidence; `Completed` is not equivalent to `Accepted`.
 
-**Policy:** Stop broadening PCA until a measured need justifies a change. Use a bounded evaluation set; separate stale external knowledge from incorrect repository reasoning. No automatic transfer of business code to an unapproved model endpoint.
+## 5. Connector socket / switch model
 
-## 5. Phase 2A — A: fixed, deterministic Workflow-first
+A connector is an integration endpoint or adapter, not necessarily an LLM Agent. The same registry concept can represent harness execution, knowledge retrieval, notification services, MCP tools, and eventually remote A2A peers, but their execution contracts remain distinct.
 
-**First integration:** `MAF Workflow → OpenCodeExecutor → OpenCode Server → Result`.
+### 5.1 Lifecycle and capability resolution
 
-- Use **official MAF Workflow APIs** (validate actual pinned SDK version first).
-- Make OpenCode an **external long-running executor**, not a surrogate `ChatClientAgent` by default.
-- Communicate through OpenCode's supported API, maintaining server session identity and progress.
-- Start with tasks that do not change files; prefer test-owned fixtures.
-- Distinguish connection timeout from remote cancellation and completion.
-- Do not add PCA/Reviewer to the first E2E until this foundation passes.
+Suggested administrative lifecycle (not an API contract yet):
 
-**Gate 2A:** At least three successful repeated task delegations; verified behavior for server unreachable, delayed completion, cancellation, unknown result, permission request, and reconnection; no unauthorized file mutations. See `docs/plans/PHASE2A_EXECUTION_PLAN.md` for exact cases.
+`NotInstalled → Installed → Configured → Enabled → Healthy/Available`
 
-## 6. Phase 2B — Reliability before autonomy
+- **Installed**: code/provider package is present; no credentials or permission inferred.
+- **Configured**: validated non-secret settings or secret references exist; still **disabled by default**.
+- **Enabled**: an authorized operator explicitly activates it for an allowed environment and purpose.
+- **Healthy/Available**: fresh health/capability checks pass, and policy permits this caller, workspace and action.
+- **Disabled / Unhealthy / Revoked**: unavailable to routing, manual invocation and background workers. Never silently fall back to another connector.
 
-Introduce only after Phase 2A evidence:
+Keep `Enabled` (administrative intent) separate from `Healthy` (runtime observation), rather than treating them as one mutable enum. Suggested effective capability rule:
 
-- Durable mapping of WorkflowRunId ↔ ExternalExecutionId ↔ OpenCode SessionId.
-- Idempotent launch/reconciliation strategy and restart recovery.
-- Explicit permissions (read-only, write-approved, prohibited) and human approvals.
-- Event/trace correlation, redaction, token/cost/time budgets.
-- Failure and partial-completion semantics; explicit diff/artifact provenance.
-- PCA → OpenCode → Review → Human approval as a fixed integration pipeline.
+`Usable = Installed && Configured && Enabled && Healthy && CallerAuthorized && WorkspaceAllowed && OperationAllowed && WithinBudget`
 
-**Gate 2B:** Restart while external run is active; reconnect to *same* remote session without duplicate prompt submission; maintain audit trail and approval boundary.
+An integration can be switched **off** without uninstalling or deleting configuration. Connection testing while disabled must require a separate explicit admin action and cannot submit work.
 
-## 7. Phase 3 — C: Hybrid orchestration
+### 5.2 Minimal registry fields (proposal)
 
-A deterministic workflow engine remains responsible for security, orchestration state, policy checks and allowed transitions. An LLM may **propose**:
+- `ConnectorId`, `Kind` (`Harness`, `NativeAgent`, `Knowledge`, `Tool`, `Notification`), `AdapterVersion`
+- `Enabled` (false by default for new external connectors), `Configured`, `HealthStatus`, `LastHealthCheck`
+- `AllowedScopes` and supported capabilities, e.g. `ReadRepository`, `ExecuteTask`, `WriteWorkspace` (the last never implied)
+- Secret **reference** only, not API key value in database/logs
+- `PolicyVersion`, config revision, operator change audit metadata
 
-- Which allowed specialist executor should handle the task.
-- Whether to request more context or hand off for review.
-- How to decompose a user-approved objective into bounded subtasks.
+Do **not** equate `Enabled=true` with unrestricted authority; execution policies and explicit approvals remain mandatory. Distinguish platform-level enablement from workspace/task-level grants.
 
-The runtime must validate decisions against typed schemas, whitelisted capabilities, budgets, max depth/iterations, idempotency rules and approval requirements. LLMs **cannot** grant themselves permissions, modify policies, mark remote work complete without evidence, or run unbounded retries.
+### 5.3 Hard controls and test cases
 
-Start with one bounded routing decision, then compare Hybrid to fixed Workflow on correctness, cost, latency and reliability. Adopt only if the measurable benefit justifies the complexity.
+- Disabled connectors must not appear as executable options to Hybrid router or auto-routing; optional UI may list them as *disabled* for administration.
+- All execution entrypoints, including direct CLI/API calls and reconnect workers, perform policy checks **server-side**, not just UI toggles.
+- Disabling during a running task follows an explicit policy: **deny new submissions immediately**; existing work is either allowed to finish, requested to cancel, or quarantined pending review, as operator policy specifies. Do not claim cancellation confirmed merely because a disable flag was set.
+- Configuration changes, enable/disable actions, and approval decisions have audit trails; changing credentials does not authorize retries of ambiguous submissions.
+- Health-check failure cannot trigger an automatic switch to another provider when work may already have been submitted.
+- Secrets stay in approved credential stores/environment references; no company source or request data sent externally without explicit policy authorization.
+- Test scenarios: absent/unconfigured, disabled, enabled+unhealthy, revoked while queued, disabled mid-run, denied workspace, failed approval, competing run, restart, capability mismatch.
 
-## 8. Future integration candidates (not implementation commitments)
+### 5.4 Configuration example (illustrative; **not implemented**)
 
-| Candidate | Why | Adoption trigger |
-| --- | --- | --- |
-| A2A (Agent-to-Agent) | Interoperate with heterogeneous remote agents via common protocol | At least one actual partner speaks A2A or standardized exposure brings clear benefit |
-| OpenCode API adapter | Delegate complete coding/repository tasks | **Immediate Phase 2A choice** |
-| Open WebUI Knowledge / RAG | Retrieve documents and domain context | Benchmarks identify retrieval recall as a limitation |
-| Additional agent runtimes | Avoid vendor or framework lock-in | A second real execution backend exists |
-| MCP | Expose tools to models or agents | Tool interoperability is needed; MCP is not a substitute for full task orchestration |
-| Workflow checkpoint storage | Restore internal workflow progress | Long-running durable workloads demand it; still reconcile external session separately |
-| Alternate orchestration engine | Long-term portability | Clear functional/operational reason, supported by contract boundaries |
+```json
+{
+  "connectors": {
+    "opencode-local": {
+      "kind": "Harness",
+      "adapter": "OpenCode",
+      "enabled": true,
+      "endpoint": "http://127.0.0.1:4096",
+      "allowedCapabilities": ["ReadRepository", "ExecuteReadOnlyTask"]
+    },
+    "codex-remote": {
+      "kind": "Harness",
+      "adapter": "Codex",
+      "enabled": false
+    },
+    "gpt-gateway": {
+      "kind": "ClientGateway",
+      "adapter": "FutureApprovedConnector",
+      "enabled": false
+    }
+  }
+}
+```
 
-Protocol rules: **A2A = agent-to-agent communication; MCP = tool/context exposure; direct provider API = harness-specific integration**. They are not interchangeable. A custom gateway is optional; never assume OpenCode natively exposes A2A without verification.
+This is a future conceptual registry example, **not** an existing `appsettings.json` format or permission to expose localhost. Connecting ChatGPT/Codex requires a separately supported, authenticated integration route; personal external services must not see company code or metadata without organizational authorization.
+
+## 6. Phase 2B implementation plan (incremental)
+
+### 2B-0 — Feasibility / engineering baseline (short)
+
+- Confirm `Microsoft.Data.Sqlite` package and native library work under company-managed Windows app-control policies on a throwaway fixture; no admin install or policy bypass.
+- Confirm current code/tests, record actual OpenCode API and version, save controlled baseline.
+- If SQLite native package is blocked, pause and choose an approved alternative. Do **not** redirect internal task data to personal Supabase simply to bypass local restrictions.
+
+### 2B-1 — Durable execution and restart reconciliation (next implementation)
+
+- Add a small `IExecutionStore` contract with a SQLite implementation. Store stable TaskId, workflow/execution/session/message IDs, request digest, submission phase, status, timestamps, and concurrency/lease metadata as warranted.
+- Serialize durable state transitions around side effects. Before submit, persist submission intent and correlation identifier; after remote response, persist observable result. Recognize the **uncertain POST window**; local transactions cannot make a remote POST exactly-once.
+- On restart, **inspect and reconcile the original remote session** before any retry. Missing proof → `Unknown`, never blindly create a second prompt.
+- Ensure unique task identity/request digest, safe transition checks and single-run ownership; scoped fake-provider fault injection at each crash boundary.
+- Keep the first implementation single-host; do not claim distributed exactly-once semantics or reliable multi-worker coordination.
+
+**Gate:** restart while a remote task is active; same external handle recovered; no duplicate POST; original result eventually collected or explicit `Unknown` with actionable identity.
+
+### 2B-2 — Approval and cancellation semantics
+
+- Separate operator request, external provider pending permission, abort acknowledgement and confirmed terminal state.
+- Expose safe operator actions for resolving pending permissions; no automatic approval.
+- Preserve audit trail and safety policy on reconnect; never transform `Unknown` into `Cancelled` without evidence.
+
+**Gate:** replay tests covering lingering `/permission` after abort, policy changes and interrupted cleanup.
+
+### 2B-3 — Observability and outcome evidence
+
+- Record high-value bounded trace: per-endpoint HTTP request count and time, workflow correlation, timing budgets, truncation flags, source/version provenance.
+- Measure baseline polling before choosing SSE/long polling; use fallback with reconciliation on event loss.
+- Collect token/cost only when provider supplies grounded usage data; never infer usage from HTTP request count.
+
+**Gate:** identify slow stage and discrepancy between execution status and answer-quality evaluation.
+
+### 2B-4 — Deterministic pipeline and future write gate
+
+- Typed handoff: PCA → external OpenCode → Review → human acceptance, with skipped/failed/partial states distinct.
+- Start with read-only analysis and review of trusted inputs. Write-enabled pilot requires separately approved workspace isolation, diff/artifact provenance, rollback strategy, explicit permissions and security acceptance.
+
+**Gate:** repeatable fixed workflow and verified cross-step evidence; no unsanctioned writes.
+
+### 2C — Registry MVP
+
+- Start with two known connector IDs: the existing native path and OpenCode. One disabled mock external connector tests disable behavior without external requests.
+- Centralized `IsUsable` authorization and audit, CLI administration first; UI and generic plugin discovery later.
+- Do not allow connector state to bypass `OpenCodeClient` read-only safety policy.
+
+**Gate:** integration can be configured, disabled and re-enabled without reinstall; disabled means zero provider task API submissions, including after restart or through direct entrypoints.
+
+## 7. Phase 3 — Hybrid orchestration, after stable gates
+
+An LLM may propose a typed selection among **currently enabled and authorized** connectors, ask for more context or choose review. The deterministic runtime approves/denies the choice. It cannot enable connectors, change allowed scopes, grant credentials, auto-approve writes, invent task completion, or retry ambiguous submissions.
+
+Start with **one routing choice**, compare against a deterministic baseline (quality, cost, latency, correctness, permission compliance), then increase autonomy only with measured benefit. Preserve human override and disable-by-default for newly installed adapters.
+
+## 8. Phase 4 / Phase 5 — Optional ecosystem and remote operation
+
+- Add Codex or Claude Code **only via a verified adapter**, user/company-supported terms, safe session semantics and controlled scopes. OpenCode direct API is already the initial external harness.
+- Add MCP for exposed tools/context; A2A for genuine remote agent peers; do not conflate protocols or mandate them without a use case.
+- Open WebUI can be a client or knowledge provider, not implicitly the central orchestrator.
+- Future GPT/ChatGPT connector: only through a supported integration, authenticated API, explicit user consent, and company data-governance approval. **No automatic personal cloud exposure of company source.**
+- Keep MAF local-first and network-closed by default. Cross-platform executability (.NET/SQLite), remote access, and distributed multi-worker execution are different milestones.
+- Upgrade from local SQLite to PostgreSQL (including approved managed providers) only if multi-worker consistency, centralized operation, or remote hosting genuinely requires it. Supabase is a potential *approved* PostgreSQL deployment, not a requirement or shortcut around company policy.
 
 ## 9. Architectural invariants
 
-1. **Execution separation:** coding harness owns editing/execution; MAF coordinates it.
-2. **Adapter separation:** provider-specific JSON/API objects never leak into generic workflow contracts.
-3. **State separation:** MAF sessions, workflow runs and OpenCode sessions are distinct.
-4. **Security:** least privilege; no automatic trust of repository content as instructions; no secret logging.
-5. **Observability:** each result records origin, run identity, final/partial status and limitations.
-6. **Budgeting:** limit retries, concurrency, task duration and model/tool usage.
-7. **Portability:** reuse where appropriate; do not force all executors into `AIAgent`.
-8. **Evidence:** explicitly label demonstrated behavior vs assumptions vs future proposal.
-9. **Human control:** retain approval gates for writes and high-risk operations.
-10. **Learning:** maintain a minimal educational example of native MAF Agent even if a replacement is later selected.
+1. OpenCode/Codex/Claude harnesses own their task/tool loops; MAF owns orchestration and policy.
+2. Provider-specific details stay in adapters; native agents need not masquerade as external harnesses.
+3. Distinct identities: MAF workflow, durable execution, provider session, external message.
+4. All **external connectors are disabled by default** until explicitly enabled; an enabled connector still requires workspace/action authorization.
+5. Disabled connectors cannot be routed to **or directly invoked**; no silent fallback or privilege escalation.
+6. Durable submission + reconciliation precedes autonomous retries or write access.
+7. `Completed` means execution finished; `Accepted` needs independent validation.
+8. Least privilege and human approval for risky actions; no secret or internal-source exfiltration to unauthorized services.
+9. Provenance and bounded budgets: time, retries, requests, concurrency, and where supported, token usage.
+10. Portability through small contracts, not premature generalized adapter/plugin frameworks.
+11. Local-first; network exposure is an opt-in architecture/security decision.
+12. Document verified evidence, remaining limitations and explicit owner decisions separately.
 
-## 10. Decision log and document maintenance
+## 10. Decision log and migration checklist
 
-- **ADR-001 (2026-10-14):** Build vs integrate — use existing harnesses rather than rebuild coding/RAG internals.
-- **ADR-002 (2026-10-14):** A before C — Workflow-first before Hybrid.
-- **ADR-003 (proposed):** OpenCode via custom Workflow Executor and provider adapter for first PoC; A2A remains optional.
+Existing decisions remain: ADR-001 (integrate rather than reimplement), ADR-002 (A before C), ADR-003 (official Workflow Executor + OpenCode direct API; now adopted for 2A). Preserve historical evidence/links and update stale 'Phase 2A next action' text rather than rewriting prior acceptance results.
 
-These are decision *records*, not claims that matching ADR files already exist. When decisions change, record **context, alternatives, decision, consequences, evidence, revisit trigger**. Update the roadmap; do not erase earlier history.
+**Proposed new ADRs:**
 
-### Current next action
+- ADR-004 — Local-first durable execution state (SQLite, single-host initial scope, reconciliation protocol).
+- ADR-005 — Connector lifecycle and activation security (`Installed/Configured/Enabled/Healthy` vs effective usability; mid-run disable semantics).
+- ADR-006 — Optional remote ingress/data boundary, *only when an authorized deployment use case exists*.
 
-Execute `docs/plans/PHASE2A_EXECUTION_PLAN.md`, referring to `docs/architecture/EXTERNAL_HARNESS_ARCHITECTURE.md`. Codex must read and reconcile the latest repository before implementing anything. This roadmap alone does not authorize a write-enabled external run.
+**Codex documentation-only update instructions:**
+
+1. Review current `docs/ROADMAP.md`, README, ADRs, plans, and acceptance results against latest main. Do not silently override newer decisions.
+2. Replace/update the roadmap with this proposal only after reconciling current file state; keep existing historical ADR references and source evidence.
+3. Update README roadmap links or status summary if stale, without changing the program, dependencies, permissions, or runtime behavior.
+4. Add ADR-004 / ADR-005 as **proposed** if requested separately; do not mark unimplemented designs as accepted.
+5. Run documentation/link checks available in repo; do not run live external-agent tests for a documentation-only change.
+6. Commit only documentation changes, report files and commit SHA.
+
+### Immediate next action
+
+**Phase 2B-0 SQLite feasibility smoke test, then Phase 2B-1 durable mapping / restart recovery.** Connector architecture is planned now; registry implementation comes only after safe execution and approval foundations exist.
