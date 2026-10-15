@@ -10,7 +10,7 @@ using System.ClientModel;
 
 if (args.Contains("--help") || args.Length == 0)
 {
-    Console.WriteLine("pca --project <directory> [--ask <question>]\npca --project <directory> --review [--scope All|Staged|Unstaged] [--focus <text>] [--context-limit <characters>] [--diagnostics <relative.json>]\npca --project <approved-directory> --external-task <text> [--task-id <id>] [--external-timeout <seconds>]\nExternal environment: OPENCODE_BASE_URL, OPENCODE_PROJECT_ROOT, OPENCODE_AGENT, OPENCODE_ALLOW_LOOPBACK_HTTP=1; optional OPENCODE_SERVER_USERNAME/PASSWORD\nReview emits JSON; exit codes: 0 Completed, 3 Partial, 1 Failed.\nEnvironment: AI_BASE_URL, AI_API_KEY, AI_MODEL\nExit: /exit; reset session: /reset");
+    Console.WriteLine("pca --project <directory> [--ask <question>]\npca --project <directory> --review [--scope All|Staged|Unstaged] [--focus <text>] [--context-limit <characters>] [--diagnostics <relative.json>]\npca --project <approved-directory> --external-task <text> [--task-id <id>] [--external-timeout <seconds>] [--output json|text|verbose]\nExternal output: json (default, UTF-8), text (summary), verbose (diagnostics). Invalid output arguments: exit 2.\nExternal environment: OPENCODE_BASE_URL, OPENCODE_PROJECT_ROOT, OPENCODE_AGENT, OPENCODE_ALLOW_LOOPBACK_HTTP=1; optional OPENCODE_SERVER_USERNAME/PASSWORD\nReview emits JSON; exit codes: 0 Completed, 3 Partial, 1 Failed.\nEnvironment: AI_BASE_URL, AI_API_KEY, AI_MODEL\nExit: /exit; reset session: /reset");
     return 0;
 }
 try

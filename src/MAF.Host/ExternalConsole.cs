@@ -1,4 +1,4 @@
-using System.Text.Json;
+using System.Text;
 using MAF.Core;
 using MAF.Workflows.External;
 using MAF.Workflows.External.OpenCode;
@@ -10,10 +10,12 @@ internal static class ExternalConsole
 {
     public static async Task<int> RunAsync(string[] args, string project, Func<string, string> option)
     {
+        var outputFormat = ExternalConsoleOutput.Parse(args);
         if (args.Contains("--ask") || args.Contains("--review"))
         {
             throw new ArgumentException("Choose one CLI mode.");
         }
+        Console.OutputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
         string Required(string name) => Environment.GetEnvironmentVariable(name) is { Length: > 0 } value
             ? value : throw new ArgumentException($"Please set {name}.");
         var configuration = new OpenCodeOptions(new Uri(Required("OPENCODE_BASE_URL")), Required("OPENCODE_PROJECT_ROOT"),
@@ -37,8 +39,11 @@ internal static class ExternalConsole
         var request = new ExternalTaskRequest(taskId, project, option("--external-task"), TimeSpan.FromSeconds(timeout));
         Console.Error.WriteLine("Official Workflow graph: ExternalTaskRequest -> OpenCodeExecutor -> ExternalTaskResult");
         var run = await provider.GetRequiredService<ExternalWorkflow>().RunAsync(request, stop.Token);
-        Console.WriteLine(JsonSerializer.Serialize(run, ExternalTaskResult.JsonOptions));
-        return run.Result.Status switch
+        ExternalConsoleOutput.Write(Console.Out, run, outputFormat);
+        return ExitCode(run.Result.Status);
+    }
+
+    internal static int ExitCode(ExternalExecutionStatus status) => status switch
         {
             ExternalExecutionStatus.Completed => 0,
             ExternalExecutionStatus.Partial => 3,
@@ -47,5 +52,4 @@ internal static class ExternalConsole
             ExternalExecutionStatus.Cancelled => 130,
             _ => 1
         };
-    }
 }

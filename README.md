@@ -199,6 +199,14 @@ dotnet run --project src/MAF.Host -- --project $env:OPENCODE_PROJECT_ROOT --exte
 
 stdout 是 typed result 與官方 Workflow event 名稱的 JSON，stderr 顯示 graph。退出碼：`0` Completed、`3` Partial、`4` Unknown、`5` WaitingForApproval、`130` Cancelled、`1` Failed；設定錯誤為 `2`。Ctrl+C 會嘗試 remote abort；沒有終態證據時回報 Unknown。WaitingForApproval 不會自動放行。
 
+外部任務可選 `--output json|text|verbose`（值不分大小寫），省略時仍為 `json`。JSON 保留既有欄位、enum、null 與結構，使用 UTF-8 直接顯示中文；字串內換行仍依 JSON 規則寫成 `\n`，這不是遺失換行。CLI 專用 encoder 不影響共用 serializer，也不適合把輸出直接嵌入 HTML／script。
+
+- `--output text`：直接顯示摘要與實際段落換行；保留限制。未完成／失敗／等待授權時另顯示狀態、安全錯誤碼與對帳 IDs。
+- `--output verbose`：摘要加狀態、task/run/execution/session/request IDs、duration、HTTP requests、error code、abort、限制、trace 與 Workflow events；未取得的值明示為 `(unavailable)`。
+- 未知值、缺值或重複 `--output` 會在建立 OpenCode client 前以 exit `2` 拒絕。此選項僅支援 `--external-task`；`--ask`／`--review` 行為不變。
+
+例如在上述指令尾端加上 `--output text` 或 `--output verbose` 即可切換，不必重設模型或權限。格式測試使用固定中文摘要 `## 中文摘要` 與兩段文字：JSON 顯示 `"summary": "## 中文摘要\n\n第一段。\n\n第二段。"`；text 顯示原始 Markdown 段落；verbose 再加入 `Status: Completed`、`Workflow run ID: workflow-1`、`HTTP requests: 12` 等診斷。JSON stdout 始終只有一份 document，graph 訊息仍在 stderr。
+
 `--task-id` 可指定程序內的提交識別；相同 TaskId 只共享相同請求，不能當成跨 CLI 程序的去重保證。Unknown 時先檢查結果中的原 ExternalSessionId，切勿盲目重跑。預設 1 秒輪詢、最多 200 次，最多 3 頁各 100 筆 messages、1 MiB HTTP body 與 32,000 字元 summary；超限明確標示限制。artifact／diff、token 與成本尚未收集。
 
 一般 `dotnet test` 不呼叫 OpenCode，live tests 預設略過。真實測試須指定 `MAF_LIVE_OPENCODE=1`、`MAF_OPENCODE_TEST_ROOT`（Temp 下 `maf-phase2a-*` fixture）、`MAF_OPENCODE_RESULTS_DIR`，且明確授權 server／模型與 fixture。詳見 [執行計畫](docs/plans/PHASE2A_EXECUTION_PLAN.md)、[架構決策](docs/architecture/ADR-003_OPENCODE_WORKFLOW_EXECUTOR.md)與[實際驗收紀錄](docs/acceptance/PHASE2A_RESULTS.md)。
