@@ -185,6 +185,8 @@ This is a future conceptual registry example, **not** an existing `appsettings.j
 
 Architecture/planning only (2026-10-16): [ADR-005](architecture/ADR-005_POLICY_APPROVAL_CANCELLATION.md), [execution plan](plans/PHASE2B2_EXECUTION_PLAN.md) and [acceptance plan](acceptance/PHASE2B2_ACCEPTANCE_PLAN.md) propose default-deny MAF task authorization, durable exact-scope human decisions and cancellation reconciliation. MAF approval does not grant OpenCode internal tool permissions; approval resume first revalidates current policy/control/provider state and never resubmits an existing execution. These documents do not implement Phase 2B-2 or authorize runtime work; operator trust and schema migration decisions require owner review before implementation.
 
+Subsequently authorized M1 only: independent Core policy contracts, immutable snapshot evaluator, trusted-context interface and versioned canonical binding are implemented; 98 focused cases and 253 offline cases passed ([M1 results](acceptance/PHASE2B2_M1_RESULTS.md)). The evaluator is not wired into submission/recovery, and supplies no production authentication or approval bypass. Durable approvals, schema v2, cancellation ledger, identity resolver and enforcement integration remain pending; M2 requires separate owner approval.
+
 - Separate operator request, external provider pending permission, abort acknowledgement and confirmed terminal state.
 - Expose safe operator actions for resolving pending permissions; no automatic approval.
 - Preserve audit trail and safety policy on reconnect; never transform `Unknown` into `Cancelled` without evidence.

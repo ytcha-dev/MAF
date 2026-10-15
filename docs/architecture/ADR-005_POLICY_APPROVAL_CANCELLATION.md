@@ -1,6 +1,8 @@
 # ADR-005：Policy、人工核准與取消對帳
 
-日期：2026-10-16（Asia/Taipei）。狀態：**Proposed，待 owner 核准；只有架構與執行計畫，未實作或驗證 Phase 2B-2。**
+日期：2026-10-16（Asia/Taipei）。狀態：**M1方向已獲owner核准並完成獨立實作／測試；其餘架構仍為Proposed，未實作或驗收完整Phase 2B-2。**
+
+後續增量：owner已明確批准M1的provider-neutral contracts、replaceable trusted context、單一immutable policy snapshot與deterministic evaluator；實測見 [M1 results](../acceptance/PHASE2B2_M1_RESULTS.md)。僅M1完成，不代表下述approval/persistence/cancellation/runtime enforcement提案已實作或全部獲准；M2與正式operator trust機制仍待另行授權。
 
 檢視基準：`origin/main = 64d3c36`；2026-10-16 fetch 後沒有更新提交。[Roadmap](../ROADMAP.md)、[ADR-003](ADR-003_OPENCODE_WORKFLOW_EXECUTOR.md)、[ADR-004](ADR-004_DURABLE_EXECUTION_RECOVERY.md)、[家用結果](../acceptance/PHASE2B1_HOME_RESULTS.md) 與 [公司安全事件](../acceptance/PHASE2B1_SECURITY_EVENT.md) 為依據。家用 2B-1 通過不解除公司 execution hold。
 
@@ -279,4 +281,4 @@ sequenceDiagram
 | abort uncertain後是否重試 | 預設不自動重送；只有adapter有已驗證idempotence＋新授權時才能提案 |
 | deadlines／audit retention | 實作前核准具體有界值與可控clock策略；期限為grant與operation較早者，不提供unbounded approval |
 
-首個實作里程碑建議為 [execution plan](../plans/PHASE2B2_EXECUTION_PLAN.md) M1：純contract／evaluator與negative tests，無provider side effects、無schema migration；owner接受本ADR及trust決策後才開始。完整矩陣見 [acceptance plan](../acceptance/PHASE2B2_ACCEPTANCE_PLAN.md)。本次不建置、測試、執行新binary或live OpenCode，不開始2B-3、2C、Phase3。
+原設計輪建議先做 [execution plan](../plans/PHASE2B2_EXECUTION_PLAN.md) M1：純contract／evaluator與negative tests，無provider side effects、無schema migration。Owner後續已批准並完成此範圍，結果見開頭M1連結；approval/persistence/trust activation與M2仍待授權。完整矩陣見 [acceptance plan](../acceptance/PHASE2B2_ACCEPTANCE_PLAN.md)。原文件設計輪沒有build/test/live；M1輪僅執行build與offline tests，沒有live OpenCode，不開始2B-3、2C、Phase3。

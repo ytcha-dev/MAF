@@ -1,6 +1,8 @@
 # Phase 2B-2 執行計畫：Policy、人工批准與取消
 
-日期：2026-10-16。狀態：**Proposed / documentation only；沒有實作授權。** Source baseline：`64d3c36`。[ADR-005](../architecture/ADR-005_POLICY_APPROVAL_CANCELLATION.md) 是完整決策提案；[acceptance plan](../acceptance/PHASE2B2_ACCEPTANCE_PLAN.md) 是待執行矩陣，不是結果。
+日期：2026-10-16。狀態：**M1已另獲批准並完成；M2–M5仍為Proposed，沒有後續實作授權。** 原計畫source baseline：`64d3c36`，M1開發基準`009a96e`。[ADR-005](../architecture/ADR-005_POLICY_APPROVAL_CANCELLATION.md) 是完整決策提案；[acceptance plan](../acceptance/PHASE2B2_ACCEPTANCE_PLAN.md) 是分層矩陣，不是完整2B-2驗收結果。
+
+後續狀態：owner另行批准的M1已實作並通過98個focused與253個offline cases，詳見 [M1 results](../acceptance/PHASE2B2_M1_RESULTS.md)。本檔保留原始里程碑提案；M2–M5、migration、identity resolver與runtime enforcement均未因此獲准或完成。
 
 ## 1. 目標與現況
 
@@ -81,4 +83,4 @@ MAF human approval MVP不回答OpenCode內部permission。若未來bridge成立�
 
 Owner需核准：trust/identity與self-approval、policy epochauthority、schema v2停機/備份、input reentry UX、bounded approval期限與audit保留。建議provider permission bridge與uncertain abort retry保持disabled。若owner只批准M1，後續M2–M5不因此自動獲准。
 
-本次只做source/evidence唯讀檢視與Markdown文件，靜態核對links、invariant coverage與final diff；沒有restore/build/test、newbinary或live prompt。執行驗收結果尚不存在；實作必須等owner明確核准。
+原文件設計輪只做source/evidence檢視與Markdown，沒有restore/build/test或live prompt。後續明確核准的M1已完成build與offline tests，結果見開頭連結；沒有live prompt。其餘里程碑仍須owner明確核准。
