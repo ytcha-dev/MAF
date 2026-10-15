@@ -81,3 +81,7 @@ Phase 2A 曾觀察公司 `Qwen3.5-122B-A10B` 讀取後沒有 final answer 的 ti
 7. **安全 gate 未解除**：IT/security 尚未確認規則條件、target 物件型態及恢復測試條件；不定性為誤報，不改名／搬路徑繞過。
 
 Phase 2B-0 僅確認既有基本 SQLite smoke 與 2A 歷史 baseline；新 baseline 被中止，安全事件待處理。Phase 2B-1 acceptance **未滿足**，Phase 2B-2／2C **不啟動**。提交後停止，等待 owner 下一步指示。
+
+## 後續可攜驗證準備（僅文件）
+
+另行指示的 home handoff 見 [Windows setup](../setup/WINDOWS_VALIDATION_SETUP.md) 與 [ordered home validation plan](PHASE2B1_HOME_VALIDATION_PLAN.md)。基於 `95c9632` 實際 source/dependencies 靜態整理；沒有 build/restore/test/Python/live 執行，也沒有轉移公司 artifacts。Source/history 可移轉授權、個人工具/provider 授權及 cross-process/live runners 仍是前提；本報告的 pending/blocked 結論不變。

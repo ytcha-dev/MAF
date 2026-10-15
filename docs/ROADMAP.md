@@ -34,6 +34,8 @@ Current boundaries: run mapping/single-flight is in memory (100 retained task id
 
 Phase 2B-1 implementation progress (2026-10-15): opt-in durable storage/recovery source and offline test cases have been authored, but are **not built, executed or accepted**. The validated baseline above remains Phase 2A. A formal Symantec security event terminated the baseline testhost; build/test/live execution is on hold pending operator authorization and required IT/security clearance. See [security event](acceptance/PHASE2B1_SECURITY_EVENT.md), [pending coverage/results](acceptance/PHASE2B1_RESULTS.md) and [ADR-004](architecture/ADR-004_DURABLE_EXECUTION_RECOVERY.md). Dedicated process-crash/live recovery acceptance runners remain outstanding; do not advance automatically to Phase 2B-2 or Phase 2C.
 
+Portable preparation only: [Windows validation setup](setup/WINDOWS_VALIDATION_SETUP.md) and [home validation sequence](acceptance/PHASE2B1_HOME_VALIDATION_PLAN.md) document clean-machine dependencies, data-transfer gates and missing acceptance runners. They neither authorize moving corporate material nor lift the corporate execution hold; no home validation results exist yet.
+
 Historical evidence and reading path:
 
 - [Phase 1 acceptance](../TEST_RESULTS.md) and [Review Agent acceptance](../TEST_RESULTS_PHASE2.md) retain the native agent baselines. The older documents call Review "Phase 2"; this roadmap groups both native agents under Phase 1 fundamentals.

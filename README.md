@@ -236,3 +236,5 @@ Durable 模式先保存穩定 run/execution/message IDs、session ID 與提交�
 本機 DB 只存 identity、fingerprint、state、timestamps 與固定診斷，**不存 prompt、完整結果或 tool transcript**。重新讀摘要仍依賴 OpenCode 保留原 session/message；沒有 provider 證據就回 Unknown，不能從本機生成答案。資料庫旁 `.locks` 是空的 ownership files；持有中的 OS handle 防止同機、同 DB 的相同 TaskId 並行提交，程序結束後釋放 handle，不需自動刪鎖檔。
 
 尚待驗證：新 dependency graph／vulnerability audit、build、離線 regression、真實 process crash／SQLite recovery，以及 OpenCode active Host restart／provider outage 後恢復與 fixture 不變。新 dedicated live／separate-process acceptance runner 尚缺，既有 Phase 2A live tests 不能取代。
+
+另行授權的個人 Windows 環境準備見 [Windows validation setup](docs/setup/WINDOWS_VALIDATION_SETUP.md) 與 [Phase 2B-1 home validation plan](docs/acceptance/PHASE2B1_HOME_VALIDATION_PLAN.md)。文件含實際 dependency matrix、安裝／preflight checklist、Stage A–E 與尚缺的 runner 規格；不是公司程式／資料移轉授權，也不解除公司 execution hold。本次只有文件準備，沒有執行個人環境驗收。
