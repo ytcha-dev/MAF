@@ -158,3 +158,8 @@ Limitations / security events / sanitized artifacts / next owner decision:
 ```
 
 **原設計輪只有文件與靜態檢視；後續獲准M1的執行結果以獨立M1報告為準。** 原矩陣未完成的S/C/L與其他里程碑維持未驗證；沒有修改原安全事件／歷史testresults。M1之後停止，不自動開始M2或2B-3／2C／Phase3。
+
+
+## 9. M3-0 gate and evidence classification (2026-10-16)
+
+Before any M3 runtime implementation, use [M3-0 architecture gate](../plans/PHASE2B2_M3_ARCHITECTURE_GATE.md) and [ADR-006](../architecture/ADR-006_TRUSTED_BROKER_BOUNDARY.md). Map all reachable CLI, direct library, durable/ephemeral, batch recovery, inspection, resume, side-effect and abort paths to existing P01–P12, A01–A19, K01–K18, S01–S07 and R01–R04. Demonstrate each supported path cannot bypass policy, and distinguish controlled synthetic logic tests from authenticated production-human evidence. Add explicit cases for policy activation mode, admission-vs-dispatch race, and Broker/source rollback evidence only if existing case IDs do not cover them. M3-0 is documentation-only; the M2-B 347/347 result is historical evidence, **not** proof these runtime gates passed. M3-C remains **Blocked** pending source authenticity, human presence, protected writer and relevant restart/revocation proofs. Preserve original Planned/Executed distinction and G0–G5 acceptance semantics.
