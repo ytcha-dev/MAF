@@ -20,6 +20,7 @@ if (args[0] == "seed")
 {
     await ApprovalSchema.InitializeOrMigrateAsync(path, SyntheticApproval.Maintenance);
     var store = new SqliteApprovalStore(path, new SyntheticAuthority(), new SyntheticClock());
+    await store.ActivatePolicyAsync(); // Explicit synthetic setup; seed never activates through a business write.
     await store.RequestAsync("approval-one", SyntheticApproval.Request(), SyntheticApproval.Caller);
     Console.WriteLine("pending-committed"); Console.Out.Flush();
     await Console.In.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(30)); return;

@@ -53,7 +53,8 @@ public sealed class UnavailableTrust : ITrustedPolicyAcquisition, ITrustedIdenti
 }
 
 // Policy acquisition is serialized with all approval/control mutations through commit. The
-// SQLite coordinator remains the durable activation/high-water owner across instances/processes.
+// SQLite coordinator is the sole explicit durable activation owner across instances/processes.
+// Acquire/GetSnapshot expose a verified candidate, not proof of a durable active revision.
 // This adapter alone is NOT a persistent authority, broker, authenticator or dispatch grant.
 public sealed class TrustedPolicyAuthority : IProtectedPolicyAuthority
 {
@@ -124,6 +125,7 @@ public sealed class TrustedPolicyAuthority : IProtectedPolicyAuthority
             return ValueTask.CompletedTask;
         }
     }
+    // Candidate visible only during its lease; business stores must separately verify durable active state.
     public PolicySnapshot? GetSnapshot() => current;
     bool Safe(Func<bool> check) { try { return current is not null && clock.GetUtcNow() >= lastObserved && DeterministicPolicyEvaluator.ValidSnapshot(current, clock.GetUtcNow()) && check(); } catch (Exception) { return false; } }
     AuthenticatedIdentity? Resolve(ITrustedCallerContext context)

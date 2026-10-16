@@ -54,7 +54,7 @@ public sealed class TrustedAuthorityTests : IDisposable
         configured ? trust : null, configured ? trust : null, configured ? trust : null);
     SqliteApprovalStore Store(TrustedPolicyAuthority a, Action<ApprovalCheckpoint>? fault = null, int capacity = 10000)
         => new(Db, a, clock, capacity, fault);
-    async Task Setup() { Directory.CreateDirectory(root); await ApprovalSchema.InitializeOrMigrateAsync(Db, SyntheticApproval.Maintenance); }
+    async Task Setup(bool activate = true) { Directory.CreateDirectory(root); await ApprovalSchema.InitializeOrMigrateAsync(Db, SyntheticApproval.Maintenance); if (activate) await Store(Authority()).ActivatePolicyAsync(); }
     async Task<ApprovalRecord> Approved(SqliteApprovalStore s)
     {
         var r = await s.RequestAsync("approval-one", SyntheticApproval.Request(), trust.Caller);
@@ -234,7 +234,7 @@ public sealed class TrustedAuthorityTests : IDisposable
     [Fact]
     public async Task FailedBusinessMutationCannotRollbackActivation()
     {
-        await Setup(); var s = Store(Authority()); await s.ActivatePolicyAsync(); source.Candidate = Wrap(Next());
+        await Setup(); var s = Store(Authority()); await s.ActivatePolicyAsync(); source.Candidate = Wrap(Next()); await s.ActivatePolicyAsync();
         await Assert.ThrowsAsync<InvalidOperationException>(() => s.RequestAsync("new-approval", SyntheticApproval.Request(), trust.Caller));
         Assert.Equal(2L, await Sql("SELECT epoch FROM policy_authority")); Assert.Equal(0L, await Sql("SELECT count(*) FROM approval_requests"));
     }
@@ -317,6 +317,175 @@ public sealed class TrustedAuthorityTests : IDisposable
             Assert.Equal(1L, await Sql("SELECT count(*) FROM executions")); Assert.Equal(2L, await Sql("SELECT epoch FROM policy_authority"));
         }
         finally { release.Set(); await consume.WaitAsync(TimeSpan.FromSeconds(10)); }
+    }
+    Task Business(SqliteApprovalStore store, ApprovalRecord record, string kind) => kind switch
+    {
+        "request" => store.RequestAsync("approval-two", SyntheticApproval.Request("two"), trust.Caller),
+        "decide" => store.DecideAsync(new(record.ApprovalId, "another-decision", record.Version, record.BindingDigest, ApprovalChoice.Reject), trust.Operator),
+        "consume" => Consume(store, record),
+        "revoke" => store.RevokeAsync(record.ApprovalId, record.Version, trust.Operator),
+        "control" => store.RequestCancellationAsync(record.ApprovalId, "cancel", 0, trust.Caller),
+        _ => throw new ArgumentException("UnknownTestOperation")
+    };
+    [Fact]
+    public async Task ExplicitActivationAloneCommitsInitialRevisionAndAudit()
+    {
+        await Setup(activate: false); var a = Authority(); var s = Store(a);
+        await using (await a.AcquireAsync()) { Assert.NotNull(a.GetSnapshot()); }
+        Assert.Equal(0L, await Sql("SELECT count(*) FROM policy_authority"));
+        Assert.Empty(await s.ReadAuditAsync());
+        await s.ActivatePolicyAsync();
+        Assert.Equal(1L, await Sql("SELECT epoch FROM policy_authority"));
+        Assert.Equal(PolicySnapshotBinding.Digest(SyntheticApproval.Policy), await Sql("SELECT digest FROM policy_authority"));
+        var audit = Assert.Single(await s.ReadAuditAsync()); Assert.Equal(ControlAuditCode.AuthorityAdvanced, audit.Code);
+        Assert.Equal(new PolicyEpoch(1), audit.Epoch); Assert.Equal(new PolicyVersion(1), audit.PolicyVersion);
+        await s.ActivatePolicyAsync(); Assert.Equal(audit, Assert.Single(await s.ReadAuditAsync()));
+        Assert.Equal(0L, await Sql("SELECT count(*) FROM approval_requests"));
+        Assert.Equal(0L, await Sql("SELECT count(*) FROM executions"));
+    }
+    [Theory]
+    [InlineData("request", false)][InlineData("decide", false)][InlineData("consume", false)]
+    [InlineData("revoke", false)][InlineData("control", false)]
+    [InlineData("request", true)][InlineData("decide", true)][InlineData("consume", true)]
+    [InlineData("revoke", true)][InlineData("control", true)]
+    public async Task BusinessMethodsCannotInitiallyActivateOrAdvancePolicy(string kind, bool active)
+    {
+        await Setup(activate: false);
+        var s = Store(Authority());
+        if (active) await s.ActivatePolicyAsync();
+        var op = SyntheticApproval.Request();
+        var r = active ? await Approved(s) : new ApprovalRecord("approval-one", op,
+            OperationBinding.Digest(op, SyntheticApproval.Descriptor), "operator:readonly", ApprovalStatus.Pending, 0, clock.Now, clock.Now.AddMinutes(5));
+        var audit = await s.ReadAuditAsync(); var control = await s.GetControlAsync(op.TaskId);
+        source.Candidate = active ? Wrap(Next(PolicyOutcome.RequireApproval)) : Wrap(SyntheticApproval.Policy);
+        var restarted = Store(Authority()); // no in-memory active state is inherited
+        Assert.Equal(active ? "PolicyActivationRequired" : "PolicyNotActivated",
+            (await Assert.ThrowsAsync<InvalidOperationException>(() => Business(restarted, r, kind))).Message);
+        Assert.Equal(active ? 1L : 0L, await Sql("SELECT count(*) FROM policy_authority"));
+        if (active) Assert.Equal(1L, await Sql("SELECT epoch FROM policy_authority"));
+        Assert.Equal(audit, await s.ReadAuditAsync()); Assert.Equal(control, await s.GetControlAsync(op.TaskId));
+        Assert.Equal(active ? r : null, await s.GetAsync(r.ApprovalId));
+        Assert.Equal(active ? 1L : 0L, await Sql("SELECT count(*) FROM approval_requests"));
+        Assert.Equal(0L, await Sql("SELECT count(*) FROM executions"));
+    }
+    [Theory]
+    [InlineData(false)][InlineData(true)]
+    public async Task UnavailableSourceCannotUseDurablePolicyAsFallback(bool throws)
+    {
+        await Setup(); var s = Store(Authority()); var r = await Approved(s); var audit = await s.ReadAuditAsync();
+        source.Candidate = null; if (throws) source.Error = new IOException("private source details");
+        var expected = throws ? "AuthorityUnavailable" : "PolicyUnavailable";
+        Assert.Equal(expected, (await Assert.ThrowsAsync<InvalidOperationException>(() => Consume(Store(Authority()), r))).Message);
+        Assert.Equal(expected, (await Assert.ThrowsAsync<InvalidOperationException>(() => Store(Authority()).ActivatePolicyAsync())).Message);
+        Assert.Equal(audit, await s.ReadAuditAsync()); Assert.Equal(r, await s.GetAsync(r.ApprovalId));
+        Assert.Equal(1L, await Sql("SELECT epoch FROM policy_authority"));
+        Assert.Equal(0L, await Sql("SELECT count(*) FROM executions"));
+    }
+    [Theory]
+    [InlineData("same-content-change", "AuthorityRevisionConflict")]
+    [InlineData("epoch-only", "AuthorityRevisionConflict")]
+    [InlineData("version-only", "AuthorityRevisionConflict")]
+    [InlineData("rollback", "AuthorityRollback")]
+    [InlineData("durable-digest", "AuthorityRevisionConflict")]
+    public async Task ActiveRevisionConflictsNeverSelfRepair(string variant, string reason)
+    {
+        await Setup(); var s = Store(Authority()); var r = await Approved(s);
+        if (variant == "rollback") { source.Candidate = Wrap(Next()); await s.ActivatePolicyAsync(); }
+        var p = SyntheticApproval.Policy;
+        p = variant switch
+        {
+            "same-content-change" => p with { DecisionLifetime = TimeSpan.FromMinutes(4) },
+            "epoch-only" => p with { Epoch = new(2) },
+            "version-only" => p with { Version = new(2) },
+            _ => p
+        };
+        source.Candidate = Wrap(p);
+        if (variant == "durable-digest") await Sql("UPDATE policy_authority SET digest='synthetic-corrupt-digest'");
+        var digest = await Sql("SELECT digest FROM policy_authority"); var audit = await s.ReadAuditAsync();
+        Assert.Equal(reason, (await Assert.ThrowsAsync<InvalidOperationException>(() => Consume(Store(Authority()), r))).Message);
+        Assert.Equal(reason, (await Assert.ThrowsAsync<InvalidOperationException>(() => Store(Authority()).ActivatePolicyAsync())).Message);
+        Assert.Equal(digest, await Sql("SELECT digest FROM policy_authority"));
+        Assert.Equal(audit, await s.ReadAuditAsync()); Assert.Equal(r, await s.GetAsync(r.ApprovalId));
+        Assert.Equal(0L, await Sql("SELECT count(*) FROM executions"));
+    }
+    [Theory]
+    [InlineData(false)][InlineData(true)]
+    public async Task ActivationFaultRollsBackRevisionAndAuditTogether(bool upgrading)
+    {
+        await Setup(activate: upgrading);
+        var before = await Sql("SELECT digest FROM policy_authority"); var audit = await Store(Authority()).ReadAuditAsync();
+        source.Candidate = Wrap(Next());
+        var failing = Store(Authority(), point => { if (point == ApprovalCheckpoint.BeforeCommit) throw new IOException("synthetic activation fault"); });
+        await Assert.ThrowsAsync<IOException>(() => failing.ActivatePolicyAsync());
+        Assert.Equal(before, await Sql("SELECT digest FROM policy_authority"));
+        Assert.Equal(audit, await Store(Authority()).ReadAuditAsync());
+        Assert.Equal(upgrading ? 1L : 0L, await Sql("SELECT count(*) FROM policy_authority"));
+        Assert.Equal("ok", await Sql("PRAGMA integrity_check"));
+        await Store(Authority()).ActivatePolicyAsync(); // only an explicit retry may activate the candidate
+        Assert.Equal(2L, await Sql("SELECT epoch FROM policy_authority"));
+        Assert.Equal(audit.Count + 1, (await Store(Authority()).ReadAuditAsync()).Count);
+    }
+    [Theory]
+    [InlineData(false)][InlineData(true)]
+    public async Task ConcurrentActivationsAreIdempotentOrHaveOneConflictingWinner(bool conflict)
+    {
+        await Setup(); var firstSource = new Source { Candidate = Wrap(Next()) };
+        var secondSource = new Source { Candidate = Wrap(Next(conflict ? PolicyOutcome.RequireApproval : PolicyOutcome.Deny)) };
+        var first = new TrustedPolicyAuthority("protected-test-source", "authority", firstSource, clock, trust, trust, trust);
+        var second = new TrustedPolicyAuthority("protected-test-source", "authority", secondSource, clock, trust, trust, trust);
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        async Task<bool> Activate(TrustedPolicyAuthority a)
+        {
+            await start.Task;
+            try { await Store(a).ActivatePolicyAsync(); return true; }
+            catch (InvalidOperationException error) when (error.Message == "AuthorityRevisionConflict") { return false; }
+        }
+        var a = Task.Run(() => Activate(first)); var b = Task.Run(() => Activate(second)); start.SetResult();
+        var results = await Task.WhenAll(a, b).WaitAsync(TimeSpan.FromSeconds(15));
+        Assert.Equal(conflict ? 1 : 2, results.Count(x => x));
+        Assert.Equal(2L, await Sql("SELECT epoch FROM policy_authority"));
+        Assert.Equal(2, (await Store(Authority()).ReadAuditAsync()).Count);
+        var digest = await Sql("SELECT digest FROM policy_authority");
+        Assert.Contains(digest, new object?[] { firstSource.Candidate!.Digest, secondSource.Candidate!.Digest });
+        Assert.Equal("ok", await Sql("PRAGMA integrity_check"));
+    }
+    [Fact]
+    public async Task ActivationCommittedBeforeStaleBusinessWriterRejectsItsCandidate()
+    {
+        await Setup(); var s = Store(Authority()); var r = await Approved(s);
+        using var release = new ManualResetEventSlim(); var acquired = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var staleSource = new Source { OnAcquire = () =>
+        {
+            acquired.TrySetResult();
+            if (!release.Wait(TimeSpan.FromSeconds(10))) throw new TimeoutException("test candidate gate");
+        } };
+        var stale = new TrustedPolicyAuthority("protected-test-source", "authority", staleSource, clock, trust, trust, trust);
+        var consume = Task.Run(() => Assert.ThrowsAsync<InvalidOperationException>(() => Consume(Store(stale), r)));
+        try
+        {
+            await acquired.Task.WaitAsync(TimeSpan.FromSeconds(10)); source.Candidate = Wrap(Next());
+            await Store(Authority()).ActivatePolicyAsync(); release.Set();
+            Assert.Equal("AuthorityRollback", (await consume.WaitAsync(TimeSpan.FromSeconds(10))).Message);
+            Assert.Equal(r, await s.GetAsync(r.ApprovalId)); Assert.Equal(0L, await Sql("SELECT count(*) FROM executions"));
+        }
+        finally { release.Set(); await consume.WaitAsync(TimeSpan.FromSeconds(10)); }
+    }
+    [Fact]
+    public async Task RestartDoesNotPromoteCandidateAndExplicitActivationInvalidatesOldApproval()
+    {
+        await Setup(); var s = Store(Authority()); var r = await Approved(s);
+        source.Candidate = Wrap(Next(PolicyOutcome.RequireApproval));
+        for (var restart = 0; restart < 2; restart++)
+        {
+            var fresh = Store(Authority());
+            var request = SyntheticApproval.Request("two") with { Epoch = new(2), Version = new(2) };
+            Assert.Equal("PolicyActivationRequired", (await Assert.ThrowsAsync<InvalidOperationException>(() => fresh.RequestAsync("approval-two", request, trust.Caller))).Message);
+            Assert.Equal(1L, await Sql("SELECT epoch FROM policy_authority"));
+            Assert.Equal(r, await fresh.GetAsync(r.ApprovalId));
+        }
+        await Store(Authority()).ActivatePolicyAsync();
+        Assert.Equal("ApprovalPolicyChanged", (await Assert.ThrowsAsync<InvalidOperationException>(() => Consume(Store(Authority()), r))).Message);
+        Assert.Equal(0L, await Sql("SELECT count(*) FROM executions"));
     }
     sealed class MaintenanceAuthorization(string expected, bool allowed = true, bool unavailable = false) : ITrustedApprovalMaintenanceAuthorization
     {

@@ -18,7 +18,7 @@ public sealed class ApprovalPersistenceTests : IDisposable
     readonly SyntheticAuthority authority = new();
     string Db => Path.Combine(root, "synthetic.db");
     SqliteApprovalStore Store(Action<ApprovalCheckpoint>? fault = null, int capacity = 10000) => new(Db, authority, clock, capacity, fault);
-    async Task Setup() { Directory.CreateDirectory(root); await ApprovalSchema.InitializeOrMigrateAsync(Db, SyntheticApproval.Maintenance); }
+    async Task Setup() { Directory.CreateDirectory(root); await ApprovalSchema.InitializeOrMigrateAsync(Db, SyntheticApproval.Maintenance); await Store().ActivatePolicyAsync(); }
     async Task<ApprovalRecord> Pending() => await Store().RequestAsync("approval-one", SyntheticApproval.Request(), SyntheticApproval.Caller);
     async Task<ApprovalRecord> Approved()
     {
@@ -250,8 +250,8 @@ public sealed class ApprovalPersistenceTests : IDisposable
         Assert.Equal(0L, await Sql("SELECT count(*) FROM executions"));
         if (r is not null) { Assert.Equal(r, await Store().GetAsync(r.ApprovalId)); Assert.Null((await Store().GetControlAsync(r.Operation.TaskId))!.CancelRequestId); }
         else Assert.Null(await Store().GetAsync("approval-one"));
-        // First request may independently pin the trusted authority; operation/audit changes are atomic.
-        Assert.Equal(before + (r is null ? 1 : 0), Convert.ToInt64(await Sql("SELECT count(*) FROM control_audit")));
+        // Explicit fixture activation precedes the fault; failed business writes cannot add authority audit.
+        Assert.Equal(before, Convert.ToInt64(await Sql("SELECT count(*) FROM control_audit")));
     }
 
     [Fact]
@@ -329,6 +329,7 @@ public sealed class ApprovalPersistenceTests : IDisposable
     {
         await Setup(); var r = await Approved();
         authority.Snapshot = authority.Snapshot with { Epoch = new(2), Version = new(2), Rules = [authority.Snapshot.Rules[0] with { Outcome = PolicyOutcome.Deny }] };
+        await Store().ActivatePolicyAsync(); // Publication alone no longer activates this trusted revision.
         Assert.False(await Succeeds(() => Store().ConsumeAsync(r.ApprovalId, r.Version, 0, r.BindingDigest, SyntheticApproval.Execution(r.Operation, clock.Now), SyntheticApproval.Caller)));
         Assert.Equal(2L, await Sql("SELECT epoch FROM policy_authority"));
         authority.Snapshot = SyntheticApproval.Policy;

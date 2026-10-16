@@ -10,7 +10,8 @@ public enum ControlAuditCode { Requested, Approved, Rejected, Expired, Revoked, 
 // M2-B supplies an unregistered adapter; production trust transports remain unavailable.
 public interface IProtectedPolicyAuthority : IPolicySource
 {
-    // Lease must freeze the acquired policy until the storage commit completes.
+    // Lease freezes a verified candidate until commit; acquisition is not durable activation.
+    // GetSnapshot and authorization callbacks under that lease must be local, without network IO.
     ValueTask<IAsyncDisposable> AcquireAsync(CancellationToken token = default);
     PolicyDecision EvaluateStoredOperation(PolicyRequest operation, DateTimeOffset evaluatedAt);
     bool CanDecide(ITrustedCallerContext actor, PolicyRequest operation, string requiredOperatorScope);
@@ -52,7 +53,8 @@ public interface IApprovalTransactionCoordinator
 }
 
 // No snapshot/epoch parameters: only a trusted source can propose the next revision.
-// Activation becomes effective at the coordinator's durable high-water commit.
+// Explicit activation alone writes the durable high-water + audit; business methods only verify it.
+// Trusted code primitive only: authenticated production control remains unavailable.
 public interface IPolicyActivationCoordinator
 {
     Task ActivatePolicyAsync(CancellationToken token = default);

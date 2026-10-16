@@ -49,7 +49,7 @@ Contracts should support later adapter replacement **without re-architecting Wor
 
 ## Required evidence and sequencing
 
-1. **Policy authority:** authenticate publisher and fixed deployment identity. SourceId plus SHA/digest is insufficient. Candidate publication is **not** durable activation. Current SQLite commit decides effective activation order; define explicit-vs-opportunistic activation and source-revocation semantics before M3 runtime integration.
+1. **Policy authority:** authenticate publisher and fixed deployment identity. SourceId plus SHA/digest is insufficient. Candidate publication is **not** durable activation. Owner D02 selects explicit-only activation, implemented in the isolated M3-A2a increment below; production source authentication/revocation and control authorization remain prerequisites.
 2. **Human approval:** authenticate a real operator through a channel the agent cannot forge; require fresh presence and exact operation/resource/binding/required scope, expiry, non-self-approval, and proof-replay defenses. `Approval` is separate from `Resume`.
 3. **Durable evidence:** choose protected reference/receipt, proof freshness and revocation checks, audit custody, external anti-rollback revision anchor, disaster-recovery and writer isolation. No signatures, nonce or hash are useful if the agent holds the same signing secret and write permissions.
 4. **Runtime enforcement:** MAF checks at every supported entry and before protected external effects. Database commit cannot be atomic with provider HTTP. Once an admission/dispatch intent commits, newer policy cannot guarantee that an in-flight provider action never happens; use durable cancellation/reconciliation instead.
@@ -69,3 +69,7 @@ No production Broker, authentication endpoint, policy signing system, operator U
 ## Revisit / acceptance gate
 
 Review when choosing actual process/OS principals, policy publisher, proof storage, authenticated transport, disaster-recovery anchor, or a second deployment node. Before enabling production approval, demonstrate the agent **cannot** impersonate the approver or write the effective authority/approval evidence, and validate real restart, revocation and rollback behavior. Until then report **Blocked / Not Demonstrated**, not Passed.
+
+## M3-A2a increment: explicit-only local activation
+
+Owner D02 is implemented by the isolated [M3-A2a results](../acceptance/PHASE2B2_M3_A2A_RESULTS.md): only explicit `ActivatePolicyAsync` writes the durable authority tuple and its audit; Request/Decide/Consume/Revoke/Control verify the exact active tuple within their business transaction. A newer unactivated candidate or unavailable source blocks business operations, with no fallback to an older cached snapshot. Publishing or acquiring a candidate never activates it. Equal activation is idempotent; rollback/conflicting revisions fail closed. Schema remains v2. This is a trusted-code storage primitive, not an authenticated production control path or Broker deployment; all production trust blockers above remain.

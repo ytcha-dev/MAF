@@ -41,55 +41,69 @@ public sealed class SqliteApprovalStore : IApprovalStore, IApprovalTransactionCo
         fault?.Invoke(ApprovalCheckpoint.BeforeCommit); tx.Commit(); return result;
     }
 
-    // Pin authority state before the operation transaction, so a failed/stale operation cannot roll
-    // back the highest trusted epoch already observed. Request fields never activate a revision.
-    async Task<PolicySnapshot> PinAuthority(CancellationToken token)
+    // Acquisition verifies a candidate, never activates it. No older active snapshot/cache fallback.
+    PolicySnapshot Candidate()
     {
         var policy = authority.GetSnapshot() ?? throw new InvalidOperationException("PolicyUnavailable");
-        var digest = PolicySnapshotBinding.Digest(policy);
-        await Transaction(async (c, tx) =>
-        {
-            using var cmd = ApprovalDatabase.Command(c, tx, "SELECT authority,epoch,version,digest FROM policy_authority WHERE id=1");
-            using var r = await cmd.ExecuteReaderAsync(token);
-            bool advance = false;
-            if (await r.ReadAsync(token))
-            {
-                Require(r.GetString(0) == policy.AuthorityId, "AuthorityMismatch");
-                var epoch = r.GetInt64(1); var version = r.GetInt64(2);
-                Require(policy.Epoch.Value >= epoch && policy.Version.Value >= version, "AuthorityRollback");
-                advance = policy.Epoch.Value > epoch && policy.Version.Value > version;
-                Require(advance || policy.Epoch.Value == epoch && policy.Version.Value == version && r.GetString(3) == digest, "AuthorityRevisionConflict");
-            }
-            else advance = true;
-            r.Close();
-            if (advance)
-            {
-                await ApprovalDatabase.Execute(c, tx, "INSERT INTO policy_authority VALUES(1,$a,$e,$v,$d) ON CONFLICT(id) DO UPDATE SET authority=$a,epoch=$e,version=$v,digest=$d", token,
-                    ("$a", policy.AuthorityId), ("$e", policy.Epoch.Value), ("$v", policy.Version.Value), ("$d", digest));
-                await Audit(c, tx, ControlAuditCode.AuthorityAdvanced, "authority", "authority", null, policy.Epoch.Value, token);
-            }
-            return true;
-        }, token);
+        _ = PolicySnapshotBinding.Digest(policy);
+        var now = clock.GetUtcNow();
+        Require(now >= policy.NotBefore && now < policy.NotAfter, "InvalidAuthorityPolicy");
         return policy;
     }
-    // Activation is the durable high-water commit. No caller-supplied policy or revision is accepted.
-    // A failed activation cannot grant access; publishing a candidate at the source is not activation.
+    void CheckCandidate(PolicySnapshot policy)
+        => Require(PolicySnapshotBinding.Digest(Candidate()) == PolicySnapshotBinding.Digest(policy), "AuthorityChanged");
+
+    // Called under the SQLite writer transaction. Returns true only for explicit initial activation
+    // or a strictly newer pair; business operations may only verify the exact durable active tuple.
+    async Task<bool> CompareActive(SqliteConnection c, SqliteTransaction tx, PolicySnapshot policy,
+        bool activating, CancellationToken token)
+    {
+        using var cmd = ApprovalDatabase.Command(c, tx, "SELECT authority,epoch,version,digest FROM policy_authority WHERE id=1");
+        using var r = await cmd.ExecuteReaderAsync(token);
+        if (!await r.ReadAsync(token))
+        {
+            Require(activating, "PolicyNotActivated");
+            return true;
+        }
+        Require(r.GetString(0) == policy.AuthorityId, "AuthorityMismatch");
+        var epoch = r.GetInt64(1); var version = r.GetInt64(2);
+        Require(policy.Epoch.Value >= epoch && policy.Version.Value >= version, "AuthorityRollback");
+        var advance = policy.Epoch.Value > epoch && policy.Version.Value > version;
+        Require(advance || policy.Epoch.Value == epoch && policy.Version.Value == version
+            && r.GetString(3) == PolicySnapshotBinding.Digest(policy), "AuthorityRevisionConflict");
+        Require(!advance || activating, "PolicyActivationRequired");
+        return advance;
+    }
+    // The only authority writer. Trusted code explicitly invokes this unregistered primitive;
+    // no production authenticated activation control/CLI is provided. No caller snapshots accepted.
     public async Task ActivatePolicyAsync(CancellationToken token = default)
     {
         await using var authorityLease = await authority.AcquireAsync(token);
-        await PinAuthority(token);
+        var policy = Candidate();
+        await Transaction(async (c, tx) =>
+        {
+            CheckCandidate(policy);
+            if (await CompareActive(c, tx, policy, activating: true, token))
+            {
+                await ApprovalDatabase.Execute(c, tx, "INSERT INTO policy_authority VALUES(1,$a,$e,$v,$d) ON CONFLICT(id) DO UPDATE SET authority=$a,epoch=$e,version=$v,digest=$d", token,
+                    ("$a", policy.AuthorityId), ("$e", policy.Epoch.Value), ("$v", policy.Version.Value), ("$d", PolicySnapshotBinding.Digest(policy)));
+                await Audit(c, tx, ControlAuditCode.AuthorityAdvanced, "authority", "authority", null, policy.Epoch.Value, token);
+            }
+            CheckCandidate(policy);
+            return true;
+        }, token);
     }
-    async Task CheckPin(SqliteConnection c, SqliteTransaction tx, PolicySnapshot policy, CancellationToken token)
+    async Task CheckActive(SqliteConnection c, SqliteTransaction tx, PolicySnapshot policy, CancellationToken token)
     {
-        Require(PolicySnapshotBinding.Digest(authority.GetSnapshot() ?? throw new InvalidOperationException("PolicyUnavailable")) == PolicySnapshotBinding.Digest(policy), "AuthorityChanged");
-        Require(Equals(await ApprovalDatabase.Scalar(c, tx, "SELECT digest FROM policy_authority WHERE id=1", token), PolicySnapshotBinding.Digest(policy)), "AuthorityChanged");
+        CheckCandidate(policy);
+        await CompareActive(c, tx, policy, activating: false, token);
     }
     Task<T> GuardedTransaction<T>(PolicySnapshot policy, Func<SqliteConnection, SqliteTransaction, Task<T>> action, CancellationToken token)
         => Transaction(async (c, tx) =>
         {
-            await CheckPin(c, tx, policy, token);
+            await CheckActive(c, tx, policy, token);
             var result = await action(c, tx);
-            await CheckPin(c, tx, policy, token);
+            await CheckActive(c, tx, policy, token);
             return result;
         }, token);
 
@@ -170,10 +184,10 @@ public sealed class SqliteApprovalStore : IApprovalStore, IApprovalTransactionCo
     public async Task<ApprovalRecord> RequestAsync(string approvalId, PolicyRequest operation, ITrustedCallerContext caller, CancellationToken token = default)
     {
         await using var authorityLease = await authority.AcquireAsync(token);
-        Id(approvalId); Metadata(operation); var actor = Actor(caller); var policy = await PinAuthority(token);
+        Id(approvalId); Metadata(operation); var actor = Actor(caller); var policy = Candidate();
         return await GuardedTransaction(policy, async (c, tx) =>
         {
-            await CheckPin(c, tx, policy, token);
+            await CheckActive(c, tx, policy, token);
             var decision = new DeterministicPolicyEvaluator(new ImmutablePolicySource(policy), clock).Evaluate(operation, caller);
             Require(decision.Outcome == PolicyOutcome.RequireApproval && decision.BindingDigest is not null && decision.RequiredOperatorScope is not null, "ApprovalNotRequiredOrDenied");
             Require(authority.CanControl(caller, operation), "CallerNotAuthorized");
@@ -199,10 +213,10 @@ public sealed class SqliteApprovalStore : IApprovalStore, IApprovalTransactionCo
     {
         await using var authorityLease = await authority.AcquireAsync(token);
         Id(command.DecisionId); var subject = Actor(actor); Require(Enum.IsDefined(command.Choice), "UnknownApprovalChoice");
-        var policy = await PinAuthority(token);
+        var policy = Candidate();
         return await GuardedTransaction(policy, async (c, tx) =>
         {
-            await CheckPin(c, tx, policy, token);
+            await CheckActive(c, tx, policy, token);
             var record = await Read(c, tx, command.ApprovalId, token) ?? throw new InvalidOperationException("UnknownApproval");
             Require(authority.CanDecide(actor, record.Operation, record.RequiredOperatorScope) && subject != record.Operation.CallerSubject, "OperatorNotAuthorized");
             Require(command.ExpectedBindingDigest == record.BindingDigest, "BindingMismatch");
@@ -230,10 +244,10 @@ public sealed class SqliteApprovalStore : IApprovalStore, IApprovalTransactionCo
     public async Task<ApprovalRecord> RevokeAsync(string approvalId, long expectedVersion, ITrustedCallerContext actor, CancellationToken token = default)
     {
         await using var authorityLease = await authority.AcquireAsync(token);
-        var subject = Actor(actor); var policy = await PinAuthority(token);
+        var subject = Actor(actor); var policy = Candidate();
         return await GuardedTransaction(policy, async (c, tx) =>
         {
-            await CheckPin(c, tx, policy, token);
+            await CheckActive(c, tx, policy, token);
             var r = await Read(c, tx, approvalId, token) ?? throw new InvalidOperationException("UnknownApproval");
             Require(authority.CanDecide(actor, r.Operation, r.RequiredOperatorScope) && subject != r.Operation.CallerSubject, "OperatorNotAuthorized");
             Require(r.Version == expectedVersion && r.Status is ApprovalStatus.Pending or ApprovalStatus.Approved, "NotRevocable");
@@ -246,10 +260,10 @@ public sealed class SqliteApprovalStore : IApprovalStore, IApprovalTransactionCo
         string expectedBindingDigest, DurableExecution initialExecution, ITrustedCallerContext caller, CancellationToken token = default)
     {
         await using var authorityLease = await authority.AcquireAsync(token);
-        var subject = Actor(caller); var policy = await PinAuthority(token);
+        var subject = Actor(caller); var policy = Candidate();
         return await GuardedTransaction(policy, async (c, tx) =>
         {
-            await CheckPin(c, tx, policy, token);
+            await CheckActive(c, tx, policy, token);
             var r = await Read(c, tx, approvalId, token) ?? throw new InvalidOperationException("UnknownApproval"); Current(r, policy);
             Require(r.Status == ApprovalStatus.Approved && r.Version == expectedApprovalVersion && r.BindingDigest == expectedBindingDigest, "ApprovalNotConsumable");
             Require(r.DecidedBy is not null && authority.IsDecisionSubjectStillAuthorized(r.DecidedBy, r.Operation, r.RequiredOperatorScope), "OperatorNoLongerAuthorized");
@@ -275,10 +289,10 @@ public sealed class SqliteApprovalStore : IApprovalStore, IApprovalTransactionCo
     public async Task<TaskControl> RequestCancellationAsync(string approvalId, string cancelRequestId, long expectedControlVersion, ITrustedCallerContext actor, CancellationToken token = default)
     {
         await using var authorityLease = await authority.AcquireAsync(token);
-        Id(cancelRequestId); var subject = Actor(actor); var policy = await PinAuthority(token);
+        Id(cancelRequestId); var subject = Actor(actor); var policy = Candidate();
         return await GuardedTransaction(policy, async (c, tx) =>
         {
-            await CheckPin(c, tx, policy, token);
+            await CheckActive(c, tx, policy, token);
             var r = await Read(c, tx, approvalId, token) ?? throw new InvalidOperationException("UnknownApproval");
             Require(authority.CanControl(actor, r.Operation), "CallerNotAuthorized");
             var control = await Control(c, tx, r.Operation.TaskId, token) ?? throw new InvalidOperationException("MissingControl");
