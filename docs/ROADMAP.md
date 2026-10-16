@@ -66,7 +66,7 @@ Stages are **outcome gates**, not fixed deadlines. Phase 2C is a logical milesto
 
 ## 4. Target architecture
 
-This diagram includes **unimplemented target components**: registry, execution store, approval gates and optional ingress. Local-first/offline-capable is a deployment goal, not evidence that the configured OpenCode model is local or that current tasks work without network access.
+This diagram includes **unimplemented target components**: registry, runtime approval gates and optional ingress. The local execution store is implemented; protected v2 runtime integration is pending. Local-first/offline-capable is a deployment goal, not evidence that the configured OpenCode model is local or that current tasks work without network access.
 
 ```mermaid
 flowchart TB
@@ -273,6 +273,6 @@ ADR-001/002 are decision-log entries; no standalone files currently exist. ADR-0
 
 ### Immediate next action
 
-**M3-0 documentation/architecture gate is next (no M3 runtime authorization).** Use [M3 architecture gate](plans/PHASE2B2_M3_ARCHITECTURE_GATE.md) and [ADR-006 Broker-ready trust boundary](architecture/ADR-006_TRUSTED_BROKER_BOUNDARY.md). Separate M3-A isolated admission tests, M3-B exact approval/resume integration, and M3-C production trust/CLI activation; M3-C is blocked until real policy provenance, human proof and writer isolation are demonstrated. Keep production activation/approval disabled.
+**M3-0 source review is delivered; owner review is next (no M3 runtime authorization).** See the [call graph, bypass matrix and M3-A/B/C proposal](acceptance/PHASE2B2_M3_0_REVIEW.md), [M3 architecture gate](plans/PHASE2B2_M3_ARCHITECTURE_GATE.md) and [ADR-006](architecture/ADR-006_TRUSTED_BROKER_BOUNDARY.md). The recommended first coding task is provider-free application admission; explicit activation and public-API compatibility decisions precede runtime integration. M3-C remains blocked pending real provenance, human proof, protected writer and rollback evidence. Keep production activation/approval disabled; do not begin M3-A automatically.
 
 **Phase 2B-1 controlled home technical acceptance is complete within the documented reliability boundary.** Corporate endpoint clearance remains separate. Phase 2B-2 has separately authorized M1/M2-A/M2-B foundation increments above; production trust and M3/runtime approval remain pending and the full phase is not accepted. Connector Registry remains Phase 2C; no write-enabled execution or new provider is authorized by this roadmap.

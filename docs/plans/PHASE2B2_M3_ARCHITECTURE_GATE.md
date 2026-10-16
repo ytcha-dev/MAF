@@ -1,12 +1,14 @@
 # Phase 2B-2 — M3-0 Architecture & Trust Gate
 
 > Date: 2026-10-16 (Asia/Taipei)  
-> Status: **Proposed design/review work only; M3 runtime not authorized.**  
+> Status: **M3-0 source review delivered; owner decisions and M3 runtime authorization pending.**
 > Base: `8d6ae99569d06edae46b6e5a6dc132a997a3d32b` · [M2-B evidence](../acceptance/PHASE2B2_M2B_RESULTS.md) · [Execution plan](PHASE2B2_EXECUTION_PLAN.md) · [Acceptance matrix](../acceptance/PHASE2B2_ACCEPTANCE_PLAN.md) · [ADR-005](../architecture/ADR-005_POLICY_APPROVAL_CANCELLATION.md) · [ADR-006](../architecture/ADR-006_TRUSTED_BROKER_BOUNDARY.md).
 
 ## 1. Purpose and stop conditions
 
-M3 integrates previously isolated deterministic policy, approval/control storage and existing durable execution **without** replacing the official MAF Workflow, reimplementing a harness loop or relaxing the M2-B security boundary. The next permitted activity is **M3-0 source-grounded architectural verification and documentation only**, not implementation.
+M3 integrates previously isolated deterministic policy, approval/control storage and existing durable execution **without** replacing the official MAF Workflow, reimplementing a harness loop or relaxing the M2-B security boundary. The authorized M3-0 source review is recorded in [M3-0 results and implementation proposal](../acceptance/PHASE2B2_M3_0_REVIEW.md), against `f37e222`. No runtime work was performed; the proposed M3-A substeps require separate owner authorization.
+
+Source clarification from that review: normal recovery does not Create/Submit, but executor cancellation can still call Abort. Public execution/client APIs have no unified MAF policy gate, Consume has no owner continuation, and the execution store rejects v2. The target invariants below do not describe completed enforcement. Explicit-only activation, compatibility changes and approval-generation limitations remain owner decisions.
 
 The following remain disabled: production policy activation, human approval, v2 production Host path, trusted operator CLI, permission/question reply, write/shell, and any unsafe fallback. Schema v2 is a test/storage foundation, not a declaration that real DB migration/credentials/writer isolation are approved. The corporate endpoint execution hold is independent.
 
