@@ -4,29 +4,39 @@ using Microsoft.Data.Sqlite;
 
 namespace MAF.Persistence.Sqlite;
 
+// ExplicitV2 opens an existing v2 database for read/update; direct creation requires admission.
+public enum ExecutionStoreProfile { LegacyV1, ExplicitV2 }
+
 // One local host; OS file ownership survives neither disposal nor process death.
 // The ownership file is not a SQLite transaction and contains no task data.
 public sealed class SqliteExecutionStore : IExecutionStore
 {
     private readonly string databasePath;
+    private readonly ExecutionStoreProfile profile;
     private readonly string connectionString;
-    private sealed class Ownership(string taskId, string database, FileStream stream) : IExecutionOwnership
+    private sealed class Ownership(string taskId, string database, FileStream stream, ExecutionStoreProfile profile) : IExecutionOwnership
     {
         public string TaskId { get; } = taskId;
         public string Database { get; } = database;
         public bool Disposed { get; private set; }
-        public async ValueTask DisposeAsync() { Disposed = true; await stream.DisposeAsync(); }
+        public ExecutionStoreProfile Profile { get; } = profile;
+        public SemaphoreSlim Gate { get; } = new(1, 1);
+        public async ValueTask DisposeAsync() { await Gate.WaitAsync(); try { Disposed = true; await stream.DisposeAsync(); } finally { Gate.Release(); } }
     }
 
-    public SqliteExecutionStore(string databasePath)
+    public SqliteExecutionStore(string databasePath) : this(databasePath, ExecutionStoreProfile.LegacyV1) { }
+
+    public SqliteExecutionStore(string databasePath, ExecutionStoreProfile profile)
     {
         if (!Path.IsPathFullyQualified(databasePath) || databasePath.StartsWith("\\\\", StringComparison.Ordinal)
             || string.IsNullOrWhiteSpace(Path.GetFileName(databasePath)))
             throw new ArgumentException("An absolute local database file path is required.");
-        this.databasePath = Path.GetFullPath(databasePath);
+        if (!Enum.IsDefined(profile)) throw new ArgumentOutOfRangeException(nameof(profile));
+        this.profile = profile;
+        this.databasePath = profile == ExecutionStoreProfile.ExplicitV2 ? ApprovalDatabase.PathFor(databasePath) : Path.GetFullPath(databasePath);
         connectionString = new SqliteConnectionStringBuilder
         {
-            DataSource = this.databasePath, Pooling = false, DefaultTimeout = 5, Mode = SqliteOpenMode.ReadWriteCreate
+            DataSource = this.databasePath, Pooling = false, DefaultTimeout = 5, Mode = profile == ExecutionStoreProfile.ExplicitV2 ? SqliteOpenMode.ReadWrite : SqliteOpenMode.ReadWriteCreate
         }.ToString();
     }
 
@@ -47,7 +57,7 @@ public sealed class SqliteExecutionStore : IExecutionStore
             command.Transaction = transaction;
             command.CommandText = "PRAGMA user_version;";
             var version = Convert.ToInt32(await command.ExecuteScalarAsync(token));
-            if (version is not (0 or 1)) throw new InvalidOperationException("Unsupported execution database schema.");
+            if (profile == ExecutionStoreProfile.ExplicitV2 ? version != 2 : version is not (0 or 1)) throw new InvalidOperationException("Unsupported execution database schema.");
             if (version == 0)
             {
                 command.CommandText = """
@@ -78,7 +88,7 @@ public sealed class SqliteExecutionStore : IExecutionStore
         {
             IExecutionOwnership owner = new Ownership(taskId, databasePath,
                 new FileStream(Path.Combine(directory, DurableExecution.Hash(taskId) + ".lock"), FileMode.OpenOrCreate,
-                    FileAccess.ReadWrite, FileShare.None));
+                    FileAccess.ReadWrite, FileShare.None), profile);
             return ValueTask.FromResult<IExecutionOwnership?>(owner);
         }
         catch (IOException) { return ValueTask.FromResult<IExecutionOwnership?>(null); }
@@ -88,6 +98,21 @@ public sealed class SqliteExecutionStore : IExecutionStore
     {
         if (ownership is not Ownership own || own.Disposed || own.TaskId != taskId || own.Database != databasePath)
             throw new InvalidOperationException("Execution ownership is required.");
+    }
+
+    internal static async ValueTask<IAsyncDisposable> UseAdmissionOwnershipAsync(string database, string task,
+        IExecutionOwnership ownership, CancellationToken token)
+    {
+        if (ownership is not Ownership own || own.TaskId != task || own.Database != database
+            || own.Profile != ExecutionStoreProfile.ExplicitV2)
+            throw new InvalidOperationException("ExecutionOwnershipRequired");
+        await own.Gate.WaitAsync(token);
+        if (own.Disposed) { own.Gate.Release(); throw new InvalidOperationException("ExecutionOwnershipRequired"); }
+        return new OwnershipUse(own.Gate);
+    }
+    private sealed class OwnershipUse(SemaphoreSlim gate) : IAsyncDisposable
+    {
+        public ValueTask DisposeAsync() { gate.Release(); return ValueTask.CompletedTask; }
     }
 
     private static DurableExecution Read(SqliteDataReader reader)
@@ -125,6 +150,7 @@ public sealed class SqliteExecutionStore : IExecutionStore
 
     public async Task CreateAsync(DurableExecution execution, IExecutionOwnership ownership, CancellationToken cancellationToken = default)
     {
+        if (profile == ExecutionStoreProfile.ExplicitV2) throw new InvalidOperationException("AtomicAdmissionRequired");
         CheckOwnership(execution.TaskId, ownership);
         if (execution.State != DurableExecutionState.Created || execution.Version != 0 || execution.CompletedAt is not null
             || execution.SubmissionPhase != SubmissionPhase.None || execution.Handle.ExternalSessionId is not null

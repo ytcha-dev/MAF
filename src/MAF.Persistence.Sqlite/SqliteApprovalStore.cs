@@ -7,7 +7,7 @@ using Microsoft.Data.Sqlite;
 namespace MAF.Persistence.Sqlite;
 
 // Not registered with Host. No workflow/provider dependencies or dispatch ticket are exposed.
-public sealed class SqliteApprovalStore : IApprovalStore, IApprovalTransactionCoordinator, IPolicyActivationCoordinator
+public sealed partial class SqliteApprovalStore : IApprovalStore, IApprovalTransactionCoordinator, IPolicyActivationCoordinator, IExecutionAdmissionCoordinator
 {
     readonly string path;
     readonly IProtectedPolicyAuthority authority;

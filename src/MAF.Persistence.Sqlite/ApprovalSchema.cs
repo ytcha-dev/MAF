@@ -2,7 +2,7 @@ using Microsoft.Data.Sqlite;
 
 namespace MAF.Persistence.Sqlite;
 
-internal enum ApprovalCheckpoint { MigrationValidated, TablesCreated, SchemaVersionWritten, PendingInserted, DecisionWritten, ApprovalConsumed, ExecutionInserted, CancellationWritten, BeforeCommit }
+internal enum ApprovalCheckpoint { MigrationValidated, TablesCreated, SchemaVersionWritten, PendingInserted, DecisionWritten, ApprovalConsumed, ExecutionInserted, CancellationWritten, BeforeCommit, AdmissionCommitted }
 
 public sealed record OfflineMaintenance(bool ExplicitMaintenanceMode, bool AllHostsStopped,
     bool BackupAndRollbackProcedureConfirmed);
