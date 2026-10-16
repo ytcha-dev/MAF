@@ -9,14 +9,14 @@ public sealed partial class SqliteApprovalStore : ICancellationAdmissionCoordina
 {
     public Task<CancellationEvidence?> GetCancellationAsync(string cancelRequestId, CancellationToken token = default)
     {
-        Require(profile == ApprovalStoreProfile.ExplicitV3, "CancellationSchemaV3Required"); Id(cancelRequestId);
+        Require(profile is ApprovalStoreProfile.ExplicitV3 or ApprovalStoreProfile.ExplicitV4, "CancellationSchemaV3Required"); Id(cancelRequestId);
         return Transaction((c, tx) => ReadCancellation(c, tx, cancelRequestId, token), token);
     }
 
     public async Task<CancellationAdmissionResult> RequestCancelAsync(CancellationCommand command, CancellationAdmissionInputs inputs,
         ITrustedCallerContext caller, CancellationToken token = default)
     {
-        Require(profile == ApprovalStoreProfile.ExplicitV3, "CancellationSchemaV3Required");
+        Require(profile is ApprovalStoreProfile.ExplicitV3 or ApprovalStoreProfile.ExplicitV4, "CancellationSchemaV3Required");
         Id(command.CancelRequestId); Id(command.TaskId); Id(command.ExecutionId); Id(inputs.OperationId); var actor = Actor(caller);
         await using var lease = await authority.AcquireAsync(token); var policy = Candidate();
         var result = await GuardedTransaction<CancellationAdmissionResult>(policy, async (c, tx) =>
@@ -145,7 +145,44 @@ public sealed partial class SqliteApprovalStore : ICancellationAdmissionCoordina
         return (execution, approval, target);
     }
 
-    static async Task<CancellationEvidence?> ReadCancellation(SqliteConnection c, SqliteTransaction tx, string id, CancellationToken token)
+    // Only offline v3 migration may preserve the known B0 mismatch as unverified legacy data.
+    // No normal read/replay or authorization uses that classification.
+    internal static async Task ValidateV3ForMigration(SqliteConnection c, CancellationToken token)
+    {
+        var approvals = new List<string>(); var cancellations = new List<string>();
+        using (var cmd = ApprovalDatabase.Command(c, null, "SELECT approval_id FROM approval_requests"))
+        using (var r = await cmd.ExecuteReaderAsync(token)) while (await r.ReadAsync(token)) approvals.Add(r.GetString(0));
+        foreach (var id in approvals)
+        {
+            var approval = await Read(c, null!, id, token) ?? throw new InvalidOperationException("MissingApproval");
+            Metadata(approval.Operation); Id(id);
+            Require(approval.BindingDigest.Length == 64 && approval.BindingDigest.All(char.IsAsciiHexDigit)
+                && approval.CreatedAt < approval.ExpiresAt && approval.Version >= 0
+                && (approval.Status is not (ApprovalStatus.Approved or ApprovalStatus.Consumed) || approval.DecidedBy is not null
+                    && approval.DecisionId is not null && approval.Choice == ApprovalChoice.Approve), "InvalidV3Approval");
+            _ = OperationBinding.Encode(approval.Operation, new(approval.Operation.ConnectorId, "migration-validation", approval.Operation.Capability,
+                EnforcementBoundary.TaskAdmission, [approval.Operation.Operation], true, true));
+            if (approval.Status == ApprovalStatus.Consumed)
+            {
+                var json = (string?)await ApprovalDatabase.Scalar(c, null, "SELECT snapshot FROM executions WHERE task_id=$t", token, ("$t", approval.Operation.TaskId));
+                var execution = json is null ? null : JsonSerializer.Deserialize<DurableExecution>(json);
+                var op = approval.Operation;
+                Require(execution is not null && op.Operation == PolicyOperation.SubmitNewReadOnlyTask && execution.Handle.ExecutionId == op.ExecutionId
+                    && execution.WorkflowRunId == op.WorkflowRunId && execution.Handle.ExternalRequestId == op.MessageId
+                    && execution.RequestFingerprint == op.RequestFingerprint && execution.ProjectRoot == op.Scope.ResourceId
+                    && execution.ProviderScope == op.Scope.ProviderScopeDigest, "ConsumedExecutionMismatch");
+            }
+        }
+        using (var cmd = ApprovalDatabase.Command(c, null, "SELECT cancel_request_id FROM cancellation_requests"))
+        using (var r = await cmd.ExecuteReaderAsync(token)) while (await r.ReadAsync(token)) cancellations.Add(r.GetString(0));
+        foreach (var id in cancellations) _ = await ReadCancellation(c, null!, id, token, true) ?? throw new InvalidOperationException("CancellationEvidenceMissing");
+        Require(Convert.ToInt64(await ApprovalDatabase.Scalar(c, null,
+            "SELECT count(*) FROM authorization_operations o LEFT JOIN cancellation_requests c ON c.operation_id=o.operation_id WHERE o.kind=3 AND c.cancel_request_id IS NULL", token)) == 0,
+            "CancellationEvidenceMissing");
+    }
+
+    static async Task<CancellationEvidence?> ReadCancellation(SqliteConnection c, SqliteTransaction tx, string id, CancellationToken token,
+        bool preserveUnverifiedLegacyEvolution = false)
     {
         CancellationEvidence evidence;
         using (var cmd = ApprovalDatabase.Command(c, tx, "SELECT *,length(CAST(evidence_json AS BLOB)) FROM cancellation_requests WHERE cancel_request_id=$id", ("$id", id)))
@@ -184,10 +221,24 @@ public sealed partial class SqliteApprovalStore : ICancellationAdmissionCoordina
         Require(control is not null && control.ExecutionId == operation.ExecutionId && control.CancelRequestId == id && control.RequestedBy == operation.CallerSubject
             && control.RequestedAt == evidence.RequestedAt && control.Version >= evidence.CommittedControlVersion, "CancellationControlMismatch");
         var (execution, approval, target) = await CancelTarget(c, tx, operation.TaskId, token);
+        var correlatedLaterSession = false;
+        if (!preserveUnverifiedLegacyEvolution && execution?.Handle.ExternalSessionId is not null && operation.ProviderSessionId is null
+            && Convert.ToInt64(await ApprovalDatabase.Scalar(c, tx, "PRAGMA user_version", token)) == 4)
+        {
+            Require(Convert.ToInt64(await ApprovalDatabase.Scalar(c, tx, "SELECT session_receipt_required FROM executions WHERE task_id=$t", token,
+                ("$t", operation.TaskId))) == 1, "LegacyCorrelationUnverified");
+            var receipt = await ReadSessionReceipt(c, tx, operation.TaskId, token, validateCancellation: false);
+            var cancelSequence = Convert.ToInt64(await ApprovalDatabase.Scalar(c, tx,
+                "SELECT sequence FROM control_audit WHERE cancel_request_id=$id AND code=6", token, ("$id", id)));
+            correlatedLaterSession = receipt?.Response is not null && receipt.Status is SessionReceiptStatus.Verified or SessionReceiptStatus.Quarantined
+                && receipt.Intent.IntentAuditSequence < cancelSequence;
+        }
         Require(target == evidence.TargetOperationId && (execution is not null ? execution.Handle.ExecutionId == operation.ExecutionId
             && execution.RequestFingerprint == operation.RequestFingerprint && execution.WorkflowRunId == operation.WorkflowRunId
             && execution.Handle.ExternalRequestId == operation.MessageId && execution.ProjectRoot == operation.Scope.ResourceId
-            && execution.Handle.ExternalSessionId == operation.ProviderSessionId
+            && (execution.Handle.ExternalSessionId == operation.ProviderSessionId
+                || preserveUnverifiedLegacyEvolution && operation.ProviderSessionId is null && execution.Handle.ExternalSessionId is not null
+                || correlatedLaterSession)
             && execution.ProviderScope == operation.Scope.ProviderScopeDigest
             : approval is not null && approval.Operation.ExecutionId == operation.ExecutionId && approval.Operation.Scope == operation.Scope
                 && approval.Operation.WorkflowRunId == operation.WorkflowRunId && approval.Operation.MessageId == operation.MessageId

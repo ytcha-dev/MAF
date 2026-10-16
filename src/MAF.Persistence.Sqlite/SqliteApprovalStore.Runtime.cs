@@ -17,7 +17,8 @@ public sealed partial class SqliteApprovalStore : IRuntimeEnforcementCoordinator
             evidence ?? throw new InvalidOperationException("ConsumedApprovalRequired"));
     async Task VerifyEffectTransactionAsync(PolicyRequest operation, PolicyDecision assessment, DurableExecution expected,
         DurableExecution? intent, long controlVersion, ProviderEffect effect, ITrustedCallerContext caller,
-        IExecutionOwnership ownership, CancellationToken token, ConsumedApprovalAuthorization? approval = null)
+        IExecutionOwnership ownership, CancellationToken token, ConsumedApprovalAuthorization? approval = null,
+        Func<Microsoft.Data.Sqlite.SqliteConnection, Microsoft.Data.Sqlite.SqliteTransaction, Task>? receiptIntent = null)
     {
         if (approval is not null) Require(approval.Database == path && ReferenceEquals(approval.Owner, ownership), "ResumeOwnershipMismatch");
         await using var use = await SqliteExecutionStore.UseAdmissionOwnershipAsync(path, operation.TaskId, ownership, token, ExecutionProfile);
@@ -51,6 +52,17 @@ public sealed partial class SqliteApprovalStore : IRuntimeEnforcementCoordinator
             }
             if (approval is not null) await VerifyConsumed(c, tx, approval, policy, operation, token);
             Authorized();
+            if (profile == ApprovalStoreProfile.ExplicitV4)
+            {
+                var required = Convert.ToInt64(await ApprovalDatabase.Scalar(c, tx, "SELECT session_receipt_required FROM executions WHERE task_id=$t", token, ("$t", expected.TaskId)));
+                Require(required == 1 || operation.Operation == PolicyOperation.InspectExistingExecution, "LegacyExecutionRecoveryOnly");
+                if (required == 1 && expected.SubmissionPhase >= SubmissionPhase.SessionCreationIntended)
+                {
+                    var r = await ReadSessionReceipt(c, tx, expected.TaskId, token) ?? throw new InvalidOperationException("SessionReceiptRequired");
+                    Require(r.Status != SessionReceiptStatus.Quarantined, "SessionReceiptQuarantined");
+                }
+                if (intent is not null && effect == ProviderEffect.CreateSession) Require(receiptIntent is not null, "SessionReceiptRequired");
+            }
             var control = await Control(c, tx, expected.TaskId, token);
             Require(control is not null && control.ExecutionId == expected.Handle.ExecutionId && control.Version == controlVersion
                 && (operation.Operation == PolicyOperation.InspectExistingExecution || control.CancelRequestId is null), "ControlConflict");
@@ -69,6 +81,7 @@ public sealed partial class SqliteApprovalStore : IRuntimeEnforcementCoordinator
                     ("$v", intent.Version), ("$j", Json(intent)), ("$t", expected.TaskId), ("$old", expected.Version), ("$before", Json(expected))) == 1,
                     "ExecutionVersionConflict");
                 await Audit(c, tx, ControlAuditCode.Requested, actor, expected.TaskId, approval?.Approval.ApprovalId, intent.Version, token);
+                if (receiptIntent is not null) await receiptIntent(c, tx);
                 fault?.Invoke(ApprovalCheckpoint.DispatchIntentWritten);
             }
             else if (effect == ProviderEffect.CreateSession)

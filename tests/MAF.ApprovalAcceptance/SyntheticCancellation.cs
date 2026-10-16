@@ -10,6 +10,7 @@ public sealed class SyntheticCancellation : ITrustedIdentityResolver, ITrustedPo
     IExecutionBindingVerifier, ITrustedApprovalMaintenanceAuthorization
 {
     public SyntheticApprovalApplication Approval { get; }
+    public bool V4 { get; }
     public SyntheticRuntime Runtime => Approval.Runtime;
     public SyntheticClock Clock => Runtime.Clock;
     public SyntheticActor Canceller { get; set; } = new("synthetic-canceller");
@@ -19,8 +20,9 @@ public sealed class SyntheticCancellation : ITrustedIdentityResolver, ITrustedPo
     public CapabilityDescriptor Capability => Runtime.Submit with { Capability = PolicyCapability.ExecutionCancellation, SupportedOperations = [PolicyOperation.RequestCancelExecution] };
     public CancellationAdmissionInputs Inputs => new(Policy.AuthorityId, Policy.Epoch, Policy.Version, Runtime.Scope, Capability, "cancel-operation");
     public CancellationCommand Command => new("cancel-one", Runtime.Request.TaskId, "runtime-execution", 0);
-    public SyntheticCancellation(string database, bool approved = false)
+    public SyntheticCancellation(string database, bool approved = false, bool v4 = false)
     {
+        V4 = v4;
         Directory.CreateDirectory(Path.GetDirectoryName(database)!);
         Approval = new(database);
         var original = approved ? Approval.Policy : Runtime.Policy;
@@ -39,8 +41,8 @@ public sealed class SyntheticCancellation : ITrustedIdentityResolver, ITrustedPo
     public bool Matches(PolicyRequest op, DurableExecution execution) => Runtime.Matches(op, execution);
     public TrustedPolicyAuthority Authority() => new("runtime-source", "runtime-authority", this, Clock, this, this, this);
     public SqliteApprovalStore Store(Action<string>? checkpoint = null, int capacity = 10000)
-        => new(Runtime.Database, Authority(), Clock, capacity, null, ApprovalStoreProfile.ExplicitV3, checkpoint);
-    public SqliteExecutionStore Executions => new(Runtime.Database, ExecutionStoreProfile.ExplicitV3);
+        => new(Runtime.Database, Authority(), Clock, capacity, null, V4 ? ApprovalStoreProfile.ExplicitV4 : ApprovalStoreProfile.ExplicitV3, checkpoint);
+    public SqliteExecutionStore Executions => new(Runtime.Database, V4 ? ExecutionStoreProfile.ExplicitV4 : ExecutionStoreProfile.ExplicitV3);
     public CancellationAdmissionApplication Application(SqliteApprovalStore? store = null, CancellationAdmissionInputs? inputs = null)
         => new(inputs ?? Inputs, this, store ?? Store(), Clock);
     public ProtectedExternalRuntime Protected(HttpClient http, SqliteApprovalStore? store = null)
@@ -52,6 +54,7 @@ public sealed class SyntheticCancellation : ITrustedIdentityResolver, ITrustedPo
     {
         await ApprovalSchema.InitializeOrMigrateAsync(Runtime.Database, SyntheticApproval.Maintenance);
         await ApprovalSchema.MigrateV2ToV3Async(Runtime.Database, SyntheticApproval.Maintenance, this);
+        if (V4) await ApprovalSchema.MigrateV3ToV4Async(Runtime.Database, SyntheticApproval.Maintenance, this);
         await Store().ActivatePolicyAsync();
         if (pending)
             await new DurableApprovalApplication(Runtime.Inputs, new ImmutablePolicySource(Policy), this, Executions, Store(), Clock)

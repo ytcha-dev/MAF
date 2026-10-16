@@ -221,8 +221,13 @@ public sealed class OpenCodeClient : IResumableExternalHarnessClient
         }
         catch (ExternalHarnessException error)
         {
+            if (access is IOriginalCreateAccess { ReceiptEnabled: true } receipt)
+                await receipt.FinalizeOriginalCreate(created, false,
+                    error.Code == "SessionPolicyMismatch" ? "SessionPolicyMismatch" : "InvalidSessionResponse");
             throw new ExternalHarnessException(error.Code, error.Ambiguous, created);
         }
+        if (access is IOriginalCreateAccess { ReceiptEnabled: true } original)
+            await original.FinalizeOriginalCreate(created, true, "None");
         return created;
     }
 
@@ -432,6 +437,8 @@ public sealed class OpenCodeClient : IResumableExternalHarnessClient
         }
         try
         {
+            if (access is IOriginalCreateAccess { ReceiptEnabled: true } receipt)
+                receipt.ArmOriginalCreate(http, request);
             using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
             if (!response.IsSuccessStatusCode)
             {
@@ -439,6 +446,8 @@ public sealed class OpenCodeClient : IResumableExternalHarnessClient
                     or HttpStatusCode.Forbidden or HttpStatusCode.NotFound or HttpStatusCode.UnprocessableEntity;
                 throw new ExternalHarnessException("HTTP" + (int)response.StatusCode, !definiteRejection);
             }
+            if (access is IOriginalCreateAccess { ReceiptEnabled: true } original)
+                original.CaptureOriginalResponse(http, request, response);
             if (noContent)
             {
                 if (response.StatusCode != HttpStatusCode.NoContent)

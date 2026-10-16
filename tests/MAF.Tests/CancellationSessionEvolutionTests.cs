@@ -8,8 +8,8 @@ using Xunit.Abstractions;
 
 namespace MAF.Tests;
 
-// Characterization of the B0 design blocker, NOT acceptance of successful reconciliation.
-// Remove the expected read failure only with an authorized correlation-evidence repair.
+// B0 legitimate-response regressions are positive v4 acceptance; historical v3 forgery
+// diagnostics below remain negative fixtures, not a production trust fallback.
 public sealed class CancellationSessionEvolutionTests(ITestOutputHelper output) : IDisposable
 {
     readonly string root = Path.Combine(Path.GetTempPath(), "maf-cancel-evolution-" + Guid.NewGuid().ToString("N"));
@@ -23,13 +23,14 @@ public sealed class CancellationSessionEvolutionTests(ITestOutputHelper output) 
 
     [Theory]
     [InlineData(false)] [InlineData(true)]
-    public async Task OriginalInFlightCreateResponseMakesHistoricalEvidenceUnreadable(bool approved)
+    public async Task OriginalInFlightCreateResponseKeepsHistoricalEvidenceReadable(bool approved)
     {
-        var f = new SyntheticCancellation(Db, approved);
+        var f = new SyntheticCancellation(Db, approved, v4: true);
         await ApprovalSchema.InitializeOrMigrateAsync(Db, SyntheticApproval.Maintenance);
         await ApprovalSchema.MigrateV2ToV3Async(Db, SyntheticApproval.Maintenance, f);
+        await ApprovalSchema.MigrateV3ToV4Async(Db, SyntheticApproval.Maintenance, f);
         await f.Store().ActivatePolicyAsync();
-        using var transport = new RuntimeHttpFixture(f.Runtime.Root); using var http = new HttpClient(transport);
+        using var transport = new RuntimeHttpFixture(f.Runtime.Root); using var http = ReceiptTransport.ForTests(transport);
         CancellationEvidence? historical = null; string? originalJson = null;
         transport.OnRequest = async (request, _) =>
         {
@@ -62,18 +63,21 @@ public sealed class CancellationSessionEvolutionTests(ITestOutputHelper output) 
         Assert.Equal(historical.Operation.MessageId, current.Handle.ExternalRequestId);
         Assert.Equal(originalJson, await Sql("SELECT evidence_json FROM cancellation_requests"));
         Assert.Equal(historical.BindingDigest, await Sql("SELECT binding_digest FROM cancellation_requests"));
-        Assert.Equal("CancellationTargetMismatch", (await Assert.ThrowsAsync<InvalidOperationException>(() => f.Store().GetCancellationAsync("cancel-one"))).Message);
-        Assert.Equal("CancellationTargetMismatch", (await Assert.ThrowsAsync<InvalidOperationException>(() => f.Store().GetControlAsync(f.Command.TaskId))).Message);
-        // Fresh composition, current independent Inspect rights: fails before any new HTTP.
+        Assert.Equal(historical.BindingDigest, (await f.Store().GetCancellationAsync("cancel-one"))!.BindingDigest);
+        Assert.Equal(1, (await f.Store().GetControlAsync(f.Command.TaskId))!.Version);
+        Assert.Equal(SessionReceiptStatus.Verified, (await f.Store().GetSessionReceiptAsync(f.Command.TaskId))!.Status);
+        // Fresh composition, current independent Inspect rights: GET original session only.
         var before = transport.Requests.Count;
-        await Assert.ThrowsAnyAsync<Exception>(() => f.Protected(http).RunAsync(new(ExternalAdmissionMode.Inspect, f.Command.TaskId, f.Runtime.Request.Timeout), f.Runtime.Caller, true));
-        Assert.Equal(before, transport.Requests.Count);
-        Assert.Equal(current, await f.Executions.GetAsync(f.Command.TaskId));
+        var recovered = await f.Protected(http).RunAsync(new(ExternalAdmissionMode.Inspect, f.Command.TaskId, f.Runtime.Request.Timeout), f.Runtime.Caller, true);
+        Assert.Equal(current.Handle, recovered.Result.Handle);
+        Assert.Equal(ExternalExecutionStatus.Unknown, recovered.Result.Status);
+        Assert.All(transport.Requests.Skip(before), x => Assert.StartsWith("GET ", x));
+        Assert.Equal(current.Handle, (await f.Executions.GetAsync(f.Command.TaskId))!.Handle);
         Assert.Equal(1, transport.Requests.Count(x => x == "POST /session"));
         Assert.DoesNotContain(transport.Requests, x => x.Contains("prompt_async") || x.Contains("abort"));
         Assert.False(current.AbortRequested);
         Assert.Equal("ok", await Sql("PRAGMA integrity_check"));
-        output.WriteLine($"B0 reproduced approved={approved}; task={current.TaskId}; execution={current.Handle.ExecutionId}; run={current.WorkflowRunId}; message={current.Handle.ExternalRequestId}; historicalSession=null; currentSession={current.Handle.ExternalSessionId}; phase={current.SubmissionPhase}; control=1; Create/Prompt/Abort=1/0/0; GetCancellation/GetControl=CancellationTargetMismatch; Inspect blocked before HTTP; historical evidence unchanged.");
+        output.WriteLine($"B0 repaired approved={approved}; task={current.TaskId}; execution={current.Handle.ExecutionId}; run={current.WorkflowRunId}; message={current.Handle.ExternalRequestId}; historicalSession=null; currentSession={current.Handle.ExternalSessionId}; phase={current.SubmissionPhase}; control=1; Create/Prompt/Abort=1/0/0; GetCancellation/GetControl=success; Inspect GET-only Unknown; historical evidence unchanged.");
     }
 
     [Theory]

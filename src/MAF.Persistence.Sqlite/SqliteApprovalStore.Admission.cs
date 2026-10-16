@@ -52,7 +52,7 @@ public sealed partial class SqliteApprovalStore
                     ("$t", operation.TaskId), ("$e", operation.ExecutionId));
             await ApprovalDatabase.Execute(c, tx, "INSERT INTO authorization_operations VALUES($o,$t,$e,$k,$g)", token,
                 ("$o", operation.OperationId), ("$t", operation.TaskId), ("$e", operation.ExecutionId), ("$k", (int)operation.Operation), ("$g", operation.IntentGeneration));
-            await ApprovalDatabase.Execute(c, tx, "INSERT INTO executions VALUES($t,0,0,$j)", token,
+            await ApprovalDatabase.Execute(c, tx, profile == ApprovalStoreProfile.ExplicitV4 ? "INSERT INTO executions(task_id,version,terminal,snapshot,session_receipt_required) VALUES($t,0,0,$j,1)" : "INSERT INTO executions VALUES($t,0,0,$j)", token,
                 ("$t", initialExecution.TaskId), ("$j", Json(initialExecution)));
             fault?.Invoke(ApprovalCheckpoint.ExecutionInserted);
             // Existing v2 Requested code, null approval_id: direct admission, never an Approved row.

@@ -6,14 +6,14 @@ using Microsoft.Data.Sqlite;
 
 namespace MAF.Persistence.Sqlite;
 
-public enum ApprovalStoreProfile { ExplicitV2, ExplicitV3 }
+public enum ApprovalStoreProfile { ExplicitV2, ExplicitV3, ExplicitV4 }
 
 // Not registered with Host. No workflow/provider dependencies or dispatch ticket are exposed.
 public sealed partial class SqliteApprovalStore : IApprovalStore, IApprovalTransactionCoordinator, IPolicyActivationCoordinator, IExecutionAdmissionCoordinator
 {
     readonly string path;
     readonly ApprovalStoreProfile profile;
-    ExecutionStoreProfile ExecutionProfile => profile == ApprovalStoreProfile.ExplicitV3 ? ExecutionStoreProfile.ExplicitV3 : ExecutionStoreProfile.ExplicitV2;
+    ExecutionStoreProfile ExecutionProfile => profile switch { ApprovalStoreProfile.ExplicitV4 => ExecutionStoreProfile.ExplicitV4, ApprovalStoreProfile.ExplicitV3 => ExecutionStoreProfile.ExplicitV3, _ => ExecutionStoreProfile.ExplicitV2 };
     readonly IProtectedPolicyAuthority authority;
     readonly TimeProvider clock;
     readonly int auditCapacity;
@@ -44,8 +44,10 @@ public sealed partial class SqliteApprovalStore : IApprovalStore, IApprovalTrans
         await c.OpenAsync(token);
         using (var setup = c.CreateCommand()) { setup.CommandText = "PRAGMA synchronous=FULL"; await setup.ExecuteNonQueryAsync(token); }
         using var tx = c.BeginTransaction(deferred: false);
-        Require(Convert.ToInt32(await ApprovalDatabase.Scalar(c, tx, "PRAGMA user_version", token)) == (profile == ApprovalStoreProfile.ExplicitV3 ? 3 : 2), profile == ApprovalStoreProfile.ExplicitV2 ? "ApprovalSchemaV2Required" : "ApprovalSchemaV3Required");
+        Require(Convert.ToInt32(await ApprovalDatabase.Scalar(c, tx, "PRAGMA user_version", token)) == (profile switch { ApprovalStoreProfile.ExplicitV4 => 4, ApprovalStoreProfile.ExplicitV3 => 3, _ => 2 }),
+            profile switch { ApprovalStoreProfile.ExplicitV4 => "ApprovalSchemaV4Required", ApprovalStoreProfile.ExplicitV3 => "ApprovalSchemaV3Required", _ => "ApprovalSchemaV2Required" });
         if (profile == ApprovalStoreProfile.ExplicitV3) await ApprovalSchema.ValidateV3Async(c, tx, token);
+        if (profile == ApprovalStoreProfile.ExplicitV4) await ApprovalSchema.ValidateV4Async(c, tx, token);
         var result = await action(c, tx);
         fault?.Invoke(ApprovalCheckpoint.BeforeCommit); tx.Commit(); return result;
     }
@@ -171,7 +173,7 @@ public sealed partial class SqliteApprovalStore : IApprovalStore, IApprovalTrans
         => Transaction(async (c, tx) =>
         {
             var control = await Control(c, tx, taskId, token);
-            if (profile == ApprovalStoreProfile.ExplicitV3 && control?.CancelRequestId is { } cancel)
+            if (profile != ApprovalStoreProfile.ExplicitV2 && control?.CancelRequestId is { } cancel)
             {
                 var evidence = await ReadCancellation(c, tx, cancel, token);
                 if (evidence is null) Require(Convert.ToInt64(await ApprovalDatabase.Scalar(c, tx,
@@ -308,7 +310,7 @@ public sealed partial class SqliteApprovalStore : IApprovalStore, IApprovalTrans
             Require(authority.MatchesExecutionBinding(op, e), "ExecutionProviderBindingMismatch");
             var next = r with { Status = ApprovalStatus.Consumed, Version = r.Version + 1 };
             await Save(c, tx, r, next, ControlAuditCode.Consumed, subject, token); fault?.Invoke(ApprovalCheckpoint.ApprovalConsumed);
-            await ApprovalDatabase.Execute(c, tx, "INSERT INTO executions VALUES($t,0,0,$j)", token, ("$t", e.TaskId), ("$j", Json(e)));
+            await ApprovalDatabase.Execute(c, tx, profile == ApprovalStoreProfile.ExplicitV4 ? "INSERT INTO executions(task_id,version,terminal,snapshot,session_receipt_required) VALUES($t,0,0,$j,1)" : "INSERT INTO executions VALUES($t,0,0,$j)", token, ("$t", e.TaskId), ("$j", Json(e)));
             fault?.Invoke(ApprovalCheckpoint.ExecutionInserted); additionalValidation?.Invoke(r); return (e, next);
         }, token);
     }

@@ -4,6 +4,56 @@ using MAF.Persistence.Sqlite;
 
 if (args.Length < 2) throw new ArgumentException("Test-only: seed <db> | read <db> | migrate-crash <db> <checkpoint>");
 var path = Path.GetFullPath(args[1]);
+if (args[0].StartsWith("receipt-", StringComparison.Ordinal))
+{
+    var approved = args.Length > 3 && args[3] == "approved";
+    var f = new SyntheticCancellation(path, approved, v4: true);
+    void Gate(string point)
+    {
+        if (args.Length < 3 || args[2] != point) return;
+        Console.WriteLine(point); Console.Out.Flush();
+        if (!Console.In.ReadLineAsync().Wait(TimeSpan.FromSeconds(30))) throw new TimeoutException("ReceiptTestGate");
+    }
+    if (args[0] == "receipt-migrate")
+    { await ApprovalSchema.MigrateV4Async(path, SyntheticApproval.Maintenance, f, Gate); return; }
+    if (args[0] == "receipt-verify")
+    {
+        await using var c = new Microsoft.Data.Sqlite.SqliteConnection(ApprovalDatabase.ConnectionString(path, Microsoft.Data.Sqlite.SqliteOpenMode.ReadWrite));
+        await c.OpenAsync();
+        var version = Convert.ToInt64(await ApprovalDatabase.Scalar(c, null, "PRAGMA user_version", default));
+        if (version == 4) await ApprovalSchema.ValidateV4Async(c, null!, default); else await ApprovalSchema.ValidateV3Async(c, null!, default);
+        var bytes = await ApprovalSchema.V3Bytes(c, null, default);
+        Console.WriteLine(JsonSerializer.Serialize(new { Version = version, Integrity = await ApprovalDatabase.Scalar(c, null, "PRAGMA integrity_check", default),
+            OriginalDigest = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(bytes))) })); return;
+    }
+    using var transport = new RuntimeHttpFixture(f.Runtime.Root) { LedgerPath = path + ".http", StatePath = path + ".provider" };
+    using var http = MAF.Workflows.External.ReceiptTransport.ForTests(transport);
+    if (args[0] == "receipt-recover")
+    {
+        f.Policy = f.Policy with { Epoch = new(2), Version = new(2), Rules = [..f.Policy.Rules.Where(r => r.Operation == MAF.Core.Policy.PolicyOperation.InspectExistingExecution)] };
+        var recovered = await f.Protected(http).RunAsync(new(MAF.Workflows.External.ExternalAdmissionMode.Inspect, f.Command.TaskId, f.Runtime.Request.Timeout), f.Runtime.Caller, true);
+        var e = (await f.Executions.GetAsync(f.Command.TaskId))!;
+        var receipt = await f.Store().GetSessionReceiptAsync(f.Command.TaskId);
+        Console.WriteLine(JsonSerializer.Serialize(new { e.TaskId, e.Handle.ExecutionId, e.WorkflowRunId, e.Handle.ExternalRequestId, e.Handle.ExternalSessionId,
+            State = recovered.Result.Status.ToString(), Phase = e.SubmissionPhase.ToString(), Receipt = receipt?.Status.ToString(), Calls = transport.Requests.ToArray() }));
+        return;
+    }
+    var store = f.Store(Gate);
+    transport.OnRequest = async (request, _) =>
+    {
+        if (request.Method == HttpMethod.Post && request.RequestUri!.AbsolutePath == "/session")
+            await f.Application(store).RequestAsync(f.Command, f.Canceller);
+    };
+    if (approved)
+    {
+        var app = new MAF.Workflows.External.DurableApprovalApplication(f.Runtime.Inputs, new MAF.Core.Policy.ImmutablePolicySource(f.Policy), f, f.Executions, store, f.Clock);
+        var pending = await app.RequestAsync("cancel-approval", f.Runtime.Intent, f.Runtime.Caller);
+        var decision = await app.DecideAsync(new(pending.ApprovalId, "decision", 0, pending.BindingDigest, MAF.Core.Policy.ApprovalChoice.Approve), f.Approval.Operator);
+        await f.Protected(http, store).ResumeAsync(new(decision.ApprovalId, decision.Version, decision.BindingDigest, f.Runtime.Request), f.Runtime.Caller, f.Approval.Operator);
+    }
+    else await f.Protected(http, store).RunAsync(f.Runtime.Intent, f.Runtime.Caller);
+    Console.WriteLine("finished"); return;
+}
 if (args[0].StartsWith("m4-", StringComparison.Ordinal))
 {
     var f = new SyntheticCancellation(path);

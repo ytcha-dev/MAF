@@ -11,6 +11,9 @@ public interface ITrustedApprovalMaintenanceAuthorization
 // primitive; this entry supplies an explicit fail-closed authorization boundary for future tools.
 public static class AuthorizedApprovalMaintenance
 {
+    public static Task MigrateV3ToV4Async(string databasePath, OfflineMaintenance prerequisites,
+        ITrustedApprovalMaintenanceAuthorization? authorization = null, CancellationToken token = default)
+        => ApprovalSchema.MigrateV3ToV4Async(databasePath, prerequisites, authorization, token);
     public static Task MigrateV2ToV3Async(string databasePath, OfflineMaintenance prerequisites,
         ITrustedApprovalMaintenanceAuthorization? authorization = null, CancellationToken token = default)
         => ApprovalSchema.MigrateV2ToV3Async(databasePath, prerequisites, authorization, token);

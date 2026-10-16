@@ -43,6 +43,8 @@ public sealed class ProtectedExternalRuntime(ExternalAdmissionInputs inputs, IPo
         if (identity is null || identity.SubjectId != caller.SubjectId || identity.AuthenticationContextId != caller.AuthenticationContextId
             || identity.Kind == IdentityKind.Unknown || !Enum.IsDefined(identity.Kind) || now < identity.NotBefore || now >= identity.NotAfter)
             throw new ExternalHarnessException("InvalidCaller");
+        if (enforcement is ISessionReceiptCoordinator { RequiresSessionReceipts: true } && !ReceiptTransport.IsOwned(http))
+            throw new ExternalHarnessException("ReceiptTransportRequired");
         if (DurableExecution.NormalizeRoot(new ProjectTools(inputs.Scope.ResourceId).Root) != inputs.Scope.ResourceId
             || DurableExecution.NormalizeRoot(options.ApprovedProjectRoot) != inputs.Scope.ResourceId)
             throw new ExternalHarnessException("RuntimeScopeMismatch");
@@ -93,7 +95,7 @@ public sealed class ProtectedExternalRuntime(ExternalAdmissionInputs inputs, IPo
             }
         }
         using var access = new ProtectedAccess(trusted, policy, identities, executions, enforcement,
-            owner, caller, control?.Version ?? 0, intent, existing is not null, clock, evidence);
+            owner, caller, control?.Version ?? 0, intent, existing is not null, clock, options, evidence);
         var client = new OpenCodeClient(access, http, options);
         if (client.Scope != inputs.Scope.ProviderScopeDigest || client.Provider != inputs.ProviderId)
             throw new ExternalHarnessException("RuntimeProviderMismatch");
@@ -107,12 +109,13 @@ public sealed class ProtectedExternalRuntime(ExternalAdmissionInputs inputs, IPo
         return await service.LaunchOwnedAsync(intent.Submission!, created!, owner, token);
     }
 
-    sealed class IntentStore(IExecutionStore inner, ProtectedAccess access) : IExecutionStore
+    sealed class IntentStore(IExecutionStore inner, ProtectedAccess access) : IExecutionStore, IOriginalCreateStore
     {
         public ValueTask<IExecutionOwnership?> TryAcquireAsync(string task, CancellationToken token = default) => throw new ExternalHarnessException("OwnedRuntimeRequired");
         public Task CreateAsync(DurableExecution e, IExecutionOwnership owner, CancellationToken token = default) => throw new ExternalHarnessException("AtomicAdmissionRequired");
         public Task<IReadOnlyList<DurableExecution>> ListRecoverableAsync(CancellationToken token = default) => throw new ExternalHarnessException("MetadataListNotSupported");
         public Task<DurableExecution?> GetAsync(string task, CancellationToken token = default) => inner.GetAsync(task, token);
+        public DurableExecution? TakeOriginalCreate(ExternalExecutionHandle handle) => access.TakeOriginalCreate(handle);
         public Task UpdateAsync(DurableExecution before, DurableExecution next, IExecutionOwnership owner, CancellationToken token = default)
             => next.SubmissionPhase != before.SubmissionPhase && next.SubmissionPhase is SubmissionPhase.SessionCreationIntended or SubmissionPhase.PromptIntended
                 ? access.VerifyAsync(next.SubmissionPhase == SubmissionPhase.PromptIntended ? ProviderEffect.SubmitPrompt : ProviderEffect.CreateSession, before, next, token)
@@ -122,15 +125,62 @@ public sealed class ProtectedExternalRuntime(ExternalAdmissionInputs inputs, IPo
     // Per-owned-run, never exposed as a dispatch permit or shared across executions.
     internal sealed class ProtectedAccess(ExternalAdmissionInputs inputs, IPolicySource policy, ITrustedIdentityResolver identities,
         IExecutionStore store, IRuntimeEnforcementCoordinator enforcement, IExecutionOwnership owner, ITrustedCallerContext caller,
-        long controlVersion, ExternalAdmissionRequest intent, bool recovery, TimeProvider clock,
-        ConsumedApprovalAuthorization? approval = null) : IRuntimeAccess, IDisposable
+        long controlVersion, ExternalAdmissionRequest intent, bool recovery, TimeProvider clock, OpenCodeOptions? optionsForReceipt = null,
+        ConsumedApprovalAuthorization? approval = null) : IRuntimeAccess, IOriginalCreateAccess, IDisposable
     {
         sealed record EffectCall(ProviderEffect Kind, ExternalExecutionHandle? Handle);
         readonly AsyncLocal<EffectCall?> current = new();
         bool disposed;
         public bool SuppressImplicitAbort => true;
         public void DemandEntry() { if (disposed) throw new ExternalHarnessException("ProtectedRuntimeExpired"); }
-        public void Dispose() => disposed = true;
+        SessionReceiptRegistration? registration;
+        HttpClient? transport; HttpRequestMessage? originalRequest; Uri? originalUri;
+        bool captured;
+        DurableExecution? finalized;
+        OpenCodeOptions ReceiptOptions => optionsForReceipt ?? throw new ExternalHarnessException("ReceiptConfigurationRequired");
+        public bool ReceiptEnabled => enforcement is ISessionReceiptCoordinator { RequiresSessionReceipts: true };
+        public void Dispose() { registration?.Burn(); disposed = true; }
+        public DurableExecution? TakeOriginalCreate(ExternalExecutionHandle handle)
+        {
+            if (finalized is null) return null;
+            if (finalized.Handle != handle) throw new ExternalHarnessException("ReceiptHandleMismatch");
+            var record = finalized; finalized = null; return record;
+        }
+        public void ArmOriginalCreate(HttpClient client, HttpRequestMessage request)
+        {
+            DemandEntry();
+            if (!ReceiptEnabled || current.Value?.Kind != ProviderEffect.CreateSession) return;
+            if (!ReceiptTransport.IsOwned(client) || registration is null || originalRequest is not null
+                || request.Method != HttpMethod.Post || request.RequestUri is null
+                || request.RequestUri.AbsolutePath != "/session"
+                || request.RequestUri.GetLeftPart(UriPartial.Authority) != ReceiptOptions.BaseUri.GetLeftPart(UriPartial.Authority)
+                || request.RequestUri.Query != "?directory=" + Uri.EscapeDataString(Path.TrimEndingDirectorySeparator(Path.GetFullPath(ReceiptOptions.ApprovedProjectRoot))))
+                throw new ExternalHarnessException("ReceiptExchangeRequired");
+            registration.Arm(); transport = client; originalRequest = request; originalUri = request.RequestUri;
+        }
+        public void CaptureOriginalResponse(HttpClient client, HttpRequestMessage request, HttpResponseMessage response)
+        {
+            DemandEntry();
+            if (!ReceiptEnabled || current.Value?.Kind != ProviderEffect.CreateSession) return;
+            if (captured || !ReferenceEquals(transport, client) || !ReferenceEquals(originalRequest, request)
+                || request.RequestUri != originalUri || !ReferenceEquals(response.RequestMessage, request)
+                || !ReceiptTransport.IsOriginalResponse(client, request, response)
+                || !response.IsSuccessStatusCode) { registration?.Burn(); throw new ExternalHarnessException("ReceiptResponseMismatch"); }
+            captured = true;
+        }
+        public async Task FinalizeOriginalCreate(ExternalExecutionHandle handle, bool verified, string diagnostic)
+        {
+            if (!ReceiptEnabled) return;
+            DemandEntry();
+            if (!captured || registration is null || current.Value?.Kind != ProviderEffect.CreateSession
+                || handle.ExecutionId != inputs.PreparedHandle.ExecutionId || handle.ExternalRequestId != inputs.PreparedHandle.ExternalRequestId
+                || handle.Provider != inputs.ProviderId || handle.ExternalSessionId is null)
+                throw new ExternalHarnessException("ReceiptResponseRequired");
+            using var budget = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            try { finalized = await registration.Complete(handle.ExternalSessionId, verified, diagnostic, clock.GetUtcNow().UtcTicks, budget.Token); }
+            catch (Exception e) when (e is InvalidOperationException or System.Data.Common.DbException or OperationCanceledException)
+            { throw new ExternalHarnessException("ReceiptPersistenceUnavailable", true); }
+        }
         public IDisposable Enter(ProviderEffect effect, ExternalTaskRequest? request = null, string? run = null, ExternalExecutionHandle? handle = null)
         {
             DemandEntry();
@@ -160,6 +210,13 @@ public sealed class ProtectedExternalRuntime(ExternalAdmissionInputs inputs, IPo
             var decision = assessment.Decision with { BindingDigest = OperationBinding.Digest(op, descriptor) };
             try
             {
+                if (ReceiptEnabled && effect == ProviderEffect.CreateSession && next is not null)
+                {
+                    registration = await ((ISessionReceiptCoordinator)enforcement).CommitCreateIntentAsync(op, decision, descriptor,
+                        record, next, controlVersion, Math.Min(intent.Timeout.Ticks, TimeSpan.FromSeconds(ReceiptOptions.RequestTimeoutSeconds).Ticks),
+                        ReceiptOptions.ResponseLimitBytes, caller, owner, approval, token);
+                    return;
+                }
                 if (approval is not null)
                 {
                     if (enforcement is not IApprovalResumeCoordinator coordinator) throw new ExternalHarnessException("ResumeNotSupported");

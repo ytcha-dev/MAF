@@ -1,4 +1,6 @@
-# SQLite approval schema v2：離線維護與回復程序
+# SQLite approval/execution：離線 schema 維護與回復程序
+
+最新受控增量為 [M4-B1b](../acceptance/PHASE2B2_M4_B1B_RESULTS.md) 的明確 v3→v4；操作限制見文末。以下 M2-A/M2-B 段落保留原版本背景，不代表正常 Host 可以自動升級或使用 v4。Production trust／maintenance CLI／Host external execution 仍未啟用。
 
 狀態：M2-A資料層與M2-B授權邊界，**沒有production migration/approval CLI，也未接入Host**。任何實際資料庫作業都需要owner另行選定受信任維護工具／操作者與資料保管位置；本次只對disposable synthetic DB執行。
 
@@ -59,3 +61,29 @@ Policy candidate publishing與durable activation不同：trusted acquisition lea
 5. 回復需同時對帳live DB、archive與外部authority high-water，不能只restore舊DB或假造缺失audit。所有fault windows需synthetic測試與owner批准後才可能啟用。
 
 現有schema v2沒有archive receipt/anchor，保管信任與retention期限未定，**本輪不提供archive/export/prune方法**。容量即將滿時應停止新control寫入並安排另行授權維護，不以降低證據要求解決。結果與M3前提見 [M2-B results](../acceptance/PHASE2B2_M2B_RESULTS.md)。
+
+## M4-B1b：明確 offline v3→v4
+
+[已接受契約](../plans/PHASE2B2_M4_B1A_V4_SCHEMA_CONTRACT.md) 的 v4 delta 已在 disposable synthetic SQLite 驗證：兩張窄用途表、execution profile 欄位、一個 explicit unique index、八個 trigger。沒有正式 migration CLI、production authorizer、Host 啟用或真實應用 DB 遷移；以下是供另行授權維護工具使用的契約，不是要求在個人／公司 DB 立即執行。
+
+入口為 `AuthorizedApprovalMaintenance.MigrateV3ToV4Async(path, prerequisites, authorization)`，底層 `ApprovalSchema.MigrateV3ToV4Async` 同樣要求精確資源的可信 maintenance authorization 與三項停機／備份 attestations。缺 resolver、拒絕、錯路徑、source failure 均拒絕；attestation 不能取代實際停機與備份驗證。原 v1→v2、v2→v3 API 的意義不變，不自動串接遷移。
+
+1. 依上方備份保管規則停止所有舊／新 Host、writer、受控 runtime 及工具，禁止重啟；盤點自己管理的 PID/StartTime。從精確已知 v3 和一致性備份開始，保留 journal/WAL 與必要 manifest，不單獨複製仍有 writer 的主檔。保存七張 v3 application tables、sqlite_sequence 的原值／storage type／NULL／serialized snapshot bytes 與 audit.cancel_request_id 基線；實體 DB file hash 在成功遷移後會改變，不能拿它代替 logical-byte 比對。
+2. 維護取得 `<db>.locks/.schema.lock` exclusive handle，再以固定順序獨占既有 task lock 與未來 `<db>.delivery-locks/*.lock`。不刪鎖、不更改 ACL；linked path/lock 拒絕，持鎖或 busy 以有界失敗停止。舊 binary 不遵守 gate，不能由「目前沒鎖」推論無 writer。
+3. ReadWrite existing DB、Pooling=false、foreign_keys=ON、synchronous FULL、busy timeout 5秒、SQLite EXCLUSIVE transaction。要求 user_version=3、exact known v3 manifest、integrity/FK/data/control/approval/cancellation/audit consistency。預期存在 kind3 operations；不能套用舊 v2→v3 的 kind3 拒絕或忽略 cancel_request_id 的 byte projection。
+4. 已知 B0 historical-session-null／current-session-known 時間差只可保全為 **legacy unverified**，且其他 exact identity/binding/control/audit 必須一致；不是補造 provenance 或放行新 delivery。其他已知 Session 替換、損壞資料／額外物件／部分或未來版本均拒絕，不 repair。
+5. 單一 transaction 加 `executions.session_receipt_required`（所有原行=0，不改 snapshot）、建立兩張空表/index/trigger、逐項驗證舊值 bytes/sequence 不變及新 manifest/integrity/FK，最後寫 user_version=4、commit。遷移不新增 receipt、delivery、consent、authority activation 或 audit row。新 admission/consume 必須明寫 profile=1，不能變更既有 profile。
+6. 保持 schema gate，以 fresh connection 再驗 exact v4、原 bytes、integrity/FK。失敗保全 DB/sidecars，停止維護；不可為了通過驗證而重寫舊 evidence 或 snapshot。
+
+| Store profile | 唯一可開的 schema |
+|---|---|
+| Execution LegacyV1（預設） | 舊有 0→1 初始化與精確 v1；拒絕 v2/v3/v4 |
+| Execution ExplicitV2／approval ExplicitV2（approval 預設） | 精確 v2 |
+| Execution／approval ExplicitV3 | 精確 v3 |
+| Execution／approval ExplicitV4（明確 opt-in） | 精確 v4，不建庫／遷移 |
+
+v4 profile0 保留歷史資料，不可再進入 Create／Submit dispatch。原 session binding 可獨立驗證的 legacy GET 仍須當前 Inspect 授權與既有 root/provider/session policy 驗證；不升級成 Verified。B0 類型 legacy mismatch 回 `LegacyCorrelationUnverified`，不做 provider GET／Abort。profile1 在 intent 後缺 receipt 是錯誤，不得降級成 legacy；普通 UpdateAsync 不可設定新 SessionId。Verified receipt 也不授權 Inspect／Abort；Quarantined 只允許結構性 control/evidence 讀取。
+
+Crash 在 ALTER／receipt table／delivery table／最後版本寫入但未 commit 時，新程序應只看到完整 v3；commit 後只看到完整 v4。以 actual process termination + independent fresh reader 驗證，不以 exception 代替 crash。遺失 commit 回應先驗真實狀態；不盲目重跑、不降版、不手動刪 journal。
+
+一旦有 v4 receipt/control/authority 等新寫入，舊 v3 備份不再是無損 rollback 來源：回復可能遺失取消意圖、原 session 關聯或 high-water，必須另行 owner/protected-authority 對帳。禁止自動 restore、降低 epoch、重建 registration capability 或重送 Create/Prompt。v4 收據與 delivery 的 audit FK 需要保留原 journal；現有10000硬上限仍有效，沒有 prune/archive/reset 例外。Ack 不等於 Cancelled；本增量沒有 Abort reservation/transport continuation、POST 或 worker。

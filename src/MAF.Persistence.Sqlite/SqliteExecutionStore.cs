@@ -5,7 +5,7 @@ using Microsoft.Data.Sqlite;
 namespace MAF.Persistence.Sqlite;
 
 // Explicit profiles open exactly their schema for read/update; direct creation requires admission.
-public enum ExecutionStoreProfile { LegacyV1, ExplicitV2, ExplicitV3 }
+public enum ExecutionStoreProfile { LegacyV1, ExplicitV2, ExplicitV3, ExplicitV4 }
 
 // One local host; OS file ownership survives neither disposal nor process death.
 // The ownership file is not a SQLite transaction and contains no task data.
@@ -57,7 +57,7 @@ public sealed class SqliteExecutionStore : IExecutionStore
             command.Transaction = transaction;
             command.CommandText = "PRAGMA user_version;";
             var version = Convert.ToInt32(await command.ExecuteScalarAsync(token));
-            if (profile == ExecutionStoreProfile.LegacyV1 ? version is not (0 or 1) : version != (profile == ExecutionStoreProfile.ExplicitV2 ? 2 : 3)) throw new InvalidOperationException("Unsupported execution database schema.");
+            if (profile == ExecutionStoreProfile.LegacyV1 ? version is not (0 or 1) : version != (profile switch { ExecutionStoreProfile.ExplicitV4 => 4, ExecutionStoreProfile.ExplicitV3 => 3, _ => 2 })) throw new InvalidOperationException("Unsupported execution database schema.");
             if (version == 0)
             {
                 command.CommandText = """
@@ -72,6 +72,7 @@ public sealed class SqliteExecutionStore : IExecutionStore
                 await command.ExecuteNonQueryAsync(token);
             }
             if (profile == ExecutionStoreProfile.ExplicitV3) await ApprovalSchema.ValidateV3Async(connection, transaction, token);
+            if (profile == ExecutionStoreProfile.ExplicitV4) await ApprovalSchema.ValidateV4Async(connection, transaction, token);
             transaction.Commit();
             return connection;
         }
@@ -97,7 +98,7 @@ public sealed class SqliteExecutionStore : IExecutionStore
 
     private void CheckOwnership(string taskId, IExecutionOwnership ownership)
     {
-        if (ownership is not Ownership own || own.Disposed || own.TaskId != taskId || own.Database != databasePath)
+        if (ownership is not Ownership own || own.Disposed || own.TaskId != taskId || own.Database != databasePath || own.Profile != profile)
             throw new InvalidOperationException("Execution ownership is required.");
     }
 
@@ -130,21 +131,33 @@ public sealed class SqliteExecutionStore : IExecutionStore
     public async Task<DurableExecution?> GetAsync(string taskId, CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken);
+        using var transaction = profile == ExecutionStoreProfile.ExplicitV4 ? connection.BeginTransaction(deferred: true) : null;
         using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = "SELECT task_id, version, terminal, snapshot FROM executions WHERE task_id=$id;";
         command.Parameters.AddWithValue("$id", taskId);
         using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        return await reader.ReadAsync(cancellationToken) ? Read(reader) : null;
+        var record = await reader.ReadAsync(cancellationToken) ? Read(reader) : null;
+        await reader.DisposeAsync();
+        if (record is not null && profile == ExecutionStoreProfile.ExplicitV4) await VerifyV4Record(connection, transaction, record, cancellationToken);
+        transaction?.Commit();
+        return record;
     }
 
     public async Task<IReadOnlyList<DurableExecution>> ListRecoverableAsync(CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken);
+        using var transaction = profile == ExecutionStoreProfile.ExplicitV4 ? connection.BeginTransaction(deferred: true) : null;
         using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = "SELECT task_id, version, terminal, snapshot FROM executions WHERE terminal=0 ORDER BY task_id LIMIT 101;";
         using var reader = await command.ExecuteReaderAsync(cancellationToken);
         var records = new List<DurableExecution>();
         while (await reader.ReadAsync(cancellationToken)) records.Add(Read(reader));
+        await reader.DisposeAsync();
+        if (profile == ExecutionStoreProfile.ExplicitV4)
+            foreach (var e in records) await VerifyV4Record(connection, transaction, e, cancellationToken);
+        transaction?.Commit();
         if (records.Count > 100) throw new InvalidOperationException("Recovery batch exceeds 100 records; recover individual TaskIds.");
         return records;
     }
@@ -170,10 +183,24 @@ public sealed class SqliteExecutionStore : IExecutionStore
         CancellationToken cancellationToken = default)
     {
         CheckOwnership(expected.TaskId, ownership);
+        await using var use = profile == ExecutionStoreProfile.ExplicitV4
+            ? await UseAdmissionOwnershipAsync(databasePath, expected.TaskId, ownership, cancellationToken, ExecutionStoreProfile.ExplicitV4) : null;
         DurableExecutionTransitions.Validate(expected, next);
         await using var connection = await OpenAsync(cancellationToken);
+        using var transaction = profile == ExecutionStoreProfile.ExplicitV4 ? connection.BeginTransaction(deferred: false) : null;
+        if (profile == ExecutionStoreProfile.ExplicitV4)
+        {
+            await VerifyV4Record(connection, transaction, expected, cancellationToken);
+            if (expected.Handle.ExternalSessionId is null && next.Handle.ExternalSessionId is not null
+                || expected.SubmissionPhase != next.SubmissionPhase && next.SubmissionPhase is SubmissionPhase.SessionCreationIntended or SubmissionPhase.PromptIntended)
+                throw new InvalidOperationException("SessionReceiptRequired");
+            var required = Convert.ToInt64(await ApprovalDatabase.Scalar(connection, transaction,
+                "SELECT session_receipt_required FROM executions WHERE task_id=$t", cancellationToken, ("$t", expected.TaskId)));
+            if (required == 0 && next.SubmissionPhase != expected.SubmissionPhase) throw new InvalidOperationException("LegacyExecutionRecoveryOnly");
+        }
         // Compare the complete prior snapshot as well as version: callers cannot invent a prior state.
         using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = """
             UPDATE executions SET version=$next, terminal=$terminal, snapshot=$snapshot
             WHERE task_id=$id AND version=$version AND snapshot=$expected;
@@ -186,5 +213,17 @@ public sealed class SqliteExecutionStore : IExecutionStore
         command.Parameters.AddWithValue("$expected", JsonSerializer.Serialize(expected));
         if (await command.ExecuteNonQueryAsync(cancellationToken) != 1)
             throw new InvalidOperationException("Durable execution version conflict.");
+        transaction?.Commit();
+    }
+
+    static async Task VerifyV4Record(SqliteConnection c, SqliteTransaction? tx, DurableExecution e, CancellationToken token)
+    {
+        var required = Convert.ToInt64(await ApprovalDatabase.Scalar(c, tx, "SELECT session_receipt_required FROM executions WHERE task_id=$t", token, ("$t", e.TaskId)));
+        if (required == 0) return;
+        var receipt = await SqliteApprovalStore.ReadSessionReceipt(c, tx, e.TaskId, token);
+        if (e.SubmissionPhase == SubmissionPhase.None ? receipt is not null : receipt is null)
+            throw new InvalidOperationException("SessionReceiptRequired");
+        if (e.SubmissionPhase >= SubmissionPhase.SessionKnown && receipt?.Response is null)
+            throw new InvalidOperationException("SessionReceiptRequired");
     }
 }

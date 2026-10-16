@@ -189,10 +189,13 @@ public sealed class DurableExecutionService : IDisposable
             try { created = await inner.CreateAsync(request, workflowRunId, handle, cancellationToken); }
             catch (ExternalHarnessException error) when (error.Handle is not null)
             {
+                if (store is IOriginalCreateStore bridge && bridge.TakeOriginalCreate(error.Handle) is { } committed)
+                { Record = committed; throw; }
                 await SaveAsync(DurableExecutionState.Unknown, SubmissionPhase.SessionKnown, error.Handle, "SessionCreationUnconfirmed");
                 throw;
             }
-            await SaveAsync(DurableExecutionState.ReadyToSubmit, SubmissionPhase.SessionKnown, created);
+            if (store is IOriginalCreateStore original && original.TakeOriginalCreate(created) is { } finalized) Record = finalized;
+            else await SaveAsync(DurableExecutionState.ReadyToSubmit, SubmissionPhase.SessionKnown, created);
             return created;
         }
 
