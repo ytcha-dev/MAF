@@ -8,6 +8,10 @@
 
 M2-B增量：[results](../acceptance/PHASE2B2_M2B_RESULTS.md)記錄43新測試、94 focused／347 offline通過；serialized activation、replaceable identity/authorization與maintenance邊界已建立，沒有可信production source/human resolver，正式activation/approval保持disabled。M3 checklist見該報告；下面保留原始target，不能視為現在狀態。
 
+最新增量（2026-10-16）：M3-A/B 的受控 synthetic runtime 與 Explicit Resume 已由另行授權完成，見 [B2 results](../acceptance/PHASE2B2_M3_B2_RESULTS.md)。Owner 允許先進行 synthetic M4 工程，M3-C production trust **deferred / blocked，仍為正式啟用必要條件**。本輪 [M4-A source review/results](../acceptance/PHASE2B2_M4_A_RESULTS.md) 在 schema gate 停止：既有 v2 未保存獨立 Cancel exact binding，舊取消 primitive 使用原 approval operation 的 CanControl。沒有 runtime/schema 變更；259 focused／604 offline 通過、build 0 warnings/errors 僅證明 baseline regression，M4-A 未完成。下一步需 owner 審查最小 cancellation-evidence 儲存擴充與明確 offline migration 範圍，不直接實作 Abort。
+
+M4 拆為獨立授權增量：**M4-A** durable cancel admission/control/evidence；**M4-B** provider Abort delivery/ack evidence；**M4-C** restart reconciliation/crash acceptance。Cancel-intent 走獨立授權的短 control transaction，不等待 running execution owner 釋放 TaskId lock；delivery 才另審 ownership。Requested、delivery、ack、remote terminal 不合併；沒有新 CLI、production trust fallback 或自動升級。下方原 M3/M4 大項是歷史 target，不代表本次擴大授權。
+
 ## 1. 目標與現況
 
 為本機單DB的唯讀外部任務建立default-deny application authorization、可跨restart的精確人工批准，以及不混淆ack/terminal的取消ledger。MAF控制啟動／觀測／取消的操作邊界；OpenCode仍控制其內部tool loop和實際permissions。未支援的細粒度tool approval不能以任務Allow代替。
