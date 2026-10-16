@@ -4,6 +4,18 @@ using MAF.Persistence.Sqlite;
 
 if (args.Length < 2) throw new ArgumentException("Test-only: seed <db> | read <db> | migrate-crash <db> <checkpoint>");
 var path = Path.GetFullPath(args[1]);
+if (args[0] is "approval-app-seed" or "approval-app-read")
+{
+    var fixture = new SyntheticApprovalApplication(path);
+    var pending = await fixture.Application().RequestAsync("app-approval", fixture.Runtime.Intent, fixture.Caller);
+    if (args[0] == "approval-app-seed")
+    {
+        Console.WriteLine("application-pending-committed"); Console.Out.Flush();
+        await Console.In.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(30));
+    }
+    else Console.WriteLine(JsonSerializer.Serialize(pending)); // Idempotent request via a fresh application/authority.
+    return;
+}
 if (args[0] is "runtime-crash" or "runtime-recover")
 {
     var fixture = new SyntheticRuntime(path);
