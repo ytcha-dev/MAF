@@ -309,3 +309,8 @@ sequenceDiagram
 7. Audit仍10000硬上限，滿額全部rollback、沒有 prune/export API；controlled archival proposal與必要 receipt/anchor 前提見 [maintenance](../setup/SQLITE_APPROVAL_MAINTENANCE.md)。未定信任與原子 archive receipt 前，archive operations disabled。
 
 本輪43個新測試、94 focused、347 offline通過；M1/M2-A與原2B-1 regression assertions保留。沒有live模型/provider dispatch、M3 CLI、provider reply、M4取消dispatch、Registry或Hybrid。七項 [architecture guardrails](ARCHITECTURE_GUARDRAILS.md) 不變；公司endpoint hold不變。
+
+
+## 13. 2026-10-16 M3 handoff and independent trust boundary
+
+[ADR-006](ADR-006_TRUSTED_BROKER_BOUNDARY.md) formally records the **planned** replaceable protected authority/Broker boundary. It does not deploy a Broker, authenticate a production policy source, demonstrate human presence or relax any existing M2-B deny defaults. [M3-0 gate](../plans/PHASE2B2_M3_ARCHITECTURE_GATE.md) requires a source-grounded full entrypoint/side-effect call graph, activation semantics decision (note that `PinAuthority` may currently advance high-water during ordinary mutations), admission/dispatch crash-window design and existing P/A/K/S/R acceptance mapping. M3-A/B synthetic work and M3-C real trust activation must receive separate authorization. Do not reinterpret §5 SID suggestion as a secure same-account human presence proof; §12 and ADR-006 govern the unresolved deployment assumption.
