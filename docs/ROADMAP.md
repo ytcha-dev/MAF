@@ -269,14 +269,7 @@ ADR-001/002 are decision-log entries; no standalone files currently exist. ADR-0
 - [ADR-005](architecture/ADR-005_POLICY_APPROVAL_CANCELLATION.md) — policy, human approval and cancellation design; M1/M2-A/M2-B foundation exists, production trust and runtime enforcement do not.
 - [ADR-006](architecture/ADR-006_TRUSTED_BROKER_BOUNDARY.md) — **adopted for architecture planning only**: replaceable trusted policy/approval authority, with an isolated Broker as a future deployment option. No Broker or production approval activation is implemented. Connector lifecycle and remote ingress ADRs need new numbers if separately proposed.
 
-**Codex documentation-only update instructions:**
-
-1. Review current `docs/ROADMAP.md`, README, ADRs, plans, and acceptance results against latest main. Do not silently override newer decisions.
-2. Replace/update the roadmap with this proposal only after reconciling current file state; keep existing historical ADR references and source evidence.
-3. Update README roadmap links or status summary if stale, without changing the program, dependencies, permissions, or runtime behavior.
-4. Add ADR-004 / ADR-005 as **proposed** if requested separately; do not mark unimplemented designs as accepted.
-5. Run documentation/link checks available in repo; do not run live external-agent tests for a documentation-only change.
-6. Commit only documentation changes, report files and commit SHA.
+**M3-0 documentation instructions:** Read the [M3 architecture gate](plans/PHASE2B2_M3_ARCHITECTURE_GATE.md) and verify actual code-level call paths before proposing runtime interfaces. Keep this roadmap a stage-level index; record detailed trust choices, verification gaps and gate decisions in the dedicated plan/ADR. Do not authorize M3-A, Broker deployment, live provider execution or production approval through a docs-only commit.
 
 ### Immediate next action
 
