@@ -5,14 +5,31 @@ using Microsoft.Agents.AI.Workflows;
 
 namespace MAF.Workflows.External;
 
-public sealed class OpenCodeExecutor(IExternalHarnessClient client, string workflowRunId, TimeSpan pollInterval,
-    CancellationToken ownerCancellation = default, ExternalExecutionHandle? initialHandle = null,
-    bool recoveryOnly = false, bool abortOnTimeout = true, bool observeOnce = false)
-    : Executor<ExternalTaskRequest, ExternalTaskResult>("OpenCodeExecutor")
+public sealed class OpenCodeExecutor : Executor<ExternalTaskRequest, ExternalTaskResult>
 {
+    readonly IExternalHarnessClient client;
+    readonly string workflowRunId;
+    readonly TimeSpan pollInterval;
+    readonly CancellationToken ownerCancellation;
+    readonly ExternalExecutionHandle? initialHandle;
+    readonly bool recoveryOnly, abortOnTimeout, observeOnce;
+    readonly IRuntimeAccess access;
+    public OpenCodeExecutor(IExternalHarnessClient client, string workflowRunId, TimeSpan pollInterval,
+        CancellationToken ownerCancellation = default, ExternalExecutionHandle? initialHandle = null,
+        bool recoveryOnly = false, bool abortOnTimeout = true, bool observeOnce = false)
+        : this(UnavailableRuntimeAccess.Instance, client, workflowRunId, pollInterval, ownerCancellation, initialHandle, recoveryOnly, abortOnTimeout, observeOnce) { }
+    internal OpenCodeExecutor(IRuntimeAccess access, IExternalHarnessClient client, string workflowRunId, TimeSpan pollInterval,
+        CancellationToken ownerCancellation = default, ExternalExecutionHandle? initialHandle = null,
+        bool recoveryOnly = false, bool abortOnTimeout = true, bool observeOnce = false) : base("OpenCodeExecutor")
+    {
+        this.access = access; this.client = client; this.workflowRunId = workflowRunId; this.pollInterval = pollInterval;
+        this.ownerCancellation = ownerCancellation; this.initialHandle = initialHandle; this.recoveryOnly = recoveryOnly;
+        this.abortOnTimeout = abortOnTimeout; this.observeOnce = observeOnce;
+    }
     public override async ValueTask<ExternalTaskResult> HandleAsync(ExternalTaskRequest request,
         IWorkflowContext context, CancellationToken cancellationToken = default)
     {
+        access.DemandEntry();
         var watch = Stopwatch.StartNew();
         var handle = initialHandle ?? new ExternalExecutionHandle(Guid.NewGuid().ToString("N"), client.Provider);
         var trace = new List<ExternalTraceEvent>();
@@ -102,6 +119,8 @@ public sealed class OpenCodeExecutor(IExternalHarnessClient client, string workf
         catch (OperationCanceledException)
         {
             limitations.Add("Cancellation or time/observation budget expired; remote work may still be active.");
+            if (access.SuppressImplicitAbort)
+                return Result(ExternalExecutionStatus.Unknown, "Inspection stopped; no abort was authorized.", "ObservationTimedOut");
             if (!abortOnTimeout && !ownerCancellation.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
                 return Result(ExternalExecutionStatus.Unknown, "Observation budget expired; recover the original session later.", "ObservationTimedOut");
             if (!created)

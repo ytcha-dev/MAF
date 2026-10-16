@@ -15,7 +15,7 @@ public sealed class OpenCodeRecoveryTests : IDisposable
         using var handler = new OpenCodeApiFixture(root);
         using var firstHttp = new HttpClient(handler, disposeHandler: false);
         var options = new OpenCodeOptions(new Uri("http://127.0.0.1:4096"), root, AllowLoopbackHttp: true);
-        var first = new OpenCodeClient(firstHttp, options);
+        var first = new OpenCodeClient(HistoricalRuntimeAccess.Instance, firstHttp, options);
         var request = new ExternalTaskRequest("recovery", root, "Read synthetic README.", TimeSpan.FromSeconds(3));
         var prepared = first.PrepareExecution();
         await first.ValidateAsync(request, default);
@@ -24,7 +24,7 @@ public sealed class OpenCodeRecoveryTests : IDisposable
         await first.SubmitAsync(request, handle, default);
         var routesBeforeRecovery = handler.Routes.Count;
         using var secondHttp = new HttpClient(handler, disposeHandler: false);
-        var second = new OpenCodeClient(secondHttp, options);
+        var second = new OpenCodeClient(HistoricalRuntimeAccess.Instance, secondHttp, options);
         Assert.Equal(first.Scope, second.Scope);
         await second.ReattachAsync(request.TaskId, root, handle, default);
         Assert.Equal(ExternalExecutionStatus.Completed, (await second.ObserveAsync(handle, default)).Status);
@@ -40,7 +40,7 @@ public sealed class OpenCodeRecoveryTests : IDisposable
     {
         using var handler = new OpenCodeApiFixture(root);
         using var http = new HttpClient(handler);
-        var client = new OpenCodeClient(http, new(new Uri("http://127.0.0.1:4096"), root, AllowLoopbackHttp: true));
+        var client = new OpenCodeClient(HistoricalRuntimeAccess.Instance, http, new(new Uri("http://127.0.0.1:4096"), root, AllowLoopbackHttp: true));
         var handle = client.PrepareExecution() with { ExternalSessionId = "ses_fixture" };
         await Assert.ThrowsAsync<ExternalHarnessException>(() => client.ReattachAsync("task", Path.GetDirectoryName(root)!, handle, default));
         Assert.Empty(handler.Routes);

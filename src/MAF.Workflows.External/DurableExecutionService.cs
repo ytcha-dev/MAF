@@ -3,9 +3,16 @@ using Microsoft.Agents.AI.Workflows;
 
 namespace MAF.Workflows.External;
 
-public sealed class DurableExecutionService(IExecutionStore store, IResumableExternalHarnessClient client,
-    TimeSpan? pollInterval = null) : IDisposable
+public sealed class DurableExecutionService : IDisposable
 {
+    readonly IExecutionStore store;
+    readonly IResumableExternalHarnessClient client;
+    readonly TimeSpan? pollInterval;
+    readonly IRuntimeAccess access;
+    public DurableExecutionService(IExecutionStore store, IResumableExternalHarnessClient client, TimeSpan? pollInterval = null)
+        : this(UnavailableRuntimeAccess.Instance, store, client, pollInterval) { }
+    internal DurableExecutionService(IRuntimeAccess access, IExecutionStore store, IResumableExternalHarnessClient client, TimeSpan? pollInterval = null)
+    { this.access = access; this.store = store; this.client = client; this.pollInterval = pollInterval; }
     private readonly SemaphoreSlim slots = new(2, 2);
     public void Dispose() => slots.Dispose();
     private static void Validate(ExternalTaskRequest request)
@@ -19,6 +26,7 @@ public sealed class DurableExecutionService(IExecutionStore store, IResumableExt
 
     public async Task<ExternalWorkflowRun> RunAsync(ExternalTaskRequest request, CancellationToken cancellationToken = default)
     {
+        access.DemandEntry();
         Validate(request);
         await using var ownership = await store.TryAcquireAsync(request.TaskId, cancellationToken)
             ?? throw new InvalidOperationException("TaskId already has an active local owner.");
@@ -41,6 +49,7 @@ public sealed class DurableExecutionService(IExecutionStore store, IResumableExt
     public async Task<ExternalWorkflowRun> RecoverAsync(string taskId, string projectRoot, TimeSpan timeout,
         bool observeOnce = false, CancellationToken cancellationToken = default)
     {
+        access.DemandEntry();
         Validate(new(taskId, projectRoot, "Recovery inspection", timeout));
         await using var ownership = await store.TryAcquireAsync(taskId, cancellationToken)
             ?? throw new InvalidOperationException("TaskId already has an active local owner.");
@@ -50,7 +59,14 @@ public sealed class DurableExecutionService(IExecutionStore store, IResumableExt
     }
 
     public Task<IReadOnlyList<DurableExecution>> ListRecoverableAsync(CancellationToken cancellationToken = default)
-        => store.ListRecoverableAsync(cancellationToken);
+    { access.DemandEntry(); return store.ListRecoverableAsync(cancellationToken); }
+
+    internal Task<ExternalWorkflowRun> LaunchOwnedAsync(ExternalTaskRequest request, DurableExecution record,
+        IExecutionOwnership owner, CancellationToken token)
+    { access.DemandEntry(); return ExecuteAsync(request, new PersistingClient(store, client, record, owner), false, false, token); }
+    internal Task<ExternalWorkflowRun> InspectOwnedAsync(DurableExecution record, string root, TimeSpan timeout,
+        IExecutionOwnership owner, bool observeOnce, CancellationToken token)
+    { access.DemandEntry(); return RecoverOwnedAsync(record, root, timeout, owner, observeOnce, token); }
 
     private async Task<ExternalWorkflowRun> RecoverOwnedAsync(DurableExecution record, string root, TimeSpan timeout,
         IExecutionOwnership ownership, bool observeOnce, CancellationToken cancellationToken)
@@ -97,7 +113,7 @@ public sealed class DurableExecutionService(IExecutionStore store, IResumableExt
         try
         {
             var record = durableClient.Record;
-            var executor = new OpenCodeExecutor(durableClient, record.WorkflowRunId, pollInterval ?? TimeSpan.FromSeconds(1),
+            var executor = new OpenCodeExecutor(access, durableClient, record.WorkflowRunId, pollInterval ?? TimeSpan.FromSeconds(1),
                 cancellationToken, record.Handle, recovery, abortOnTimeout: false, observeOnce: observeOnce);
             var workflow = new WorkflowBuilder(executor).WithOutputFrom(executor).Build();
             await using var run = await InProcessExecution.RunAsync(workflow, request, record.WorkflowRunId, CancellationToken.None);

@@ -20,8 +20,8 @@ public sealed class OpenCodeClientTests : IDisposable
     {
         using var handler = new OpenCodeApiFixture(root);
         using var http = new HttpClient(handler);
-        var client = new OpenCodeClient(http, Options());
-        var run = await new ExternalWorkflow(client, TimeSpan.FromMilliseconds(5)).RunAsync(Request());
+        var client = new OpenCodeClient(HistoricalRuntimeAccess.Instance, http, Options());
+        var run = await new ExternalWorkflow(HistoricalRuntimeAccess.Instance, client, TimeSpan.FromMilliseconds(5)).RunAsync(Request());
         Assert.Equal(ExternalExecutionStatus.Completed, run.Result.Status);
         Assert.Equal(1, handler.Submissions);
         Assert.Contains(handler.Routes, route => route.Contains("prompt_async"));
@@ -42,7 +42,7 @@ public sealed class OpenCodeClientTests : IDisposable
     {
         using var handler = new OpenCodeApiFixture(root) { HealthStatus = status };
         using var http = new HttpClient(handler);
-        var result = (await new ExternalWorkflow(new OpenCodeClient(http, Options())).RunAsync(Request())).Result;
+        var result = (await new ExternalWorkflow(HistoricalRuntimeAccess.Instance, new OpenCodeClient(HistoricalRuntimeAccess.Instance, http, Options())).RunAsync(Request())).Result;
         Assert.Equal(ExternalExecutionStatus.Failed, result.Status);
         Assert.Equal("HTTP" + status, result.ErrorCode);
         Assert.DoesNotContain("private-response", result.ToJson());
@@ -54,7 +54,7 @@ public sealed class OpenCodeClientTests : IDisposable
     {
         using var handler = new OpenCodeApiFixture(root) { StripSessionRules = true };
         using var http = new HttpClient(handler);
-        var result = (await new ExternalWorkflow(new OpenCodeClient(http, Options())).RunAsync(Request())).Result;
+        var result = (await new ExternalWorkflow(HistoricalRuntimeAccess.Instance, new OpenCodeClient(HistoricalRuntimeAccess.Instance, http, Options())).RunAsync(Request())).Result;
         Assert.Equal(ExternalExecutionStatus.Failed, result.Status);
         Assert.Equal("SessionPolicyMismatch", result.ErrorCode);
         Assert.NotNull(result.Handle.ExternalSessionId);
@@ -66,7 +66,7 @@ public sealed class OpenCodeClientTests : IDisposable
     {
         using var handler = new OpenCodeApiFixture(root) { InvalidSessionShape = true };
         using var http = new HttpClient(handler);
-        var result = (await new ExternalWorkflow(new OpenCodeClient(http, Options())).RunAsync(Request())).Result;
+        var result = (await new ExternalWorkflow(HistoricalRuntimeAccess.Instance, new OpenCodeClient(HistoricalRuntimeAccess.Instance, http, Options())).RunAsync(Request())).Result;
         Assert.Equal(ExternalExecutionStatus.Unknown, result.Status);
         Assert.NotNull(result.Handle.ExternalSessionId);
         Assert.Equal("InvalidSessionResponse", result.ErrorCode);
@@ -78,7 +78,7 @@ public sealed class OpenCodeClientTests : IDisposable
     {
         using var handler = new OpenCodeApiFixture(root) { DelayHealth = true };
         using var http = new HttpClient(handler);
-        var result = (await new ExternalWorkflow(new OpenCodeClient(http, Options() with { RequestTimeoutSeconds = 1 }))
+        var result = (await new ExternalWorkflow(HistoricalRuntimeAccess.Instance, new OpenCodeClient(HistoricalRuntimeAccess.Instance, http, Options() with { RequestTimeoutSeconds = 1 }))
             .RunAsync(Request())).Result;
         Assert.Equal(ExternalExecutionStatus.Failed, result.Status);
         Assert.Equal("TransportTimeout", result.ErrorCode);
@@ -90,7 +90,7 @@ public sealed class OpenCodeClientTests : IDisposable
     {
         using var handler = new OpenCodeApiFixture(root) { PendingPermission = true };
         using var http = new HttpClient(handler);
-        var result = (await new ExternalWorkflow(new OpenCodeClient(http, Options() with { RequireReadApproval = true }))
+        var result = (await new ExternalWorkflow(HistoricalRuntimeAccess.Instance, new OpenCodeClient(HistoricalRuntimeAccess.Instance, http, Options() with { RequireReadApproval = true }))
             .RunAsync(Request())).Result;
         Assert.Equal(ExternalExecutionStatus.WaitingForApproval, result.Status);
         Assert.Contains(handler.PermissionRules, rule => rule.GetProperty("permission").GetString() == "read"
@@ -104,7 +104,7 @@ public sealed class OpenCodeClientTests : IDisposable
     {
         using var handler = new OpenCodeApiFixture(root) { OmitPermissionApi = true };
         using var http = new HttpClient(handler);
-        var result = (await new ExternalWorkflow(new OpenCodeClient(http, Options())).RunAsync(Request())).Result;
+        var result = (await new ExternalWorkflow(HistoricalRuntimeAccess.Instance, new OpenCodeClient(HistoricalRuntimeAccess.Instance, http, Options())).RunAsync(Request())).Result;
         Assert.Equal("UnsupportedServerApi", result.ErrorCode);
         Assert.Equal(0, handler.Submissions);
     }
@@ -116,7 +116,7 @@ public sealed class OpenCodeClientTests : IDisposable
     {
         using var handler = new OpenCodeApiFixture(root) { PendingPermission = permission, PendingQuestion = !permission };
         using var http = new HttpClient(handler);
-        var result = (await new ExternalWorkflow(new OpenCodeClient(http, Options())).RunAsync(Request())).Result;
+        var result = (await new ExternalWorkflow(HistoricalRuntimeAccess.Instance, new OpenCodeClient(HistoricalRuntimeAccess.Instance, http, Options())).RunAsync(Request())).Result;
         Assert.Equal(ExternalExecutionStatus.WaitingForApproval, result.Status);
         Assert.DoesNotContain(handler.Routes, route => route.Contains("reply"));
     }
@@ -129,7 +129,7 @@ public sealed class OpenCodeClientTests : IDisposable
     {
         using var handler = new OpenCodeApiFixture(root) { State = state };
         using var http = new HttpClient(handler);
-        var result = (await new ExternalWorkflow(new OpenCodeClient(http, Options()), TimeSpan.FromMilliseconds(5)).RunAsync(Request())).Result;
+        var result = (await new ExternalWorkflow(HistoricalRuntimeAccess.Instance, new OpenCodeClient(HistoricalRuntimeAccess.Instance, http, Options()), TimeSpan.FromMilliseconds(5)).RunAsync(Request())).Result;
         Assert.Equal(ExternalExecutionStatus.Unknown, result.Status);
         Assert.Equal(1, handler.Submissions);
     }
@@ -139,7 +139,7 @@ public sealed class OpenCodeClientTests : IDisposable
     {
         using var handler = new OpenCodeApiFixture(root) { LoseSubmitResponse = true, LoseFirstObservation = true };
         using var http = new HttpClient(handler);
-        var run = await new ExternalWorkflow(new OpenCodeClient(http, Options()), TimeSpan.FromMilliseconds(5)).RunAsync(Request());
+        var run = await new ExternalWorkflow(HistoricalRuntimeAccess.Instance, new OpenCodeClient(HistoricalRuntimeAccess.Instance, http, Options()), TimeSpan.FromMilliseconds(5)).RunAsync(Request());
         Assert.Equal(ExternalExecutionStatus.Completed, run.Result.Status);
         Assert.Equal(1, handler.Submissions);
         Assert.Contains(run.Result.Trace, item => item.Kind == "ReconnectOriginalSession");
@@ -152,7 +152,7 @@ public sealed class OpenCodeClientTests : IDisposable
         using var handler = new OpenCodeApiFixture(root) { Output = "value " + password + new string('x', 400) };
         using var http = new HttpClient(handler);
         var options = Options(password) with { SummaryLimit = 100 };
-        var result = (await new ExternalWorkflow(new OpenCodeClient(http, options)).RunAsync(Request())).Result;
+        var result = (await new ExternalWorkflow(HistoricalRuntimeAccess.Instance, new OpenCodeClient(HistoricalRuntimeAccess.Instance, http, options)).RunAsync(Request())).Result;
         Assert.Equal(ExternalExecutionStatus.Partial, result.Status);
         Assert.DoesNotContain(password, result.ToJson());
         Assert.Equal(100, result.Summary.Length);
@@ -164,13 +164,13 @@ public sealed class OpenCodeClientTests : IDisposable
     {
         using var oversized = new OpenCodeApiFixture(root) { Output = new string('x', 3000) };
         using var http = new HttpClient(oversized);
-        var client = new OpenCodeClient(http, Options() with { ResponseLimitBytes = 2500 });
-        var result = (await new ExternalWorkflow(client, TimeSpan.FromMilliseconds(5)).RunAsync(Request())).Result;
+        var client = new OpenCodeClient(HistoricalRuntimeAccess.Instance, http, Options() with { ResponseLimitBytes = 2500 });
+        var result = (await new ExternalWorkflow(HistoricalRuntimeAccess.Instance, client, TimeSpan.FromMilliseconds(5)).RunAsync(Request())).Result;
         Assert.Equal(ExternalExecutionStatus.Unknown, result.Status);
         Assert.Equal("ResponseSizeLimit", result.ErrorCode);
         using var pages = new OpenCodeApiFixture(root) { FullMessagePage = true };
         using var pageHttp = new HttpClient(pages);
-        var paged = (await new ExternalWorkflow(new OpenCodeClient(pageHttp, Options())).RunAsync(Request())).Result;
+        var paged = (await new ExternalWorkflow(HistoricalRuntimeAccess.Instance, new OpenCodeClient(HistoricalRuntimeAccess.Instance, pageHttp, Options())).RunAsync(Request())).Result;
         Assert.Equal(ExternalExecutionStatus.Partial, paged.Status);
         Assert.Contains(paged.Limitations, item => item.Contains("collection limit"));
         Assert.Contains(pages.Routes, route => route.Contains("before="));
@@ -184,7 +184,7 @@ public sealed class OpenCodeClientTests : IDisposable
     {
         using var handler = new OpenCodeApiFixture(root) { MessageMode = mode };
         using var http = new HttpClient(handler);
-        var client = new OpenCodeClient(http, Options());
+        var client = new OpenCodeClient(HistoricalRuntimeAccess.Instance, http, Options());
         var request = Request();
         await client.ValidateAsync(request, default);
         var handle = await client.CreateAsync(request, "workflow", new("execution", client.Provider), default);

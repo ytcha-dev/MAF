@@ -4,6 +4,26 @@ using MAF.Persistence.Sqlite;
 
 if (args.Length < 2) throw new ArgumentException("Test-only: seed <db> | read <db> | migrate-crash <db> <checkpoint>");
 var path = Path.GetFullPath(args[1]);
+if (args[0] is "runtime-crash" or "runtime-recover")
+{
+    var fixture = new SyntheticRuntime(path);
+    using var transport = new RuntimeHttpFixture(fixture.Root) { LedgerPath = path + ".http", StatePath = path + ".provider" };
+    using var http = new HttpClient(transport);
+    var occurrence = 0;
+    var coordinator = new SqliteApprovalStore(path, fixture.Authority(), fixture.Clock, 10000, point =>
+    {
+        if (args[0] != "runtime-crash" || point.ToString() != args[2] || ++occurrence != int.Parse(args[3])) return;
+        Console.WriteLine("runtime-checkpoint"); Console.Out.Flush();
+        if (!Console.In.ReadLineAsync().Wait(TimeSpan.FromSeconds(30))) throw new TimeoutException("UnreleasedRuntimeGate");
+    });
+    var runtime = fixture.Runtime(http, coordinator);
+    var intent = args[0] == "runtime-recover"
+        ? new MAF.Workflows.External.ExternalAdmissionRequest(MAF.Workflows.External.ExternalAdmissionMode.Inspect, fixture.Request.TaskId, fixture.Request.Timeout)
+        : fixture.Intent;
+    var result = await runtime.RunAsync(intent, fixture.Caller, observeOnce: true);
+    Console.WriteLine(JsonSerializer.Serialize(new { result.Result.TaskId, result.Result.WorkflowRunId, result.Result.Handle, result.Result.Status }));
+    return;
+}
 if (args[0] is "admit-child" or "admit-crash")
 {
     var fixture = new SyntheticAdmission();

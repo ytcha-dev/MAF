@@ -15,7 +15,7 @@ public sealed class DurableExecutionTests : IDisposable
     private SqliteExecutionStore Store() => new(Database);
     private ExternalTaskRequest Request(string id = "task") => new(id, directory, "Read the synthetic README.", TimeSpan.FromSeconds(1));
     private static DurableExecutionService Service(IExecutionStore store, FakeRemote remote)
-        => new(store, new FakeClient(remote), TimeSpan.FromMilliseconds(1));
+        => new(HistoricalRuntimeAccess.Instance, store, new FakeClient(remote), TimeSpan.FromMilliseconds(1));
 
     [Fact]
     public async Task CompletionAndIdentitySurviveNewServiceAndStoreInstances()
@@ -244,7 +244,7 @@ public sealed class DurableExecutionTests : IDisposable
     {
         var remote = new FakeRemote();
         await Service(Store(), remote).RunAsync(Request());
-        var other = new DurableExecutionService(Store(), new FakeClient(remote, DurableExecution.Hash("other endpoint")));
+        var other = new DurableExecutionService(HistoricalRuntimeAccess.Instance, Store(), new FakeClient(remote, DurableExecution.Hash("other endpoint")));
         await Assert.ThrowsAsync<ArgumentException>(() => other.RecoverAsync("task", directory, TimeSpan.FromSeconds(1)));
         Assert.Equal(0, remote.Reattaches);
     }

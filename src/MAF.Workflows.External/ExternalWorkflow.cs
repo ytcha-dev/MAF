@@ -6,15 +6,23 @@ namespace MAF.Workflows.External;
 
 public sealed record ExternalWorkflowRun(ExternalTaskResult Result, IReadOnlyList<string> WorkflowEvents);
 
-public sealed class ExternalWorkflow(IExternalHarnessClient client, TimeSpan? pollInterval = null, int maxConcurrency = 2)
+public sealed class ExternalWorkflow
 {
+    readonly IExternalHarnessClient client;
+    readonly TimeSpan? pollInterval;
+    readonly IRuntimeAccess access;
+    public ExternalWorkflow(IExternalHarnessClient client, TimeSpan? pollInterval = null, int maxConcurrency = 2)
+        : this(UnavailableRuntimeAccess.Instance, client, pollInterval, maxConcurrency) { }
+    internal ExternalWorkflow(IRuntimeAccess access, IExternalHarnessClient client, TimeSpan? pollInterval = null, int maxConcurrency = 2)
+    { this.access = access; this.client = client; this.pollInterval = pollInterval; slots = new(maxConcurrency, maxConcurrency); }
     private sealed record Entry(ExternalTaskRequest Request, Lazy<Task<ExternalWorkflowRun>> Run);
     private readonly ConcurrentDictionary<string, Entry> runs = new(StringComparer.Ordinal);
     private readonly object identityLock = new();
-    private readonly SemaphoreSlim slots = new(maxConcurrency, maxConcurrency);
+    private readonly SemaphoreSlim slots;
 
     public Task<ExternalWorkflowRun> RunAsync(ExternalTaskRequest request, CancellationToken cancellationToken = default)
     {
+        access.DemandEntry();
         if (string.IsNullOrWhiteSpace(request.TaskId) || request.TaskId.Length > 100
             || string.IsNullOrWhiteSpace(request.TaskText) || request.TaskText.Length > 4000
             || request.Timeout < TimeSpan.FromMilliseconds(10) || request.Timeout > TimeSpan.FromMinutes(10)
@@ -54,7 +62,7 @@ public sealed class ExternalWorkflow(IExternalHarnessClient client, TimeSpan? po
         }
         try
         {
-            var executor = new OpenCodeExecutor(client, workflowRunId, pollInterval ?? TimeSpan.FromSeconds(1), cancellationToken);
+            var executor = new OpenCodeExecutor(access, client, workflowRunId, pollInterval ?? TimeSpan.FromSeconds(1), cancellationToken);
             var workflow = new WorkflowBuilder(executor).WithOutputFrom(executor).Build();
             // Cancellation reaches the provider through the executor; keep the engine alive to emit the typed abort result.
             await using var run = await InProcessExecution.RunAsync(workflow, request, workflowRunId, CancellationToken.None);

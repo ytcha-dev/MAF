@@ -14,7 +14,7 @@ public sealed class ExternalWorkflowTests
     public async Task OfficialWorkflowEmitsTypedResultAndSerializes()
     {
         var fake = new FakeHarness();
-        var run = await new ExternalWorkflow(fake, TimeSpan.FromMilliseconds(5)).RunAsync(Request());
+        var run = await new ExternalWorkflow(HistoricalRuntimeAccess.Instance, fake, TimeSpan.FromMilliseconds(5)).RunAsync(Request());
         Assert.Equal(ExternalExecutionStatus.Completed, run.Result.Status);
         Assert.Contains("ExecutorInvokedEvent", run.WorkflowEvents);
         Assert.Contains("WorkflowOutputEvent", run.WorkflowEvents);
@@ -28,7 +28,7 @@ public sealed class ExternalWorkflowTests
     public async Task ConcurrentDuplicateRequestsSubmitOnceAndKeepIdentity()
     {
         var fake = new FakeHarness();
-        var workflow = new ExternalWorkflow(fake, TimeSpan.FromMilliseconds(5));
+        var workflow = new ExternalWorkflow(HistoricalRuntimeAccess.Instance, fake, TimeSpan.FromMilliseconds(5));
         var results = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => workflow.RunAsync(Request())));
         Assert.Equal(1, fake.Submissions);
         Assert.Single(results.Select(result => result.Result.Handle.ExternalSessionId).Distinct());
@@ -58,7 +58,7 @@ public sealed class ExternalWorkflowTests
                 Interlocked.Decrement(ref active);
             }
         };
-        var workflow = new ExternalWorkflow(fake, TimeSpan.FromMilliseconds(5), maxConcurrency: 2);
+        var workflow = new ExternalWorkflow(HistoricalRuntimeAccess.Instance, fake, TimeSpan.FromMilliseconds(5), maxConcurrency: 2);
         var tasks = Enumerable.Range(0, 6).Select(index => workflow.RunAsync(Request("parallel-" + index, 5000))).ToArray();
         try
         {
@@ -85,7 +85,7 @@ public sealed class ExternalWorkflowTests
     public async Task ProviderStatesRemainExplicit(ExternalExecutionStatus terminal)
     {
         var fake = new FakeHarness { Terminal = terminal };
-        var result = (await new ExternalWorkflow(fake, TimeSpan.FromMilliseconds(5)).RunAsync(Request())).Result;
+        var result = (await new ExternalWorkflow(HistoricalRuntimeAccess.Instance, fake, TimeSpan.FromMilliseconds(5)).RunAsync(Request())).Result;
         Assert.Equal(terminal, result.Status);
         if (terminal == ExternalExecutionStatus.WaitingForApproval)
         {
@@ -97,7 +97,7 @@ public sealed class ExternalWorkflowTests
     public async Task AmbiguousSubmissionAndReadDisconnectReconcileWithoutResubmit()
     {
         var fake = new FakeHarness { AmbiguousSubmit = true, FailFirstRead = true };
-        var result = (await new ExternalWorkflow(fake, TimeSpan.FromMilliseconds(5)).RunAsync(Request())).Result;
+        var result = (await new ExternalWorkflow(HistoricalRuntimeAccess.Instance, fake, TimeSpan.FromMilliseconds(5)).RunAsync(Request())).Result;
         Assert.Equal(ExternalExecutionStatus.Completed, result.Status);
         Assert.Equal(1, fake.Submissions);
         Assert.Contains(result.Trace, item => item.Kind == "ReconnectOriginalSession");
@@ -108,7 +108,7 @@ public sealed class ExternalWorkflowTests
     public async Task OfflineProviderDoesNotSubmit()
     {
         var fake = new FakeHarness { Offline = true };
-        var result = (await new ExternalWorkflow(fake).RunAsync(Request())).Result;
+        var result = (await new ExternalWorkflow(HistoricalRuntimeAccess.Instance, fake).RunAsync(Request())).Result;
         Assert.Equal(ExternalExecutionStatus.Failed, result.Status);
         Assert.Equal("Unreachable", result.ErrorCode);
         Assert.Equal(0, fake.Submissions);
@@ -120,7 +120,7 @@ public sealed class ExternalWorkflowTests
     public async Task TimeoutAbortRequiresTerminalEvidence(bool confirmed, ExternalExecutionStatus expected)
     {
         var fake = new FakeHarness { NeverComplete = true, ConfirmAbort = confirmed };
-        var result = (await new ExternalWorkflow(fake, TimeSpan.FromMilliseconds(10)).RunAsync(Request(timeoutMilliseconds: 80))).Result;
+        var result = (await new ExternalWorkflow(HistoricalRuntimeAccess.Instance, fake, TimeSpan.FromMilliseconds(10)).RunAsync(Request(timeoutMilliseconds: 80))).Result;
         Assert.True(result.AbortRequested);
         Assert.Equal(expected, result.Status);
         Assert.Equal(1, fake.Aborts);
@@ -131,7 +131,7 @@ public sealed class ExternalWorkflowTests
     {
         var fake = new FakeHarness { NeverComplete = true, ConfirmAbort = true };
         using var stop = new CancellationTokenSource();
-        var run = new ExternalWorkflow(fake, TimeSpan.FromMilliseconds(5)).RunAsync(Request(), stop.Token);
+        var run = new ExternalWorkflow(HistoricalRuntimeAccess.Instance, fake, TimeSpan.FromMilliseconds(5)).RunAsync(Request(), stop.Token);
         await fake.Submitted.Task.WaitAsync(TimeSpan.FromSeconds(2));
         stop.Cancel();
         Assert.Equal(ExternalExecutionStatus.Cancelled, (await run).Result.Status);
@@ -143,7 +143,7 @@ public sealed class ExternalWorkflowTests
         var fake = new FakeHarness();
         using var stop = new CancellationTokenSource();
         stop.Cancel();
-        var run = await new ExternalWorkflow(fake).RunAsync(Request(), stop.Token);
+        var run = await new ExternalWorkflow(HistoricalRuntimeAccess.Instance, fake).RunAsync(Request(), stop.Token);
         Assert.Equal(ExternalExecutionStatus.Cancelled, run.Result.Status);
         Assert.False(run.Result.AbortRequested);
         Assert.Equal(0, fake.Submissions);

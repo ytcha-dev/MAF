@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using MAF.Core;
 using MAF.Core.Tools;
+using MAF.Core.Policy;
 
 namespace MAF.Workflows.External.OpenCode;
 
@@ -13,6 +14,7 @@ public sealed class OpenCodeClient : IResumableExternalHarnessClient
 {
     private sealed record PermissionRule(string Permission, string Pattern, string Action);
     private sealed record Binding(string TaskId, string Root, ExternalExecutionHandle Handle);
+    private readonly IRuntimeAccess access;
     private readonly HttpClient http;
     private readonly OpenCodeOptions options;
     private readonly ConcurrentDictionary<string, Binding> bindings = new();
@@ -33,6 +35,7 @@ public sealed class OpenCodeClient : IResumableExternalHarnessClient
 
     public async Task ReattachAsync(string taskId, string projectRoot, ExternalExecutionHandle handle, CancellationToken cancellationToken)
     {
+        using var effect = access.Enter(ProviderEffect.Reattach, handle: handle);
         if (handle.Provider != Provider || handle.ExternalSessionId is null
             || !Regex.IsMatch(handle.ExternalSessionId, "^ses_[a-zA-Z0-9_-]{1,120}$")
             || handle.ExternalRequestId is null || !Regex.IsMatch(handle.ExternalRequestId, "^msg_[a-zA-Z0-9_-]{1,120}$"))
@@ -63,19 +66,24 @@ public sealed class OpenCodeClient : IResumableExternalHarnessClient
         new("read", "*\\.git\\*", "deny")
     ];
 
-    public OpenCodeClient(HttpClient httpClient, OpenCodeOptions configuration)
+    public OpenCodeClient(HttpClient httpClient, OpenCodeOptions configuration) : this(UnavailableRuntimeAccess.Instance, httpClient, configuration) { }
+
+    internal OpenCodeClient(IRuntimeAccess access, HttpClient httpClient, OpenCodeOptions configuration)
     {
+        this.access = access;
         configuration.Validate();
         http = httpClient;
         options = configuration;
         approvedRoot = new ProjectTools(options.ApprovedProjectRoot).Root;
         sessionRules = ReadOnlyRules.Select(rule => options.RequireReadApproval && rule.Permission == "read" && rule.Action == "allow"
             ? rule with { Action = "ask" } : rule).ToArray();
-        http.BaseAddress = options.BaseUri;
+        if (http.BaseAddress is null) http.BaseAddress = options.BaseUri;
+        else if (http.BaseAddress != options.BaseUri) throw new ArgumentException("ProviderOriginMismatch");
     }
 
     public async Task ValidateAsync(ExternalTaskRequest request, CancellationToken cancellationToken)
     {
+        using var effect = access.Enter(ProviderEffect.Validate, request);
         string root;
         try
         {
@@ -177,6 +185,7 @@ public sealed class OpenCodeClient : IResumableExternalHarnessClient
     {
         try
         {
+            using var effect = access.Enter(ProviderEffect.CreateSession, request, workflowRunId, handle);
             return await CreateCoreAsync(request, workflowRunId, handle, cancellationToken);
         }
         catch (Exception error) when (error is JsonException or KeyNotFoundException or InvalidOperationException or ArgumentException)
@@ -246,6 +255,7 @@ public sealed class OpenCodeClient : IResumableExternalHarnessClient
 
     public async Task SubmitAsync(ExternalTaskRequest request, ExternalExecutionHandle handle, CancellationToken cancellationToken)
     {
+        using var effect = access.Enter(ProviderEffect.SubmitPrompt, request, handle: handle);
         var binding = Bound(handle);
         if (binding.TaskId != request.TaskId || !submitted.TryAdd(handle.ExecutionId, 0))
         {
@@ -262,6 +272,7 @@ public sealed class OpenCodeClient : IResumableExternalHarnessClient
     {
         try
         {
+            using var effect = access.Enter(ProviderEffect.Observe, handle: handle);
             return await ObserveCoreAsync(handle, cancellationToken);
         }
         catch (Exception error) when (error is JsonException or InvalidOperationException or KeyNotFoundException or ArgumentException)
@@ -369,6 +380,7 @@ public sealed class OpenCodeClient : IResumableExternalHarnessClient
 
     public async Task<bool> AbortAsync(ExternalExecutionHandle handle, CancellationToken cancellationToken)
     {
+        using var effect = access.Enter(ProviderEffect.Abort, handle: handle);
         var binding = Bound(handle);
         using var result = await SendAsync(HttpMethod.Post, SessionPath(handle) + "/abort" + Query(binding.Root), null,
             binding.TaskId, cancellationToken);
@@ -404,10 +416,11 @@ public sealed class OpenCodeClient : IResumableExternalHarnessClient
     private async Task<JsonDocument> SendAsync(HttpMethod method, string path, object? body, string taskId,
         CancellationToken cancellationToken, bool noContent = false)
     {
+        await access.BeforeWireAsync(method, path, taskId, cancellationToken);
         counts.AddOrUpdate(taskId, 1, (_, value) => value + 1);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(options.RequestTimeoutSeconds));
-        using var request = new HttpRequestMessage(method, path);
+        using var request = new HttpRequestMessage(method, new Uri(options.BaseUri, path));
         if (options.Password is { Length: > 0 } password)
         {
             request.Headers.Authorization = new AuthenticationHeaderValue("Basic",

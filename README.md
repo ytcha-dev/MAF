@@ -6,6 +6,8 @@ C# / .NET 10 的兩個獨立 Microsoft Agent Framework Agent，以唯讀工具�
 
 ## 系統用途
 
+M3-A2c 已完成受控 synthetic runtime 的 admission → 官方 Workflow → provider-effect enforcement；[驗收結果](docs/acceptance/PHASE2B2_M3_A2C_RESULTS.md) 為 37 focused／530 offline 通過。**相容性變更：Host 的 external-task／recover／recover-pending 現在拒絕 `ProductionTrustUnavailable`；公開 raw client、Workflow、durable service、executor 缺受保護 context 時 fail closed。** 沒有 production trust、unsafe opt-out 或舊路徑 fallback。PCA／Reviewer 是另外的原生基線，尚未受這套 policy 保護。正式 activation、人類 Approval/Resume 與取消派送仍未啟用。
+
 PCA 讓你指定一個本機專案，以繁體中文提問，取得結合實際程式碼與檔案行號的說明。
 
 | 可以詢問 | 預期回答 |
@@ -165,6 +167,8 @@ powershell -File scripts/evaluate-review.ps1 -Trials 3
 Phase 1 歷史驗收見 [TEST_RESULTS.md](TEST_RESULTS.md)：當時 22／22 測試通過，真實模型的架構、功能流程、Git Diff 與 DI 回答保留於 `docs/acceptance`。Phase 2 的確定性測試及已執行的真實 LLM 評估記錄於 [TEST_RESULTS_PHASE2.md](TEST_RESULTS_PHASE2.md)，兩個階段的結果不能混用。
 
 ## Phase 2A — OpenCode 外部 Workflow
+
+以下是歷史 PoC／2B-1 操作說明。M3-A2c 起，這些 Host external CLI 命令已停用，不能用環境變數恢復；live acceptance helpers 亦不能繞過新 guard。受控測試透過 `ProtectedExternalRuntime`、明確 v2 store、test-only trust 與 fake HTTP 執行，不連線真實 OpenCode。
 
 執行路徑為 **官方 MAF Workflow → OpenCodeExecutor → OpenCode Server**。這個模式不呼叫 PCA／Review，不需要 Host 的模型設定；模型由 OpenCode 配置。使用者須自行啟動或明確授權啟動 server。本機原生 CLI 範例：`opencode serve --hostname 127.0.0.1 --port 4096`；本公司環境請使用原生 executable，不執行 `.ps1` shim。
 

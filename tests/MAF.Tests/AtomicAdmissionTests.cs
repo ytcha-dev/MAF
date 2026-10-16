@@ -367,7 +367,7 @@ public sealed class AtomicAdmissionTests(ITestOutputHelper output) : IDisposable
         await Setup();
         await using (var owner = (await Executions.TryAcquireAsync(f.Request.TaskId))!) { await Admit(Store(), owner); }
         var trap = new NoEffectsClient(f.Scope.ProviderScopeDigest);
-        using var recovery = new DurableExecutionService(Executions, trap);
+        using var recovery = new DurableExecutionService(HistoricalRuntimeAccess.Instance, Executions, trap);
         var result = await recovery.RecoverAsync(f.Request.TaskId, f.Root, f.Request.Timeout);
         Assert.Equal(ExternalExecutionStatus.Unknown, result.Result.Status); Assert.Equal("MissingSubmissionEvidence", result.Result.ErrorCode);
         Assert.Empty(result.WorkflowEvents); Assert.Equal(0, trap.Calls);
