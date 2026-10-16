@@ -88,3 +88,8 @@ MAF human approval MVP不回答OpenCode內部permission。若未來bridge成立�
 Owner需核准：trust/identity與self-approval、policy epochauthority、schema v2停機/備份、input reentry UX、bounded approval期限與audit保留。建議provider permission bridge與uncertain abort retry保持disabled。若owner只批准M1，後續M2–M5不因此自動獲准。
 
 原文件設計輪只做source/evidence檢視與Markdown，沒有restore/build/test或live prompt。後續明確核准的M1已完成build與offline tests，結果見開頭連結；沒有live prompt。其餘里程碑仍須owner明確核准。
+
+
+## 9. M3-0 revision — architecture gate before runtime work
+
+The original M3 table above remains a target, **not implementation authorization**. Adopt the documentation-first [M3-0 architecture gate](PHASE2B2_M3_ARCHITECTURE_GATE.md) and [ADR-006](../architecture/ADR-006_TRUSTED_BROKER_BOUNDARY.md): source call graph and bypass review; explicit-vs-opportunistic policy activation decision; exact admission / dispatch-intent / cancel ordering; approval/resume separation; durable recovery-only behavior. Afterwards independently consider M3-A isolated policy admission, M3-B synthetic approval/resume and **blocked** M3-C production trust and CLI activation. No production human identity, policy publisher, protected writer or Broker currently exists; default-deny controls remain in effect. Do not proceed automatically to M3-A.
