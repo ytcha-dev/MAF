@@ -7,9 +7,11 @@ public enum ControlAuditCode { Requested, Approved, Rejected, Expired, Revoked, 
 // A trusted deployment boundary, not a caller-provided epoch or authentication fallback.
 // Implementations must protect policy configuration and serialize revision activation with storage maintenance.
 // CanDecide/CanControl must validate the supplied trusted identity against the exact operation scope.
-// No production implementation is supplied or registered in M2-A.
+// M2-B supplies an unregistered adapter; production trust transports remain unavailable.
 public interface IProtectedPolicyAuthority : IPolicySource
 {
+    // Lease must freeze the acquired policy until the storage commit completes.
+    ValueTask<IAsyncDisposable> AcquireAsync(CancellationToken token = default);
     PolicyDecision EvaluateStoredOperation(PolicyRequest operation, DateTimeOffset evaluatedAt);
     bool CanDecide(ITrustedCallerContext actor, PolicyRequest operation, string requiredOperatorScope);
     bool IsDecisionSubjectStillAuthorized(string recordedSubject, PolicyRequest operation, string requiredOperatorScope);
@@ -47,4 +49,11 @@ public interface IApprovalTransactionCoordinator
         string expectedBindingDigest, DurableExecution initialExecution, ITrustedCallerContext caller, CancellationToken token = default);
     Task<TaskControl> RequestCancellationAsync(string approvalId, string cancelRequestId, long expectedControlVersion,
         ITrustedCallerContext actor, CancellationToken token = default);
+}
+
+// No snapshot/epoch parameters: only a trusted source can propose the next revision.
+// Activation becomes effective at the coordinator's durable high-water commit.
+public interface IPolicyActivationCoordinator
+{
+    Task ActivatePolicyAsync(CancellationToken token = default);
 }

@@ -1,10 +1,12 @@
 # Phase 2B-2 執行計畫：Policy、人工批准與取消
 
-日期：2026-10-16。狀態：**M1與M2-A已另獲批准並完成；M2其餘／M3–M5仍為Proposed，沒有後續實作授權。** 原計畫source baseline：`64d3c36`，M1開發基準`009a96e`，M2-A開發基準`9849933`。[ADR-005](../architecture/ADR-005_POLICY_APPROVAL_CANCELLATION.md) 是完整決策提案；[acceptance plan](../acceptance/PHASE2B2_ACCEPTANCE_PLAN.md) 是分層矩陣，不是完整2B-2驗收結果。
+日期：2026-10-16。狀態：**M1、M2-A與另批M2-B foundation已完成；production trust未部署，M3–M5仍為Proposed，沒有後續實作授權。** 原計畫source baseline：`64d3c36`，M1開發基準`009a96e`，M2-A開發基準`9849933`。[ADR-005](../architecture/ADR-005_POLICY_APPROVAL_CANCELLATION.md) 是完整決策提案；[acceptance plan](../acceptance/PHASE2B2_ACCEPTANCE_PLAN.md) 是分層矩陣，不是完整2B-2驗收結果。
 
 後續狀態：owner另行批准的M1已實作並通過98個focused與253個offline cases，詳見 [M1 results](../acceptance/PHASE2B2_M1_RESULTS.md)。本檔保留原始里程碑提案；M2–M5、migration、identity resolver與runtime enforcement均未因此獲准或完成。
 
 再後續狀態：owner只批准M2-A資料層；[M2-A results](../acceptance/PHASE2B2_M2A_RESULTS.md)記錄explicit offline schema v2、approval/control/coordinator與51 focused／304 offline通過。M2其餘整合、protected production authority與identity、M3–M5仍待授權；沒有provider活動。
+
+M2-B增量：[results](../acceptance/PHASE2B2_M2B_RESULTS.md)記錄43新測試、94 focused／347 offline通過；serialized activation、replaceable identity/authorization與maintenance邊界已建立，沒有可信production source/human resolver，正式activation/approval保持disabled。M3 checklist見該報告；下面保留原始target，不能視為現在狀態。
 
 ## 1. 目標與現況
 

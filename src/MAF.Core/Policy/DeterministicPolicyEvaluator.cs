@@ -81,7 +81,7 @@ public sealed class DeterministicPolicyEvaluator(IPolicySource? source, TimeProv
         }
     }
 
-    private static bool ValidSnapshot(PolicySnapshot s, DateTimeOffset now)
+    internal static bool ValidSnapshot(PolicySnapshot s, DateTimeOffset now)
     {
         if (!PolicyValidation.Text(s.AuthorityId) || !s.Epoch.IsValid || !s.Version.IsValid || now < s.NotBefore || now >= s.NotAfter
             || s.NotBefore >= s.NotAfter || s.DecisionLifetime <= TimeSpan.Zero || s.DecisionLifetime > TimeSpan.FromHours(1)

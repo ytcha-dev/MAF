@@ -13,6 +13,9 @@ public sealed class SyntheticClock : TimeProvider
 }
 public sealed class SyntheticAuthority : IProtectedPolicyAuthority
 {
+    // Deliberately mutable M2-A fault fixture; never a production authority implementation.
+    public ValueTask<IAsyncDisposable> AcquireAsync(CancellationToken token = default) => ValueTask.FromResult<IAsyncDisposable>(new TestLease());
+    sealed class TestLease : IAsyncDisposable { public ValueTask DisposeAsync() => ValueTask.CompletedTask; }
     public PolicySnapshot Snapshot { get; set; } = SyntheticApproval.Policy;
     public bool OperatorEnabled { get; set; } = true;
     public PolicySnapshot GetSnapshot() => Snapshot;

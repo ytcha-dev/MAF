@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text;
 using System.Text.Json;
 using MAF.Core;
 using MAF.Core.Policy;
@@ -8,7 +7,7 @@ using Microsoft.Data.Sqlite;
 namespace MAF.Persistence.Sqlite;
 
 // Not registered with Host. No workflow/provider dependencies or dispatch ticket are exposed.
-public sealed class SqliteApprovalStore : IApprovalStore, IApprovalTransactionCoordinator
+public sealed class SqliteApprovalStore : IApprovalStore, IApprovalTransactionCoordinator, IPolicyActivationCoordinator
 {
     readonly string path;
     readonly IProtectedPolicyAuthority authority;
@@ -47,7 +46,7 @@ public sealed class SqliteApprovalStore : IApprovalStore, IApprovalTransactionCo
     async Task<PolicySnapshot> PinAuthority(CancellationToken token)
     {
         var policy = authority.GetSnapshot() ?? throw new InvalidOperationException("PolicyUnavailable");
-        var digest = PolicyDigest(policy);
+        var digest = PolicySnapshotBinding.Digest(policy);
         await Transaction(async (c, tx) =>
         {
             using var cmd = ApprovalDatabase.Command(c, tx, "SELECT authority,epoch,version,digest FROM policy_authority WHERE id=1");
@@ -73,10 +72,17 @@ public sealed class SqliteApprovalStore : IApprovalStore, IApprovalTransactionCo
         }, token);
         return policy;
     }
+    // Activation is the durable high-water commit. No caller-supplied policy or revision is accepted.
+    // A failed activation cannot grant access; publishing a candidate at the source is not activation.
+    public async Task ActivatePolicyAsync(CancellationToken token = default)
+    {
+        await using var authorityLease = await authority.AcquireAsync(token);
+        await PinAuthority(token);
+    }
     async Task CheckPin(SqliteConnection c, SqliteTransaction tx, PolicySnapshot policy, CancellationToken token)
     {
-        Require(PolicyDigest(authority.GetSnapshot() ?? throw new InvalidOperationException("PolicyUnavailable")) == PolicyDigest(policy), "AuthorityChanged");
-        Require(Equals(await ApprovalDatabase.Scalar(c, tx, "SELECT digest FROM policy_authority WHERE id=1", token), PolicyDigest(policy)), "AuthorityChanged");
+        Require(PolicySnapshotBinding.Digest(authority.GetSnapshot() ?? throw new InvalidOperationException("PolicyUnavailable")) == PolicySnapshotBinding.Digest(policy), "AuthorityChanged");
+        Require(Equals(await ApprovalDatabase.Scalar(c, tx, "SELECT digest FROM policy_authority WHERE id=1", token), PolicySnapshotBinding.Digest(policy)), "AuthorityChanged");
     }
     Task<T> GuardedTransaction<T>(PolicySnapshot policy, Func<SqliteConnection, SqliteTransaction, Task<T>> action, CancellationToken token)
         => Transaction(async (c, tx) =>
@@ -86,31 +92,6 @@ public sealed class SqliteApprovalStore : IApprovalStore, IApprovalTransactionCo
             await CheckPin(c, tx, policy, token);
             return result;
         }, token);
-    static string PolicyDigest(PolicySnapshot p)
-    {
-        Require(p.Epoch.IsValid && p.Version.IsValid && p.NotBefore < p.NotAfter && !p.Capabilities.IsDefault && !p.Rules.IsDefault, "InvalidAuthorityPolicy");
-        Id(p.AuthorityId);
-        // Fixed fields and ordinal-sorted collections with BinaryWriter length-prefixed UTF-8 strings.
-        using var m = new MemoryStream(); using var w = new BinaryWriter(m, new UTF8Encoding(false, true), leaveOpen: true);
-        w.Write("MAF.PolicySnapshot.v1"); w.Write(p.AuthorityId); w.Write(p.Epoch.Value); w.Write(p.Version.Value);
-        w.Write(Utc(p.NotBefore)); w.Write(Utc(p.NotAfter)); w.Write(p.DecisionLifetime.Ticks);
-        w.Write(p.Capabilities.Length);
-        foreach (var d in p.Capabilities.OrderBy(d => d.ConnectorId, StringComparer.Ordinal).ThenBy(d => d.Capability))
-        {
-            w.Write(d.ConnectorId); w.Write(d.AdapterVersion); w.Write((int)d.Capability); w.Write((int)d.Boundary); w.Write(d.Enabled); w.Write(d.Healthy);
-            w.Write(d.SupportedOperations.Length); foreach (var op in d.SupportedOperations.Order()) w.Write((int)op);
-        }
-        var rules = p.Rules.Select(r =>
-        {
-            using var rm = new MemoryStream(); using var rw = new BinaryWriter(rm, new UTF8Encoding(false, true));
-            rw.Write(r.CallerSubject); rw.Write(r.ConnectorId); rw.Write((int)r.Capability); rw.Write((int)r.Operation);
-            rw.Write(r.Scope.ResourceId); rw.Write(r.Scope.ProviderScopeDigest); rw.Write(r.Scope.AgentPolicyDigest);
-            rw.Write(r.Scope.ConfigurationRevision); rw.Write(r.Scope.ScopeRevision); rw.Write((int)r.Scope.Access); rw.Write(r.Scope.BudgetTicks);
-            rw.Write((int)r.Outcome); rw.Write(r.RequiredOperatorScope ?? ""); rw.Flush(); return Convert.ToHexString(rm.ToArray());
-        }).Order(StringComparer.Ordinal).ToArray();
-        w.Write(rules.Length); foreach (var r in rules) w.Write(r); w.Flush();
-        return DurableExecution.Hash(Convert.ToHexString(m.ToArray()));
-    }
 
     async Task Audit(SqliteConnection c, SqliteTransaction tx, ControlAuditCode code, string actor, string task, string? approval, long version, CancellationToken token)
     {
@@ -188,6 +169,7 @@ public sealed class SqliteApprovalStore : IApprovalStore, IApprovalTransactionCo
 
     public async Task<ApprovalRecord> RequestAsync(string approvalId, PolicyRequest operation, ITrustedCallerContext caller, CancellationToken token = default)
     {
+        await using var authorityLease = await authority.AcquireAsync(token);
         Id(approvalId); Metadata(operation); var actor = Actor(caller); var policy = await PinAuthority(token);
         return await GuardedTransaction(policy, async (c, tx) =>
         {
@@ -215,6 +197,7 @@ public sealed class SqliteApprovalStore : IApprovalStore, IApprovalTransactionCo
 
     public async Task<ApprovalRecord> DecideAsync(ApprovalDecisionCommand command, ITrustedCallerContext actor, CancellationToken token = default)
     {
+        await using var authorityLease = await authority.AcquireAsync(token);
         Id(command.DecisionId); var subject = Actor(actor); Require(Enum.IsDefined(command.Choice), "UnknownApprovalChoice");
         var policy = await PinAuthority(token);
         return await GuardedTransaction(policy, async (c, tx) =>
@@ -246,6 +229,7 @@ public sealed class SqliteApprovalStore : IApprovalStore, IApprovalTransactionCo
 
     public async Task<ApprovalRecord> RevokeAsync(string approvalId, long expectedVersion, ITrustedCallerContext actor, CancellationToken token = default)
     {
+        await using var authorityLease = await authority.AcquireAsync(token);
         var subject = Actor(actor); var policy = await PinAuthority(token);
         return await GuardedTransaction(policy, async (c, tx) =>
         {
@@ -261,6 +245,7 @@ public sealed class SqliteApprovalStore : IApprovalStore, IApprovalTransactionCo
     public async Task<DurableExecution> ConsumeAsync(string approvalId, long expectedApprovalVersion, long expectedControlVersion,
         string expectedBindingDigest, DurableExecution initialExecution, ITrustedCallerContext caller, CancellationToken token = default)
     {
+        await using var authorityLease = await authority.AcquireAsync(token);
         var subject = Actor(caller); var policy = await PinAuthority(token);
         return await GuardedTransaction(policy, async (c, tx) =>
         {
@@ -289,6 +274,7 @@ public sealed class SqliteApprovalStore : IApprovalStore, IApprovalTransactionCo
 
     public async Task<TaskControl> RequestCancellationAsync(string approvalId, string cancelRequestId, long expectedControlVersion, ITrustedCallerContext actor, CancellationToken token = default)
     {
+        await using var authorityLease = await authority.AcquireAsync(token);
         Id(cancelRequestId); var subject = Actor(actor); var policy = await PinAuthority(token);
         return await GuardedTransaction(policy, async (c, tx) =>
         {

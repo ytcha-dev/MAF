@@ -1,6 +1,6 @@
 # ADR-005：Policy、人工核准與取消對帳
 
-日期：2026-10-16（Asia/Taipei）。狀態：**M1與另行批准的M2-A資料層已實作／驗證；runtime approval/enforcement、operator identity與其他架構仍為Proposed，完整Phase 2B-2未驗收。**
+日期：2026-10-16（Asia/Taipei）。狀態：**M1、M2-A與另行批准的M2-B foundation已實作／驗證；production trust、runtime approval/enforcement與M3仍未啟用，完整Phase 2B-2未驗收。**
 
 後續增量：owner已明確批准M1的provider-neutral contracts、replaceable trusted context、單一immutable policy snapshot與deterministic evaluator；實測見 [M1 results](../acceptance/PHASE2B2_M1_RESULTS.md)。僅M1完成，不代表下述approval/persistence/cancellation/runtime enforcement提案已實作或全部獲准；M2與正式operator trust機制仍待另行授權。
 
@@ -295,3 +295,17 @@ sequenceDiagram
 - Consume重新核對exact binding/current policy、operator仍有權、caller/control/cancel、execution/provider mapping；同transaction consume+Created+audit，**不返回dispatch continuation/ticket，不呼叫Workflow或provider**。只有M3建立完整identity與enforcement後才能接續。
 - task_controls版本由0開始，cancel intent提升version並保持sticky，同transaction revoke未consume批准；不覆寫execution terminal或假造Cancelled。Audit為有界固定欄位（含epoch/version），硬上限10000 rows、讀取最多100；滿額整筆business mutation拒絕，無自動prune。
 - 真實process驗證涵蓋Pending writer death/new reader與兩個migration precommit kill點；51 focused、304 offline全通過。沒有provider POST、live session或agent execution。完整證據與M2-B/M3 prerequisites見M2-A report；公司事件與舊結果不變。
+
+## 12. 已實作的 M2-B foundation 與未啟用的 production trust
+
+本節為 owner 另批 M2-B 的增量決策；不將前述 target 當成已完成。實測與 M3 checklist 見 [M2-B results](../acceptance/PHASE2B2_M2B_RESULTS.md)。
+
+1. 保留 IProtectedPolicyAuthority；增加 async acquisition lease，跨越 trusted candidate 取得、durable pin 與完整 approval/control transaction commit。`IPolicyActivationCoordinator.ActivatePolicyAsync` 不接受任意 snapshot/epoch。Policy source 發布只是 candidate；同DB high-water+audit commit 才是 activation 生效點。不同 instance 由 SQLite writer/CAS 排序，當新版先啟用，舊 approval 無法 consume；先前 admission 不會被新 policy 逆轉。
+2. `ITrustedPolicyAcquisition` 必須由 trusted composition 注入固定 source/authority identity，驗來源、digest、validity、monotonic epoch/version；source identity 字串與 hash **不是認證機制**。沒有實際 protected loader/credential/transport，正式 activation 保持 disabled。現有 DB high-water 防 stale/conflict，不防惡意 DB owner/整份備份回退；外部權威 anchor 與災難回復仍待定。
+3. Authentication (`ITrustedIdentityResolver`) 與 exact authorization (`IApprovalAuthorization`) 分開。Require human operator、fresh human presence、有效期間與非 self approval，並對 operation/resource/binding/required scope 授權；read/list 不等於 decide。僅實作 interface 或同字串 context 不會被認證。預設 UnavailableTrust deny，沒有 production/test fallback 或 Host 註冊。**目前同 OS 帳號無可靠 human/Agent 區分，正式 approval 保持關閉**；§5 的 OS-subject 提議不能單獨作啟用依據。
+4. Authorization/identity/provider-binding callbacks 是 transaction 內的本機 bounded verification，不得做網路或等待人類。未來 Broker 的 transport 認證與 proof acquisition 應在進入 storage 前完成，並定義 proof/rights revision 的 freshness、revocation 及與 activation 的序列化；不能在現有 callback 裡直接加遠端 HTTP。
+5. 未來 Broker 主要替換 acquisition/resolution/authorization/maintenance access adapters；durable approval、execution 與 Workflow 核心保持。Broker own-writer isolation、authenticated protocol、exact decision proof 的 durable reference 尚未設計；如需 additive evidence/schema 擴充，須另審，不承諾零改動或現在已具 tamper resistance。
+6. Schema仍v2；`AuthorizedApprovalMaintenance` 為缺 authorizer 即拒絕的精確 DB resource 入口，原 ApprovalSchema 仍是 trusted storage primitive。Stop/backup bools 為 operational attestations，非 authentication。沒有正式 migration CLI，沒有真 DB 遷移。
+7. Audit仍10000硬上限，滿額全部rollback、沒有 prune/export API；controlled archival proposal與必要 receipt/anchor 前提見 [maintenance](../setup/SQLITE_APPROVAL_MAINTENANCE.md)。未定信任與原子 archive receipt 前，archive operations disabled。
+
+本輪43個新測試、94 focused、347 offline通過；M1/M2-A與原2B-1 regression assertions保留。沒有live模型/provider dispatch、M3 CLI、provider reply、M4取消dispatch、Registry或Hybrid。七項 [architecture guardrails](ARCHITECTURE_GUARDRAILS.md) 不變；公司endpoint hold不變。

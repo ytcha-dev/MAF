@@ -2,7 +2,7 @@
 
 C# / .NET 10 的兩個獨立 Microsoft Agent Framework Agent，以唯讀工具理解與審查本機程式碼。共用 Console Host，不使用自製 Agent Loop。
 
-已完成 Phase 2A 唯讀 OpenCode Workflow PoC 與 Phase 2B-1 持久化／重啟對帳實作。另行授權的家用 Windows 驗證已涵蓋 build、155 個離線測試、跨程序 SQLite／Host crash，以及 OpenCode 1.19.0 免費模型的 same-session recovery；證據與限制見 [家用驗收](docs/acceptance/PHASE2B1_HOME_RESULTS.md)。這不解除公司端安全事件的 execution hold。原生 PCA／Review 保留為基線；Phase 2B-2 與 Phase 2C 尚未開始，後續依 [Roadmap v0.2](docs/ROADMAP.md)。
+已完成 Phase 2A 唯讀 OpenCode Workflow PoC 與 Phase 2B-1 持久化／重啟對帳實作。另行授權的家用 Windows 驗證已涵蓋 build、155 個離線測試、跨程序 SQLite／Host crash，以及 OpenCode 1.19.0 免費模型的 same-session recovery；證據與限制見 [家用驗收](docs/acceptance/PHASE2B1_HOME_RESULTS.md)。這不解除公司端安全事件的 execution hold。原生 PCA／Review 保留為基線；Phase 2B-2 已另行完成 M1／M2-A／M2-B foundation，最新 [M2-B 結果](docs/acceptance/PHASE2B2_M2B_RESULTS.md) 為 347 個離線測試通過；正式 Policy Authority 與人類驗證尚未部署，activation／approval 保持關閉，完整 2B-2 尚未驗收。Phase 2C 未開始，後續依 [Roadmap v0.2](docs/ROADMAP.md)。
 
 ## 系統用途
 

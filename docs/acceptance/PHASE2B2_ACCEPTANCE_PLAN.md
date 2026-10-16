@@ -6,6 +6,8 @@
 
 再後續增量：[M2-A results](PHASE2B2_M2A_RESULTS.md)記錄51個新persistence/process cases與304個offline全通過，涵蓋migration、durable pending、CAS/decision/consume/cancel races與integrity的適用資料層子集；不是M3身份、live enforcement、provider cancellation或整列G2/G3完成。原Planned矩陣仍是完整target，不以fake身份當production authentication。
 
+M2-B增量：[results](PHASE2B2_M2B_RESULTS.md)記錄43新authority/identity/maintenance contract cases及347 offline全通過。Production source provenance、真正human authentication與Broker restart未示範；功能保持disabled，沒有因此完成runtime G gates或完整2B-2。
+
 ## 1. 測試分層與通用oracle
 
 | 層 | Fixture／觀測 | 模型需求 |

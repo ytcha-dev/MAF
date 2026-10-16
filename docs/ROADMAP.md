@@ -189,7 +189,9 @@ Architecture/planning only (2026-10-16): [ADR-005](architecture/ADR-005_POLICY_A
 
 M1 baseline: independent Core policy contracts, immutable snapshot evaluator, trusted-context interface and versioned canonical binding are implemented; 98 focused cases and 253 offline cases passed ([M1 results](acceptance/PHASE2B2_M1_RESULTS.md)). The evaluator remains outside submission/recovery and supplies no production authentication or approval bypass. Subsequent persistence progress and remaining runtime gates follow.
 
-Subsequently authorized M2-A storage only: explicit offline schema-v2 migration, separate approval/control storage and atomic coordinator are implemented; 51 focused and 304 offline cases passed ([M2-A results](acceptance/PHASE2B2_M2A_RESULTS.md)). Approved rows never dispatch tasks. Normal Host remains v1-only; production authority/identity, v2 runtime integration, provider cancellation and M2-B/M3 remain disabled pending approval. See the [maintenance/backup procedure](setup/SQLITE_APPROVAL_MAINTENANCE.md).
+Subsequently authorized M2-A storage only: explicit offline schema-v2 migration, separate approval/control storage and atomic coordinator are implemented; 51 focused and 304 offline cases passed ([M2-A results](acceptance/PHASE2B2_M2A_RESULTS.md)). Approved rows never dispatch tasks. Normal Host remains v1-only; production authority/identity, v2 runtime integration, provider cancellation and M3 remain disabled pending approval. See the [maintenance/backup procedure](setup/SQLITE_APPROVAL_MAINTENANCE.md).
+
+Subsequently authorized M2-B foundation: replaceable policy acquisition, operator authentication/exact authorization and serialized durable activation contracts are implemented; 43 new cases, 94 focused and 347 offline cases passed ([M2-B results](acceptance/PHASE2B2_M2B_RESULTS.md)). Production policy provenance and human-versus-same-account-agent separation are not established, so activation/approval remain disabled. No Broker, M3 CLI/runtime enforcement or provider dispatch was added; schema remains v2 and audit archival remains disabled.
 
 - Separate operator request, external provider pending permission, abort acknowledgement and confirmed terminal state.
 - Expose safe operator actions for resolving pending permissions; no automatic approval.
@@ -278,4 +280,4 @@ ADR-001/002 are decision-log entries; no standalone files currently exist. ADR-0
 
 ### Immediate next action
 
-**Phase 2B-1 controlled home technical acceptance is complete within the documented reliability boundary.** Corporate endpoint clearance remains separate. Phase 2B-2 policy/approval/cancellation is the next owner decision, not started by this acceptance work. Connector Registry remains Phase 2C; no write-enabled execution or new provider is authorized by this roadmap.
+**Phase 2B-1 controlled home technical acceptance is complete within the documented reliability boundary.** Corporate endpoint clearance remains separate. Phase 2B-2 has separately authorized M1/M2-A/M2-B foundation increments above; production trust and M3/runtime approval remain pending and the full phase is not accepted. Connector Registry remains Phase 2C; no write-enabled execution or new provider is authorized by this roadmap.

@@ -1,6 +1,6 @@
 # SQLite approval schema v2：離線維護與回復程序
 
-狀態：M2-A資料層能力，**沒有production migration/approval CLI，也未接入Host**。任何實際資料庫作業都需要owner另行選定受信任維護工具／操作者與資料保管位置；本次只對disposable synthetic DB執行。
+狀態：M2-A資料層與M2-B授權邊界，**沒有production migration/approval CLI，也未接入Host**。任何實際資料庫作業都需要owner另行選定受信任維護工具／操作者與資料保管位置；本次只對disposable synthetic DB執行。
 
 ## 啟用邊界
 
@@ -37,3 +37,25 @@
 - 一旦有新approval/control/authority高水位寫入，舊備份不再是可無損rollback來源。回復可能遺失revocation/cancellation/epoch資訊，需owner與protected authority對帳；禁止自動downgrade或讓舊批准重放。M2-A不提供這種災難回復自動化。
 
 本機同DB的high-water與SQL constraint無法抵禦惡意DB owner或整份備份回退；外部protected authority仍須保存其可信monotonic revision，並在後續部署中與維護／activation序列化。Power-loss、磁碟損壞、mixed-version deployment與公司endpoint compatibility不由目前process-crash tests證明。
+
+## M2-B：明確維護授權與 production disabled
+
+未來維護工具應經 `AuthorizedApprovalMaintenance.InitializeOrMigrateAsync`：由 trusted composition 注入 `ITrustedApprovalMaintenanceAuthorization`，對精確 canonical absolute DB path 授權；缺授權、錯resource、明確拒絕或resolver故障均在開DB前失敗。未安裝production authorizer，沒有CLI；不得把agent可控制的bool/actor/環境變數包裝成實作。現有 `ApprovalSchema` 是trusted storage primitive而非authenticated入口，保留供測試與受信任maintenance工具；wrapper不是阻止惡意程式直接呼叫primitive的OS邊界。
+
+Code 已驗證：schema互斥/SQLite EXCLUSIVE、版本與layout、atomic rollback、原snapshot bytes、integrity。Operational 程序仍須驗證：真正owner授權、所有舊/新Hosts停機且禁止重啟、一致備份及還原演練。`OfflineMaintenance`三項true不證明這些事實。禁止遷移現有個人/公司DB作測試；本輪只用synthetic fixtures，正式資料維護仍需另行批准。
+
+Policy candidate publishing與durable activation不同：trusted acquisition lease先取得candidate，coordinator在同DB提交high-water+audit後才算啟用。Policy activation與admission的先後由SQLite寫入交易決定。Production source、human identity、writer isolation與外部rollback anchor未成立，故不啟用正式authority/approval。不得在maintenance restore時清除high-water、調低revision或繞過audit上限。
+
+## Audit archive/retention 提案（disabled，未實作）
+
+目前硬上限10000 rows、每頁讀100；滿額拒絕整筆mutation及需要audit的activation，不默默刪除。不得直接DELETE/VACUUM清額度或restore舊DB來繼續工作。
+
+後續可審查單DB離線、固定sequence區間的受控archive，而非通用event store：
+
+1. 由另行認證/授權的maintenance operator停所有writers，保存已驗證的一致性DB備份及當前policy/control/approval checkpoint；先保證未結案approval/consumed/取消/authority歷史仍可追溯。
+2. 設定有限archive batch/保留期間；以完整連續sequence區間（含事件數、首尾sequence、authority epoch/version、schema/encoding、DB resource identity）輸出至受保護非repo儲存；保留必要歷史時窗，不能只留下最新Approved。
+3. 建立可獨立驗證的manifest/digest與外部可信checkpoint，實測可讀、連續性與restore；hash本身不證明檔案未被同owner一起竄改。Source/control DB與archive的保管/權限及容量需owner批准，不由Agent改ACL。
+4. 必須先設計durable archive receipt/外部anchor及crash recovery協定，再在短exclusive transaction驗證相同checkpoint、保存receipt與刪除已驗證區間；永不重設sequence或遺失pending/decision/consume/cancel/authority必要證據。未完成archive、驗證失敗、receipt缺失或race均拒絕刪除。
+5. 回復需同時對帳live DB、archive與外部authority high-water，不能只restore舊DB或假造缺失audit。所有fault windows需synthetic測試與owner批准後才可能啟用。
+
+現有schema v2沒有archive receipt/anchor，保管信任與retention期限未定，**本輪不提供archive/export/prune方法**。容量即將滿時應停止新control寫入並安排另行授權維護，不以降低證據要求解決。結果與M3前提見 [M2-B results](../acceptance/PHASE2B2_M2B_RESULTS.md)。
