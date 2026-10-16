@@ -263,11 +263,11 @@ Existing decisions remain:
 
 ADR-001/002 are decision-log entries; no standalone files currently exist. ADR-003 has a standalone record. Preserve historical evidence/links and update stale 'Phase 2A next action' text rather than rewriting prior acceptance results. Future records must distinguish context, alternatives, decision, consequences, evidence and revisit trigger.
 
-**Proposed new ADRs:**
+**Actual ADR index (supersedes the old proposed numbering):**
 
-- ADR-004 — Local-first durable execution state (SQLite, single-host initial scope, reconciliation protocol).
-- ADR-005 — Connector lifecycle and activation security (`Installed/Configured/Enabled/Healthy` vs effective usability; mid-run disable semantics).
-- ADR-006 — Optional remote ingress/data boundary, *only when an authorized deployment use case exists*.
+- [ADR-004](architecture/ADR-004_DURABLE_EXECUTION_RECOVERY.md) — implemented local-first durable execution and reconciliation boundary.
+- [ADR-005](architecture/ADR-005_POLICY_APPROVAL_CANCELLATION.md) — policy, human approval and cancellation design; M1/M2-A/M2-B foundation exists, production trust and runtime enforcement do not.
+- [ADR-006](architecture/ADR-006_TRUSTED_BROKER_BOUNDARY.md) — **adopted for architecture planning only**: replaceable trusted policy/approval authority, with an isolated Broker as a future deployment option. No Broker or production approval activation is implemented. Connector lifecycle and remote ingress ADRs need new numbers if separately proposed.
 
 **Codex documentation-only update instructions:**
 
@@ -279,5 +279,7 @@ ADR-001/002 are decision-log entries; no standalone files currently exist. ADR-0
 6. Commit only documentation changes, report files and commit SHA.
 
 ### Immediate next action
+
+**M3-0 documentation/architecture gate is next (no M3 runtime authorization).** Use [M3 architecture gate](plans/PHASE2B2_M3_ARCHITECTURE_GATE.md) and [ADR-006 Broker-ready trust boundary](architecture/ADR-006_TRUSTED_BROKER_BOUNDARY.md). Separate M3-A isolated admission tests, M3-B exact approval/resume integration, and M3-C production trust/CLI activation; M3-C is blocked until real policy provenance, human proof and writer isolation are demonstrated. Keep production activation/approval disabled.
 
 **Phase 2B-1 controlled home technical acceptance is complete within the documented reliability boundary.** Corporate endpoint clearance remains separate. Phase 2B-2 has separately authorized M1/M2-A/M2-B foundation increments above; production trust and M3/runtime approval remain pending and the full phase is not accepted. Connector Registry remains Phase 2C; no write-enabled execution or new provider is authorized by this roadmap.
