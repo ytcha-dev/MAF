@@ -4,6 +4,38 @@ using MAF.Persistence.Sqlite;
 
 if (args.Length < 2) throw new ArgumentException("Test-only: seed <db> | read <db> | migrate-crash <db> <checkpoint>");
 var path = Path.GetFullPath(args[1]);
+if (args[0].StartsWith("resume-", StringComparison.Ordinal))
+{
+    var fixture = new SyntheticApprovalApplication(path);
+    using var transport = new RuntimeHttpFixture(fixture.Runtime.Root) { LedgerPath = path + ".http", StatePath = path + ".provider" };
+    using var http = new HttpClient(transport);
+    var sql = new SqliteApprovalStore(path, fixture.Authority(), fixture.Clock, 10000, point =>
+    {
+        if (args[0] != "resume-crash" || point.ToString() != args[2]) return;
+        Console.WriteLine("resume-checkpoint"); Console.Out.Flush();
+        if (!Console.In.ReadLineAsync().Wait(TimeSpan.FromSeconds(30))) throw new TimeoutException("ResumeTestGate");
+    });
+    if (args[0] == "resume-race")
+    {
+        Console.WriteLine("ready"); Console.Out.Flush(); await Console.In.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(20));
+        transport.OnRequest = async (request, token) =>
+        {
+            if (request.RequestUri!.AbsolutePath != "/global/health") return;
+            Console.WriteLine("owned"); Console.Out.Flush(); await Console.In.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(20));
+        };
+    }
+    try
+    {
+        var approval = (await sql.GetAsync("resume-approval"))!;
+        var runtime = fixture.ProtectedRuntime(http, sql);
+        var result = args[0] == "resume-recover"
+            ? await runtime.RunAsync(new(MAF.Workflows.External.ExternalAdmissionMode.Inspect, fixture.Runtime.Request.TaskId, fixture.Runtime.Request.Timeout), fixture.Caller, observeOnce: true)
+            : await runtime.ResumeAsync(new(approval.ApprovalId, approval.Version, approval.BindingDigest, fixture.Runtime.Request), fixture.Caller, fixture.Operator);
+        Console.WriteLine(JsonSerializer.Serialize(result.Result));
+    }
+    catch (MAF.Core.ExternalHarnessException e) when (e.Code == "TaskAlreadyOwned") { Console.WriteLine("busy"); }
+    return;
+}
 if (args[0] is "approval-app-seed" or "approval-app-read")
 {
     var fixture = new SyntheticApprovalApplication(path);

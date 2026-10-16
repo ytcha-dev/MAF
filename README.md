@@ -8,7 +8,9 @@ C# / .NET 10 的兩個獨立 Microsoft Agent Framework Agent，以唯讀工具�
 
 M3-A2c 已完成受控 synthetic runtime 的 admission → 官方 Workflow → provider-effect enforcement；[驗收結果](docs/acceptance/PHASE2B2_M3_A2C_RESULTS.md) 為 37 focused／530 offline 通過。**相容性變更：Host 的 external-task／recover／recover-pending 現在拒絕 `ProductionTrustUnavailable`；公開 raw client、Workflow、durable service、executor 缺受保護 context 時 fail closed。** 沒有 production trust、unsafe opt-out 或舊路徑 fallback。PCA／Reviewer 是另外的原生基線，尚未受這套 policy 保護。正式 activation、人類 Approval/Resume 與取消派送仍未啟用。
 
-[M3-B1](docs/acceptance/PHASE2B2_M3_B1_RESULTS.md) 已加入獨立、非執行性的 durable approval request/decision application，30 focused／560 offline 通過。Synthetic Approve/Reject 只保存決定，不啟動 Workflow；Explicit Resume 與 production human authentication 尚未實作。
+[M3-B1](docs/acceptance/PHASE2B2_M3_B1_RESULTS.md) 已加入獨立、非執行性的 durable approval request/decision application，30 focused／560 offline 通過。Synthetic Approve/Reject 只保存決定，不啟動 Workflow；Resume 不屬於 B1，production human authentication 尚未部署。
+
+[M3-B2](docs/acceptance/PHASE2B2_M3_B2_RESULTS.md) 另行完成 synthetic Explicit Resume，44 focused／604 offline 通過。RequireApproval 保留，只有原子 Consume+Created 後、綁定當次 owner 的證據能接入 effect guard；重啟僅能 Inspect/recover。Production human authentication／Broker／Abort delivery 仍未啟用。
 
 PCA 讓你指定一個本機專案，以繁體中文提問，取得結合實際程式碼與檔案行號的說明。
 

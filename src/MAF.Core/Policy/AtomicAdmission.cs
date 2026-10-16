@@ -22,10 +22,18 @@ public sealed class AdmissionContinuation
     readonly DurableExecution execution;
     readonly IExecutionOwnership owner;
     readonly Func<IExecutionOwnership, CancellationToken, ValueTask<IAsyncDisposable>> guard;
+    readonly ConsumedApprovalAuthorization? approval;
     int consumed;
     internal AdmissionContinuation(DurableExecution execution, IExecutionOwnership owner,
-        Func<IExecutionOwnership, CancellationToken, ValueTask<IAsyncDisposable>> guard)
-    { this.execution = execution; this.owner = owner; this.guard = guard; }
+        Func<IExecutionOwnership, CancellationToken, ValueTask<IAsyncDisposable>> guard, ConsumedApprovalAuthorization? approval = null)
+    { this.execution = execution; this.owner = owner; this.guard = guard; this.approval = approval; }
+
+    public async ValueTask<(DurableExecution Execution, ConsumedApprovalAuthorization Authorization)> ConsumeApprovedAsync(
+        IExecutionOwnership ownership, CancellationToken token = default)
+    {
+        if (approval is null) throw new InvalidOperationException("ApprovedResumeRequired");
+        return (await ConsumeAsync(ownership, token), approval);
+    }
 
     public async ValueTask<DurableExecution> ConsumeAsync(IExecutionOwnership ownership, CancellationToken token = default)
     {

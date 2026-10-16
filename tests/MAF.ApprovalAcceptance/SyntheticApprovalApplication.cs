@@ -37,6 +37,12 @@ public sealed class SyntheticApprovalApplication : ITrustedIdentityResolver, ITr
     public bool Matches(PolicyRequest op, DurableExecution execution) => Runtime.Matches(op, execution);
     public TrustedPolicyAuthority Authority() => new("runtime-source", "runtime-authority", this, Clock, this, this, this);
     public SqliteApprovalStore Store() => new(Runtime.Database, Authority(), Clock);
+    public ProtectedExternalRuntime ProtectedRuntime(HttpClient http, SqliteApprovalStore? coordinator = null)
+    {
+        var sql = coordinator ?? Store();
+        return new(Runtime.Inputs, new ImmutablePolicySource(Policy), this,
+            new SqliteExecutionStore(Runtime.Database, ExecutionStoreProfile.ExplicitV2), sql, sql, sql, http, Runtime.Options, Clock);
+    }
     public DurableApprovalApplication Application(IApprovalTransactionCoordinator? coordinator = null, IExecutionStore? executions = null)
         => new(Runtime.Inputs, new ImmutablePolicySource(Policy), this,
             executions ?? new SqliteExecutionStore(Runtime.Database, ExecutionStoreProfile.ExplicitV2), coordinator ?? Store(), Clock);

@@ -258,6 +258,11 @@ public sealed partial class SqliteApprovalStore : IApprovalStore, IApprovalTrans
 
     public async Task<DurableExecution> ConsumeAsync(string approvalId, long expectedApprovalVersion, long expectedControlVersion,
         string expectedBindingDigest, DurableExecution initialExecution, ITrustedCallerContext caller, CancellationToken token = default)
+        => (await ConsumeTransactionAsync(approvalId, expectedApprovalVersion, expectedControlVersion,
+            expectedBindingDigest, initialExecution, caller, token)).Execution;
+    async Task<(DurableExecution Execution, ApprovalRecord Approval)> ConsumeTransactionAsync(string approvalId, long expectedApprovalVersion, long expectedControlVersion,
+        string expectedBindingDigest, DurableExecution initialExecution, ITrustedCallerContext caller, CancellationToken token,
+        Action<ApprovalRecord>? additionalValidation = null)
     {
         await using var authorityLease = await authority.AcquireAsync(token);
         var subject = Actor(caller); var policy = Candidate();
@@ -269,6 +274,7 @@ public sealed partial class SqliteApprovalStore : IApprovalStore, IApprovalTrans
             Require(r.DecidedBy is not null && authority.IsDecisionSubjectStillAuthorized(r.DecidedBy, r.Operation, r.RequiredOperatorScope), "OperatorNoLongerAuthorized");
             Require(r.Operation.CallerSubject == subject && r.Operation.Operation == PolicyOperation.SubmitNewReadOnlyTask
                 && authority.CanControl(caller, r.Operation), "CallerNotAuthorized");
+            additionalValidation?.Invoke(r);
             var control = await Control(c, tx, r.Operation.TaskId, token);
             Require(control is not null && control.Version == expectedControlVersion && control.CancelRequestId is null && control.ExecutionId == r.Operation.ExecutionId, "ControlConflict");
             var e = initialExecution; var op = r.Operation;
@@ -282,7 +288,7 @@ public sealed partial class SqliteApprovalStore : IApprovalStore, IApprovalTrans
             var next = r with { Status = ApprovalStatus.Consumed, Version = r.Version + 1 };
             await Save(c, tx, r, next, ControlAuditCode.Consumed, subject, token); fault?.Invoke(ApprovalCheckpoint.ApprovalConsumed);
             await ApprovalDatabase.Execute(c, tx, "INSERT INTO executions VALUES($t,0,0,$j)", token, ("$t", e.TaskId), ("$j", Json(e)));
-            fault?.Invoke(ApprovalCheckpoint.ExecutionInserted); return e;
+            fault?.Invoke(ApprovalCheckpoint.ExecutionInserted); additionalValidation?.Invoke(r); return (e, next);
         }, token);
     }
 

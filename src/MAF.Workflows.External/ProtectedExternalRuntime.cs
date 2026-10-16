@@ -14,8 +14,20 @@ public sealed class ProtectedExternalRuntime(ExternalAdmissionInputs inputs, IPo
     public Task<IReadOnlyList<DurableExecution>> ListAsync(CancellationToken token = default)
         => throw new ExternalHarnessException("MetadataListNotSupported");
 
-    public async Task<ExternalWorkflowRun> RunAsync(ExternalAdmissionRequest intent, ITrustedCallerContext caller,
+    public Task<ExternalWorkflowRun> RunAsync(ExternalAdmissionRequest intent, ITrustedCallerContext caller,
         bool observeOnce = false, CancellationToken token = default)
+        => RunCoreAsync(intent, caller, observeOnce, token, null, null);
+
+    public Task<ExternalWorkflowRun> ResumeAsync(ApprovalResumeRequest resume, ITrustedCallerContext caller,
+        ITrustedCallerContext operatorContext, CancellationToken token = default)
+    {
+        if (resume.Input is null) throw new ExternalHarnessException("InputRequired");
+        return RunCoreAsync(new(ExternalAdmissionMode.Submit, resume.Input.TaskId, resume.Input.Timeout, resume.Input),
+            caller, true, token, resume, operatorContext);
+    }
+
+    async Task<ExternalWorkflowRun> RunCoreAsync(ExternalAdmissionRequest intent, ITrustedCallerContext caller,
+        bool observeOnce, CancellationToken token, ApprovalResumeRequest? resume, ITrustedCallerContext? operatorContext)
     {
         if (intent.Mode is not (ExternalAdmissionMode.Submit or ExternalAdmissionMode.Inspect))
             throw new ExternalHarnessException("OperationNotSupported");
@@ -37,13 +49,51 @@ public sealed class ProtectedExternalRuntime(ExternalAdmissionInputs inputs, IPo
         await using var owner = await executions.TryAcquireAsync(intent.TaskId, token)
             ?? throw new ExternalHarnessException("TaskAlreadyOwned");
         var existing = await executions.GetAsync(intent.TaskId, token);
+        if (resume is not null && existing is not null)
+            throw new ExternalHarnessException("ExistingExecutionRecoveryOnly"); // Explicit Inspect is a separate authorization.
         var trusted = inputs with { Executions = existing is null ? [] : [existing] };
+        if (resume is not null)
+        {
+            // Restore identity metadata, never a continuation/grant. Consumption below must still
+            // verify the exact row, policy, caller, operator and ownership atomically.
+            var approval = await controls.GetAsync(resume.ApprovalId, token) ?? throw new ExternalHarnessException("UnknownApproval");
+            var original = approval.Operation;
+            if (original.TaskId != intent.TaskId || original.CallerSubject != identity.SubjectId)
+                throw new ExternalHarnessException("ResumeOperationMismatch");
+            trusted = trusted with { OperationId = original.OperationId, NewWorkflowRunId = original.WorkflowRunId,
+                PreparedHandle = new(original.ExecutionId, inputs.ProviderId, ExternalRequestId: original.MessageId) };
+        }
         var result = new ExternalExecutionApplication(trusted, policy, identities, clock).Assess(intent, caller);
-        if (result.Decision.Outcome != PolicyOutcome.Allow || result.Operation is null)
+        var approvedResume = resume is not null && existing is null;
+        if (result.Decision.Outcome != (approvedResume ? PolicyOutcome.RequireApproval : PolicyOutcome.Allow) || result.Operation is null)
             throw new ExternalHarnessException(result.Decision.Reason.ToString());
         var control = await controls.GetControlAsync(intent.TaskId, token);
+        // Provider configuration validation is local and precedes any approval consumption.
+        var projection = new OpenCodeClient(http, options);
+        if (projection.Scope != inputs.Scope.ProviderScopeDigest || projection.Provider != inputs.ProviderId)
+            throw new ExternalHarnessException("RuntimeProviderMismatch");
+        DurableExecution? created = null;
+        ConsumedApprovalAuthorization? evidence = null;
+        if (existing is null)
+        {
+            if (approvedResume)
+            {
+                if (enforcement is not IApprovalResumeCoordinator coordinator) throw new ExternalHarnessException("ResumeNotSupported");
+                var op = result.Operation; var at = clock.GetUtcNow();
+                var initial = new DurableExecution(op.TaskId, op.RequestFingerprint, op.Scope.ProviderScopeDigest, op.Scope.ResourceId,
+                    op.WorkflowRunId, new(op.ExecutionId, inputs.ProviderId, ExternalRequestId: op.MessageId), DurableExecutionState.Created, SubmissionPhase.None, at, at);
+                var continuation = await coordinator.ConsumeOwnedAsync(resume!, op, initial, control?.Version ?? 0, caller, operatorContext!, owner, token);
+                (created, evidence) = await continuation.ConsumeApprovedAsync(owner, token);
+            }
+            else
+            {
+                var continuation = await new AtomicAdmissionApplication(trusted, policy, identities, admission, clock)
+                    .AdmitAsync(intent, caller, owner, control?.Version ?? 0, token);
+                created = await continuation.ConsumeAsync(owner, token);
+            }
+        }
         using var access = new ProtectedAccess(trusted, policy, identities, executions, enforcement,
-            owner, caller, control?.Version ?? 0, intent, existing is not null, clock);
+            owner, caller, control?.Version ?? 0, intent, existing is not null, clock, evidence);
         var client = new OpenCodeClient(access, http, options);
         if (client.Scope != inputs.Scope.ProviderScopeDigest || client.Provider != inputs.ProviderId)
             throw new ExternalHarnessException("RuntimeProviderMismatch");
@@ -54,10 +104,7 @@ public sealed class ProtectedExternalRuntime(ExternalAdmissionInputs inputs, IPo
             await access.VerifyAsync(ProviderEffect.Metadata, existing, null, token);
             return await service.InspectOwnedAsync(existing, inputs.Scope.ResourceId, intent.Timeout, owner, observeOnce, token);
         }
-        var continuation = await new AtomicAdmissionApplication(trusted, policy, identities, admission, clock)
-            .AdmitAsync(intent, caller, owner, control?.Version ?? 0, token);
-        var created = await continuation.ConsumeAsync(owner, token);
-        return await service.LaunchOwnedAsync(intent.Submission!, created, owner, token);
+        return await service.LaunchOwnedAsync(intent.Submission!, created!, owner, token);
     }
 
     sealed class IntentStore(IExecutionStore inner, ProtectedAccess access) : IExecutionStore
@@ -75,7 +122,8 @@ public sealed class ProtectedExternalRuntime(ExternalAdmissionInputs inputs, IPo
     // Per-owned-run, never exposed as a dispatch permit or shared across executions.
     internal sealed class ProtectedAccess(ExternalAdmissionInputs inputs, IPolicySource policy, ITrustedIdentityResolver identities,
         IExecutionStore store, IRuntimeEnforcementCoordinator enforcement, IExecutionOwnership owner, ITrustedCallerContext caller,
-        long controlVersion, ExternalAdmissionRequest intent, bool recovery, TimeProvider clock) : IRuntimeAccess, IDisposable
+        long controlVersion, ExternalAdmissionRequest intent, bool recovery, TimeProvider clock,
+        ConsumedApprovalAuthorization? approval = null) : IRuntimeAccess, IDisposable
     {
         sealed record EffectCall(ProviderEffect Kind, ExternalExecutionHandle? Handle);
         readonly AsyncLocal<EffectCall?> current = new();
@@ -105,12 +153,20 @@ public sealed class ProtectedExternalRuntime(ExternalAdmissionInputs inputs, IPo
             var assessmentInputs = inputs with { Executions = inspecting ? [record] : [] };
             var request = inspecting ? new ExternalAdmissionRequest(ExternalAdmissionMode.Inspect, record.TaskId, intent.Timeout) : intent;
             var assessment = new ExternalExecutionApplication(assessmentInputs, policy, identities, clock).Assess(request, caller);
-            if (assessment.Decision.Outcome != PolicyOutcome.Allow || assessment.Operation is null)
+            if (assessment.Decision.Outcome != (approval is not null && !inspecting ? PolicyOutcome.RequireApproval : PolicyOutcome.Allow) || assessment.Operation is null)
                 throw new ExternalHarnessException(assessment.Decision.Reason.ToString());
             var op = assessment.Operation with { ProviderSessionId = record.Handle.ExternalSessionId };
             var descriptor = inspecting ? inputs.InspectionCapability : inputs.SubmissionCapability;
             var decision = assessment.Decision with { BindingDigest = OperationBinding.Digest(op, descriptor) };
-            try { await enforcement.VerifyEffectAsync(op, decision, record, next, controlVersion, effect, caller, owner, token); }
+            try
+            {
+                if (approval is not null)
+                {
+                    if (enforcement is not IApprovalResumeCoordinator coordinator) throw new ExternalHarnessException("ResumeNotSupported");
+                    await coordinator.VerifyApprovedEffectAsync(approval, op, decision, record, next, controlVersion, effect, caller, owner, token);
+                }
+                else await enforcement.VerifyEffectAsync(op, decision, record, next, controlVersion, effect, caller, owner, token);
+            }
             catch (InvalidOperationException) { throw new ExternalHarnessException("RuntimeAuthorizationDenied"); }
         }
         public async Task BeforeWireAsync(HttpMethod method, string path, string task, CancellationToken token)
