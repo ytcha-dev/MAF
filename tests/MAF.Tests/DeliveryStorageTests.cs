@@ -59,11 +59,11 @@ public sealed class DeliveryStorageTests : IDisposable
         });
     }
     [Fact]
-    public async Task ReservedEvidenceIsReadableButNoPolicyOperationOrProviderDispatchWasEnabled()
+    public async Task ReservedEvidenceIsReadableButDoesNotIssueDeliveryContinuation()
     {
         var (f, _) = await Seed(); var row = (await f.Store().ReadDeliveryStorageAsync("delivery-one"))!;
         Assert.Equal(0, row.Version); Assert.Equal(0, row.Stage); Assert.Equal(0, row.Outcome);
-        Assert.False(Enum.IsDefined((PolicyOperation)8)); Assert.False(Enum.IsDefined((PolicyCapability)4));
+        Assert.Equal(8, (int)PolicyOperation.AbortExistingExecution); Assert.Equal(4, (int)PolicyCapability.ExecutionAbort);
         Assert.Equal(0L, await Sql("SELECT count(*) FROM authorization_operations WHERE kind=8"));
     }
     [Theory] [InlineData("scope")] [InlineData("duplicate")] [InlineData("audit")]

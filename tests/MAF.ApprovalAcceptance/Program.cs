@@ -4,6 +4,40 @@ using MAF.Persistence.Sqlite;
 
 if (args.Length < 2) throw new ArgumentException("Test-only: seed <db> | read <db> | migrate-crash <db> <checkpoint>");
 var path = Path.GetFullPath(args[1]);
+if (args[0].StartsWith("abort-", StringComparison.Ordinal))
+{
+    var a = new SyntheticAbort(path); var f = a.F;
+    void Gate(string point)
+    {
+        if (args.Length < 3 || args[2] != point) return;
+        Console.WriteLine(point); Console.Out.Flush();
+        if (!Console.In.ReadLineAsync().Wait(TimeSpan.FromSeconds(30))) throw new TimeoutException("AbortTestGate");
+    }
+    var store = f.Store(Gate);
+    if (args[0] == "abort-read")
+    {
+        var row = await store.ReadDeliveryStorageAsync("delivery-one");
+        Console.WriteLine(JsonSerializer.Serialize(new { row?.Version, row?.Stage, row?.Outcome })); return;
+    }
+    if (args[0] == "abort-owner")
+    {
+        await using var executionOwner = await f.Executions.TryAcquireAsync("runtime-task") ?? throw new InvalidOperationException("ExecutionOwnerRequired");
+        Console.WriteLine("ExecutionOwned"); Console.Out.Flush(); await Console.In.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(30)); return;
+    }
+    await using var owner = await store.TryAcquireDeliveryAsync("cancel-one");
+    if (owner is null) { Console.WriteLine("DeliveryBusy"); return; }
+    try
+    {
+        var continuation = await store.ReserveAbortAsync(a.Command, a.Inputs, f.Runtime.Caller, owner);
+        using var fake = new RuntimeHttpFixture(f.Runtime.Root) { LedgerPath = path + ".abort-http" };
+        fake.OnRequest = (_, _) => { Gate("AbortWireEntered"); return Task.CompletedTask; };
+        using var http = MAF.Workflows.External.ReceiptTransport.ForTests(fake);
+        var result = await MAF.Workflows.External.OpenCode.ProtectedAbortDelivery.DeliverAsync(continuation, http, f.Runtime.Options);
+        Gate("AbortEvidenceCommitted"); Console.WriteLine(JsonSerializer.Serialize(result));
+    }
+    catch (InvalidOperationException e) when (e.Message == "DeliveryAlreadyReserved") { Console.WriteLine("DeliveryAlreadyReserved"); }
+    return;
+}
 if (args[0].StartsWith("receipt-", StringComparison.Ordinal))
 {
     var approved = args.Length > 3 && args[3] == "approved";

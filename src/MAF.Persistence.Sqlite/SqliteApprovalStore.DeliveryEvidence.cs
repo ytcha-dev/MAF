@@ -19,12 +19,14 @@ public sealed partial class SqliteApprovalStore
                 && after.Observation.TerminalEvidence == before.Observation?.TerminalEvidence
                 && after.Observation.TerminalEvidenceDigest == before.Observation?.TerminalEvidenceDigest), "DeliveryStorageTransitionInvalid");
     }
-    // Data-only diagnostic seam. No writer, reservation, authorization or dispatch token exists.
+    // Data-only diagnostic seam; never reconstructs a delivery continuation.
     internal Task<DeliveryStorageRecord?> ReadDeliveryStorageAsync(string deliveryId, CancellationToken token = default)
     {
         Require(RequiresSessionReceipts, "ApprovalSchemaV4Required"); Id(deliveryId);
-        return Transaction(async (c, tx) =>
-        {
+        return Transaction((c, tx) => ReadDeliveryStorage(c, tx, deliveryId, token), token);
+    }
+    async Task<DeliveryStorageRecord?> ReadDeliveryStorage(SqliteConnection c, SqliteTransaction tx, string deliveryId, CancellationToken token)
+    {
             DeliveryStorageRecord result; long lastAudit;
             using (var cmd = ApprovalDatabase.Command(c, tx, "SELECT *,length(CAST(intent_json AS BLOB)),length(CAST(observation_json AS BLOB)) FROM cancellation_deliveries WHERE delivery_id=$id", ("$id", deliveryId)))
             using (var r = await cmd.ExecuteReaderAsync(token))
@@ -105,7 +107,6 @@ public sealed partial class SqliteApprovalStore
                 await DeliveryAudit(c, tx, lastAudit, result.Version, o.ObservedAtTicks, o.ObserverOperation, receipt.Intent.ApprovalId, token);
             }
             return result;
-        }, token);
     }
     static async Task DeliveryAudit(SqliteConnection c, SqliteTransaction tx, long sequence, long version, long ticks, JsonElement op, string? approval, CancellationToken token)
     {

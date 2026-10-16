@@ -3,8 +3,8 @@ using MAF.Core.Policy;
 
 namespace MAF.Persistence.Sqlite;
 
-// Reserved evidence format only. No Policy enum/grant, evaluator, reservation or HTTP API.
-// Future Abort names are closed strings, deliberately NOT cast into today's Policy enums.
+// Closed evidence format, not an authorization grant. B2's typed operation is golden-tested
+// against these B1b bytes; no existing binding encoding is changed.
 internal static class DeliveryStorageFormat
 {
     internal sealed record Intent(JsonElement Operation, JsonElement Capability, string DeliveryId, string CancelRequestId,
@@ -27,7 +27,7 @@ internal static class DeliveryStorageFormat
     { if (s.Length is < 1 or > 160 || !s.All(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '-' or '.' or ':')) throw new InvalidOperationException("DeliveryMetadataInvalid"); }
     internal static void HashText(string s)
     { if (s.Length != 64 || !s.All(c => char.IsAsciiHexDigit(c) && !char.IsLower(c))) throw new InvalidOperationException("DeliveryHashInvalid"); }
-    // Layout deliberately matches existing OperationBinding v1; only closed future storage
+    // Layout deliberately matches existing OperationBinding v1; only closed storage
     // names are accepted. A golden test compares the supported Inspect layout to Core.
     internal static byte[] Pair(JsonElement op, JsonElement cap)
     {

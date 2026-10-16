@@ -15,6 +15,7 @@ public sealed class SyntheticCancellation : ITrustedIdentityResolver, ITrustedPo
     public SyntheticClock Clock => Runtime.Clock;
     public SyntheticActor Canceller { get; set; } = new("synthetic-canceller");
     public bool Available = true, Enabled = true;
+    public bool ExpiredIdentity;
     public Action? Acquired;
     public PolicySnapshot Policy { get => Approval.Policy; set => Approval.Policy = value; }
     public CapabilityDescriptor Capability => Runtime.Submit with { Capability = PolicyCapability.ExecutionCancellation, SupportedOperations = [PolicyOperation.RequestCancelExecution] };
@@ -30,8 +31,12 @@ public sealed class SyntheticCancellation : ITrustedIdentityResolver, ITrustedPo
             new(Canceller.SubjectId, Capability.ConnectorId, Capability.Capability, PolicyOperation.RequestCancelExecution, Runtime.Scope, PolicyOutcome.Allow)] };
     }
     public bool CanMigrate(string path) => path == Path.GetFullPath(Runtime.Database);
-    public AuthenticatedIdentity? Resolve(ITrustedCallerContext caller) => ReferenceEquals(caller, Canceller)
+    public AuthenticatedIdentity? Resolve(ITrustedCallerContext caller)
+    {
+        var identity = ReferenceEquals(caller, Canceller)
         ? new(Canceller.SubjectId, Canceller.AuthenticationContextId, IdentityKind.Agent, Clock.Now.AddHours(-1), Clock.Now.AddHours(1), false) : Approval.Resolve(caller);
+        return ExpiredIdentity && identity is not null ? identity with { NotAfter = Clock.Now.AddTicks(-1) } : identity;
+    }
     public Task<AcquiredPolicy?> AcquireAsync(CancellationToken token)
     { Acquired?.Invoke(); return Task.FromResult<AcquiredPolicy?>(Available ? new("runtime-source", Policy, PolicySnapshotBinding.Digest(Policy)) : null); }
     public bool CanControl(AuthenticatedIdentity identity, PolicyRequest op, PolicySnapshot policy)

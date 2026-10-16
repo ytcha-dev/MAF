@@ -112,6 +112,7 @@ public sealed class RuntimeHttpFixture(string root) : HttpMessageHandler
             return new(HttpStatusCode.NoContent);
         }
         if (route == "/session/ses_runtime") return Json(Session);
+        if (route == "/session/ses_runtime/abort" && request.Method == HttpMethod.Post) return Json(true);
         if (route is "/permission" or "/question") return Json(Pending ? new object[] { new { sessionID = "ses_runtime" } } : []);
         if (route == "/session/status") return Json(new Dictionary<string, object> { ["ses_runtime"] = new { type = Running ? "busy" : "idle" } });
         if (route.EndsWith("/message")) return Json(new[] { new { info = new { id = "msg_reply", sessionID = "ses_runtime", parentID = message, role = "assistant", time = new { created = 1, completed = 2 }, finish = "stop" }, parts = new[] { new { type = "text", text = "synthetic result" } } } });

@@ -8,9 +8,9 @@ public enum PolicyOutcome { Deny, Allow, RequireApproval }
 public enum PolicyOperation
 {
     Unknown, SubmitNewReadOnlyTask, InspectExistingExecution, RequestCancelExecution,
-    ResolveProviderPermission, WriteWorkspace, ExecuteShell, ElevateScope
+    ResolveProviderPermission, WriteWorkspace, ExecuteShell, ElevateScope, AbortExistingExecution = 8
 }
-public enum PolicyCapability { Unknown, ReadOnlyTask, ExecutionInspection, ExecutionCancellation }
+public enum PolicyCapability { Unknown, ReadOnlyTask, ExecutionInspection, ExecutionCancellation, ExecutionAbort = 4 }
 public enum EnforcementBoundary { Unknown, TaskAdmission, ProviderChallenge }
 public enum ResourceAccess { Unknown, ReadOnly, Write, Shell }
 public enum PolicyReason
@@ -90,12 +90,13 @@ internal static class PolicyValidation
         && Hash(s.ProviderScopeDigest) && Hash(s.AgentPolicyDigest) && s.ConfigurationRevision > 0 && s.ScopeRevision > 0
         && Enum.IsDefined(s.Access) && s.Access != ResourceAccess.Unknown && s.BudgetTicks > 0;
     internal static bool Supported(PolicyOperation op) => op is PolicyOperation.SubmitNewReadOnlyTask
-        or PolicyOperation.InspectExistingExecution or PolicyOperation.RequestCancelExecution;
+        or PolicyOperation.InspectExistingExecution or PolicyOperation.RequestCancelExecution or PolicyOperation.AbortExistingExecution;
     internal static PolicyCapability CapabilityFor(PolicyOperation op) => op switch
     {
         PolicyOperation.SubmitNewReadOnlyTask => PolicyCapability.ReadOnlyTask,
         PolicyOperation.InspectExistingExecution => PolicyCapability.ExecutionInspection,
         PolicyOperation.RequestCancelExecution => PolicyCapability.ExecutionCancellation,
+        PolicyOperation.AbortExistingExecution => PolicyCapability.ExecutionAbort,
         _ => PolicyCapability.Unknown
     };
     internal static bool Request(PolicyRequest? r) => r is not null && Text(r.AuthorityId) && Text(r.CallerSubject)
