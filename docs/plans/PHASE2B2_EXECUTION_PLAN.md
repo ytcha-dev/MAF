@@ -12,6 +12,8 @@ M2-B增量：[results](../acceptance/PHASE2B2_M2B_RESULTS.md)記錄43新測試�
 
 M4 拆為獨立授權增量：**M4-A** durable cancel admission/control/evidence；**M4-B** provider Abort delivery/ack evidence；**M4-C** restart reconciliation/crash acceptance。Cancel-intent 走獨立授權的短 control transaction，不等待 running execution owner 釋放 TaskId lock；delivery 才另審 ownership。Requested、delivery、ack、remote terminal 不合併；沒有新 CLI、production trust fallback 或自動升級。下方原 M3/M4 大項是歷史 target，不代表本次擴大授權。
 
+M4-A0 設計交付：[Cancellation Evidence Schema Design](PHASE2B2_M4_A0_SCHEMA_DESIGN.md) 提出 immutable cancellation_requests、nullable audit CancelRequestId FK、explicit offline v2→v3、精確 ExplicitV3 profiles、TaskId lifetime winner、legacy intent 不補造授權，以及 replay/transaction/crash tests 契約。本輪只改文件，DDL 未執行、migration 未實作；M4-A 尚未通過。Owner 接受後才另批 M4-A1 的 migration/profile + provider-free cancellation admission；不含 M4-B/C、Host 啟用或 M3-C。既有 Policy、Approval、Workflow 不重新設計。
+
 ## 1. 目標與現況
 
 為本機單DB的唯讀外部任務建立default-deny application authorization、可跨restart的精確人工批准，以及不混淆ack/terminal的取消ledger。MAF控制啟動／觀測／取消的操作邊界；OpenCode仍控制其內部tool loop和實際permissions。未支援的細粒度tool approval不能以任務Allow代替。
