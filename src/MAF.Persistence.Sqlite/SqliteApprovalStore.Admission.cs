@@ -10,7 +10,7 @@ public sealed partial class SqliteApprovalStore
         ExternalTaskRequest request, DurableExecution initialExecution, long expectedControlVersion,
         ITrustedCallerContext caller, IExecutionOwnership ownership, CancellationToken token = default)
     {
-        await using var ownershipUse = await SqliteExecutionStore.UseAdmissionOwnershipAsync(path, operation.TaskId, ownership, token);
+        await using var ownershipUse = await SqliteExecutionStore.UseAdmissionOwnershipAsync(path, operation.TaskId, ownership, token, ExecutionProfile);
         await using var authorityLease = await authority.AcquireAsync(token);
         Metadata(operation); var actor = Actor(caller); var policy = Candidate();
         void Validate()
@@ -62,6 +62,6 @@ public sealed partial class SqliteApprovalStore
         }, token);
         fault?.Invoke(ApprovalCheckpoint.AdmissionCommitted);
         return new AdmissionContinuation(initialExecution, ownership,
-            (owner, ct) => SqliteExecutionStore.UseAdmissionOwnershipAsync(path, operation.TaskId, owner, ct));
+            (owner, ct) => SqliteExecutionStore.UseAdmissionOwnershipAsync(path, operation.TaskId, owner, ct, ExecutionProfile));
     }
 }

@@ -4,6 +4,55 @@ using MAF.Persistence.Sqlite;
 
 if (args.Length < 2) throw new ArgumentException("Test-only: seed <db> | read <db> | migrate-crash <db> <checkpoint>");
 var path = Path.GetFullPath(args[1]);
+if (args[0].StartsWith("m4-", StringComparison.Ordinal))
+{
+    var f = new SyntheticCancellation(path);
+    void Gate(string point)
+    {
+        if (args.Length < 3 || args[2] != point) return;
+        Console.WriteLine(point); Console.Out.Flush();
+        if (!Console.In.ReadLineAsync().Wait(TimeSpan.FromSeconds(30))) throw new TimeoutException("M4Gate");
+    }
+    if (args[0] == "m4-migrate")
+    { await ApprovalSchema.MigrateV3Async(path, SyntheticApproval.Maintenance, f, Gate); return; }
+    if (args[0] == "m4-owner")
+    {
+        await using var owner = await f.Executions.TryAcquireAsync(f.Command.TaskId) ?? throw new InvalidOperationException("OwnerRequired");
+        Console.WriteLine("owned"); Console.Out.Flush(); await Console.In.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(30)); return;
+    }
+    if (args[0] == "m4-read")
+    {
+        var evidence = await f.Store().GetCancellationAsync(f.Command.CancelRequestId);
+        using var transport = new RuntimeHttpFixture(f.Runtime.Root); using var http = new HttpClient(transport);
+        var recovered = await f.Protected(http).RunAsync(new(MAF.Workflows.External.ExternalAdmissionMode.Inspect,
+            f.Command.TaskId, f.Runtime.Request.Timeout), f.Runtime.Caller, true);
+        Console.WriteLine(JsonSerializer.Serialize(new { evidence!.BindingDigest, evidence.Operation.TaskId, evidence.Operation.ExecutionId,
+            evidence.CommittedControlVersion, recovered.Result.WorkflowRunId, recovered.Result.Handle.ExternalRequestId,
+            Status = recovered.Result.Status.ToString(), ProviderCalls = transport.Requests.Count })); return;
+    }
+    if (args[0] == "m4-verify")
+    {
+        await using var c = new Microsoft.Data.Sqlite.SqliteConnection(new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder
+            { DataSource = path, Pooling = false, Mode = Microsoft.Data.Sqlite.SqliteOpenMode.ReadWrite, ForeignKeys = true }.ToString());
+        await c.OpenAsync();
+        var version = Convert.ToInt64(await ApprovalDatabase.Scalar(c, null, "PRAGMA user_version", default));
+        var integrity = (string)(await ApprovalDatabase.Scalar(c, null, "PRAGMA integrity_check", default))!;
+        var bytes = await ApprovalSchema.OldBytes(c, null, default);
+        var digest = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(bytes)));
+        Console.WriteLine(JsonSerializer.Serialize(new { Version = version, Integrity = integrity, OriginalDigest = digest })); return;
+    }
+    if (args[0] == "m4-race")
+    { Console.WriteLine("ready"); Console.Out.Flush(); await Console.In.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(20)); }
+    try
+    {
+        var command = f.Command;
+        if (args[0] == "m4-race") command = command with { CancelRequestId = args[2] };
+        var result = await f.Application(f.Store(Gate)).RequestAsync(command, f.Canceller);
+        Console.WriteLine(result.Status);
+    }
+    catch (InvalidOperationException e) when (e.Message == "CancellationAlreadyRequested") { Console.WriteLine("conflict"); }
+    return;
+}
 if (args[0].StartsWith("resume-", StringComparison.Ordinal))
 {
     var fixture = new SyntheticApprovalApplication(path);

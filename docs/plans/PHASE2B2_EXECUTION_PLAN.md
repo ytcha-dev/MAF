@@ -14,6 +14,8 @@ M4 拆為獨立授權增量：**M4-A** durable cancel admission/control/evidence
 
 M4-A0 設計交付：[Cancellation Evidence Schema Design](PHASE2B2_M4_A0_SCHEMA_DESIGN.md) 提出 immutable cancellation_requests、nullable audit CancelRequestId FK、explicit offline v2→v3、精確 ExplicitV3 profiles、TaskId lifetime winner、legacy intent 不補造授權，以及 replay/transaction/crash tests 契約。本輪只改文件，DDL 未執行、migration 未實作；M4-A 尚未通過。Owner 接受後才另批 M4-A1 的 migration/profile + provider-free cancellation admission；不含 M4-B/C、Host 啟用或 M3-C。既有 Policy、Approval、Workflow 不重新設計。
 
+後續 owner 已接受 M4-A0 並另批 M4-A1。[M4-A1 results](../acceptance/PHASE2B2_M4_A1_RESULTS.md)：已完成受控 synthetic v2→v3 offline migration、嚴格 ExplicitV3、獨立 Cancel 授權與 evidence/control/revocation/audit 原子保存；129 focused／733 offline 通過、build 0 warnings/errors，含真 process crash、獨立 owner 持鎖下取消競爭、v3 Direct-Allow／Approved Resume。取消不取 execution lock、不建 execution／Workflow、不發 provider 呼叫；legacy intent 保留未驗證。這是 M4-A cancellation admission/control 的受控驗證，不是 Abort delivery 或完整 Phase 2B-2。提交後停止；M4-B delivery evidence/ownership/current authorization 需另批，M4-C 與 M3-C production trust 仍待驗收。
+
 ## 1. 目標與現況
 
 為本機單DB的唯讀外部任務建立default-deny application authorization、可跨restart的精確人工批准，以及不混淆ack/terminal的取消ledger。MAF控制啟動／觀測／取消的操作邊界；OpenCode仍控制其內部tool loop和實際permissions。未支援的細粒度tool approval不能以任務Allow代替。

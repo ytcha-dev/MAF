@@ -28,7 +28,7 @@ public sealed record ApprovalDecisionCommand(string ApprovalId, string DecisionI
 public sealed record TaskControl(string TaskId, string ExecutionId, long Version, string? CancelRequestId = null,
     string? RequestedBy = null, DateTimeOffset? RequestedAt = null);
 public sealed record ControlAudit(long Sequence, ControlAuditCode Code, string Actor, string TaskId,
-    string? ApprovalId, long Version, DateTimeOffset RecordedAt, PolicyEpoch Epoch, PolicyVersion PolicyVersion);
+    string? ApprovalId, long Version, DateTimeOffset RecordedAt, PolicyEpoch Epoch, PolicyVersion PolicyVersion, string? CancelRequestId = null);
 
 public interface IApprovalStore
 {

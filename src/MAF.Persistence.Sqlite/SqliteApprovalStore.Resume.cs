@@ -10,7 +10,7 @@ public sealed partial class SqliteApprovalStore : IApprovalResumeCoordinator
         long controlVersion, ITrustedCallerContext caller, ITrustedCallerContext operatorContext, IExecutionOwnership owner, CancellationToken token = default)
     {
         Require(request.Input is not null, "InputRequired");
-        await using var use = await SqliteExecutionStore.UseAdmissionOwnershipAsync(path, operation.TaskId, owner, token);
+        await using var use = await SqliteExecutionStore.UseAdmissionOwnershipAsync(path, operation.TaskId, owner, token, ExecutionProfile);
         var consumed = await ConsumeTransactionAsync(request.ApprovalId, request.ApprovalVersion, controlVersion, request.BindingDigest,
             initial, caller, token, r =>
             {
@@ -25,7 +25,7 @@ public sealed partial class SqliteApprovalStore : IApprovalResumeCoordinator
         fault?.Invoke(ApprovalCheckpoint.ConsumptionCommitted);
         var evidence = new ConsumedApprovalAuthorization(consumed.Approval, path, owner, operatorContext);
         return new AdmissionContinuation(consumed.Execution, owner,
-            (o, ct) => SqliteExecutionStore.UseAdmissionOwnershipAsync(path, operation.TaskId, o, ct), evidence);
+            (o, ct) => SqliteExecutionStore.UseAdmissionOwnershipAsync(path, operation.TaskId, o, ct, ExecutionProfile), evidence);
     }
 
     void VerifyResumeOperator(ApprovalRecord r, ITrustedCallerContext operatorContext)

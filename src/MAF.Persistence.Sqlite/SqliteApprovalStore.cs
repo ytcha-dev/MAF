@@ -6,18 +6,26 @@ using Microsoft.Data.Sqlite;
 
 namespace MAF.Persistence.Sqlite;
 
+public enum ApprovalStoreProfile { ExplicitV2, ExplicitV3 }
+
 // Not registered with Host. No workflow/provider dependencies or dispatch ticket are exposed.
 public sealed partial class SqliteApprovalStore : IApprovalStore, IApprovalTransactionCoordinator, IPolicyActivationCoordinator, IExecutionAdmissionCoordinator
 {
     readonly string path;
+    readonly ApprovalStoreProfile profile;
+    ExecutionStoreProfile ExecutionProfile => profile == ApprovalStoreProfile.ExplicitV3 ? ExecutionStoreProfile.ExplicitV3 : ExecutionStoreProfile.ExplicitV2;
     readonly IProtectedPolicyAuthority authority;
     readonly TimeProvider clock;
     readonly int auditCapacity;
     readonly Action<ApprovalCheckpoint>? fault;
     public SqliteApprovalStore(string databasePath, IProtectedPolicyAuthority authority, TimeProvider clock, int auditCapacity = 10000)
         : this(databasePath, authority, clock, auditCapacity, null) { }
-    internal SqliteApprovalStore(string databasePath, IProtectedPolicyAuthority authority, TimeProvider clock, int auditCapacity, Action<ApprovalCheckpoint>? fault)
+    public SqliteApprovalStore(string databasePath, IProtectedPolicyAuthority authority, TimeProvider clock, ApprovalStoreProfile profile, int auditCapacity = 10000)
+        : this(databasePath, authority, clock, auditCapacity, null, profile) { }
+    internal SqliteApprovalStore(string databasePath, IProtectedPolicyAuthority authority, TimeProvider clock, int auditCapacity, Action<ApprovalCheckpoint>? fault, ApprovalStoreProfile profile = ApprovalStoreProfile.ExplicitV2, Action<string>? cancellationCheckpoint = null)
     {
+        if (!Enum.IsDefined(profile)) throw new ArgumentOutOfRangeException(nameof(profile));
+        this.profile = profile; this.cancellationCheckpoint = cancellationCheckpoint;
         path = ApprovalDatabase.PathFor(databasePath); this.authority = authority ?? throw new ArgumentNullException(nameof(authority));
         this.clock = clock ?? throw new ArgumentNullException(nameof(clock));
         if (auditCapacity is < 1 or > 10000) throw new ArgumentOutOfRangeException(nameof(auditCapacity));
@@ -36,7 +44,8 @@ public sealed partial class SqliteApprovalStore : IApprovalStore, IApprovalTrans
         await c.OpenAsync(token);
         using (var setup = c.CreateCommand()) { setup.CommandText = "PRAGMA synchronous=FULL"; await setup.ExecuteNonQueryAsync(token); }
         using var tx = c.BeginTransaction(deferred: false);
-        Require(Convert.ToInt32(await ApprovalDatabase.Scalar(c, tx, "PRAGMA user_version", token)) == 2, "ApprovalSchemaV2Required");
+        Require(Convert.ToInt32(await ApprovalDatabase.Scalar(c, tx, "PRAGMA user_version", token)) == (profile == ApprovalStoreProfile.ExplicitV3 ? 3 : 2), profile == ApprovalStoreProfile.ExplicitV2 ? "ApprovalSchemaV2Required" : "ApprovalSchemaV3Required");
+        if (profile == ApprovalStoreProfile.ExplicitV3) await ApprovalSchema.ValidateV3Async(c, tx, token);
         var result = await action(c, tx);
         fault?.Invoke(ApprovalCheckpoint.BeforeCommit); tx.Commit(); return result;
     }
@@ -159,7 +168,19 @@ public sealed partial class SqliteApprovalStore : IApprovalStore, IApprovalTrans
     public Task<ApprovalRecord?> GetAsync(string approvalId, CancellationToken token = default)
         => Transaction((c, tx) => Read(c, tx, approvalId, token), token);
     public Task<TaskControl?> GetControlAsync(string taskId, CancellationToken token = default)
-        => Transaction((c, tx) => Control(c, tx, taskId, token), token);
+        => Transaction(async (c, tx) =>
+        {
+            var control = await Control(c, tx, taskId, token);
+            if (profile == ApprovalStoreProfile.ExplicitV3 && control?.CancelRequestId is { } cancel)
+            {
+                var evidence = await ReadCancellation(c, tx, cancel, token);
+                if (evidence is null) Require(Convert.ToInt64(await ApprovalDatabase.Scalar(c, tx,
+                    "SELECT count(*) FROM authorization_operations WHERE task_id=$t AND kind=3", token, ("$t", taskId))) == 0
+                    && Convert.ToInt64(await ApprovalDatabase.Scalar(c, tx, "SELECT count(*) FROM control_audit WHERE cancel_request_id=$id", token, ("$id", cancel))) == 0,
+                    "CancellationEvidenceMissing");
+            }
+            return control;
+        }, token);
     public Task<IReadOnlyList<ApprovalRecord>> ListPendingAsync(int limit = 100, CancellationToken token = default)
     {
         Require(limit is >= 1 and <= 100, "InvalidPageLimit");
@@ -175,9 +196,9 @@ public sealed partial class SqliteApprovalStore : IApprovalStore, IApprovalTrans
         Require(afterSequence >= 0 && limit is >= 1 and <= 100, "InvalidPageLimit");
         return Transaction<IReadOnlyList<ControlAudit>>(async (c, tx) =>
         {
-            using var cmd = ApprovalDatabase.Command(c, tx, "SELECT sequence,code,actor,task_id,approval_id,version,recorded_at,policy_epoch,policy_version FROM control_audit WHERE sequence>$after ORDER BY sequence LIMIT $limit", ("$after", afterSequence), ("$limit", limit));
+            using var cmd = ApprovalDatabase.Command(c, tx, "SELECT sequence,code,actor,task_id,approval_id,version,recorded_at,policy_epoch,policy_version," + (profile == ApprovalStoreProfile.ExplicitV3 ? "cancel_request_id" : "NULL") + " FROM control_audit WHERE sequence>$after ORDER BY sequence LIMIT $limit", ("$after", afterSequence), ("$limit", limit));
             using var r = await cmd.ExecuteReaderAsync(token); var results = new List<ControlAudit>();
-            while (await r.ReadAsync(token)) results.Add(new(r.GetInt64(0), (ControlAuditCode)r.GetInt32(1), r.GetString(2), r.GetString(3), r.IsDBNull(4) ? null : r.GetString(4), r.GetInt64(5), DateTimeOffset.Parse(r.GetString(6), CultureInfo.InvariantCulture), new(r.GetInt64(7)), new(r.GetInt64(8)))); return results;
+            while (await r.ReadAsync(token)) results.Add(new(r.GetInt64(0), (ControlAuditCode)r.GetInt32(1), r.GetString(2), r.GetString(3), r.IsDBNull(4) ? null : r.GetString(4), r.GetInt64(5), DateTimeOffset.Parse(r.GetString(6), CultureInfo.InvariantCulture), new(r.GetInt64(7)), new(r.GetInt64(8)), r.IsDBNull(9) ? null : r.GetString(9))); return results;
         }, token);
     }
 
@@ -294,6 +315,7 @@ public sealed partial class SqliteApprovalStore : IApprovalStore, IApprovalTrans
 
     public async Task<TaskControl> RequestCancellationAsync(string approvalId, string cancelRequestId, long expectedControlVersion, ITrustedCallerContext actor, CancellationToken token = default)
     {
+        Require(profile == ApprovalStoreProfile.ExplicitV2, "LegacyCancellationNotSupported");
         await using var authorityLease = await authority.AcquireAsync(token);
         Id(cancelRequestId); var subject = Actor(actor); var policy = Candidate();
         return await GuardedTransaction(policy, async (c, tx) =>

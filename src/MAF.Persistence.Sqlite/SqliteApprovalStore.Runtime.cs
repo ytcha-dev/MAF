@@ -20,7 +20,7 @@ public sealed partial class SqliteApprovalStore : IRuntimeEnforcementCoordinator
         IExecutionOwnership ownership, CancellationToken token, ConsumedApprovalAuthorization? approval = null)
     {
         if (approval is not null) Require(approval.Database == path && ReferenceEquals(approval.Owner, ownership), "ResumeOwnershipMismatch");
-        await using var use = await SqliteExecutionStore.UseAdmissionOwnershipAsync(path, operation.TaskId, ownership, token);
+        await using var use = await SqliteExecutionStore.UseAdmissionOwnershipAsync(path, operation.TaskId, ownership, token, ExecutionProfile);
         await using var lease = await authority.AcquireAsync(token);
         var policy = Candidate(); Metadata(operation); var actor = Actor(caller);
         await GuardedTransaction(policy, async (c, tx) =>

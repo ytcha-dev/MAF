@@ -7,9 +7,17 @@ internal enum ApprovalCheckpoint { MigrationValidated, TablesCreated, SchemaVers
 public sealed record OfflineMaintenance(bool ExplicitMaintenanceMode, bool AllHostsStopped,
     bool BackupAndRollbackProcedureConfirmed);
 
-public static class ApprovalSchema
+public static partial class ApprovalSchema
 {
-    const string V1Definition = "CREATE TABLE executions(task_id TEXT PRIMARY KEY NOT NULL, version INTEGER NOT NULL CHECK(version>=0), terminal INTEGER NOT NULL CHECK(terminal IN (0,1)), snapshot TEXT NOT NULL)";
+    internal const string V1Definition = "CREATE TABLE executions(task_id TEXT PRIMARY KEY NOT NULL, version INTEGER NOT NULL CHECK(version>=0), terminal INTEGER NOT NULL CHECK(terminal IN (0,1)), snapshot TEXT NOT NULL)";
+    internal const string V2Definition = """
+                    CREATE TABLE policy_authority(id INTEGER PRIMARY KEY CHECK(id=1), authority TEXT NOT NULL, epoch INTEGER NOT NULL CHECK(epoch>0), version INTEGER NOT NULL CHECK(version>0), digest TEXT NOT NULL);
+                    CREATE TABLE task_controls(task_id TEXT PRIMARY KEY NOT NULL, execution_id TEXT NOT NULL, version INTEGER NOT NULL CHECK(version>=0), cancel_id TEXT UNIQUE, actor TEXT, requested_at TEXT);
+                    CREATE TABLE authorization_operations(operation_id TEXT PRIMARY KEY NOT NULL, task_id TEXT NOT NULL REFERENCES task_controls(task_id), execution_id TEXT NOT NULL, kind INTEGER NOT NULL, generation INTEGER NOT NULL CHECK(generation>0), UNIQUE(task_id,kind,generation));
+                    CREATE UNIQUE INDEX one_initial_admission ON authorization_operations(task_id) WHERE kind=1;
+                    CREATE TABLE approval_requests(approval_id TEXT PRIMARY KEY NOT NULL, operation_id TEXT UNIQUE NOT NULL REFERENCES authorization_operations(operation_id), status INTEGER NOT NULL CHECK(status BETWEEN 0 AND 5), version INTEGER NOT NULL CHECK(version>=0), decision_id TEXT UNIQUE, snapshot TEXT NOT NULL);
+                    CREATE TABLE control_audit(sequence INTEGER PRIMARY KEY AUTOINCREMENT, code INTEGER NOT NULL CHECK(code BETWEEN 0 AND 7), actor TEXT NOT NULL, task_id TEXT NOT NULL, approval_id TEXT, version INTEGER NOT NULL, recorded_at TEXT NOT NULL, policy_epoch INTEGER NOT NULL CHECK(policy_epoch>0), policy_version INTEGER NOT NULL CHECK(policy_version>0));
+                    """;
     public static Task InitializeOrMigrateAsync(string databasePath, OfflineMaintenance maintenance, CancellationToken token = default)
         => MigrateAsync(databasePath, maintenance, null, token);
 
@@ -54,14 +62,7 @@ public static class ApprovalSchema
                 var before = await ExecutionBytes(c, tx, token);
                 if (!Equals(await ApprovalDatabase.Scalar(c, tx, "PRAGMA integrity_check", token), "ok")) throw new InvalidOperationException("IntegrityCheckFailed");
                 fault?.Invoke(ApprovalCheckpoint.MigrationValidated);
-                await ApprovalDatabase.Execute(c, tx, """
-                    CREATE TABLE policy_authority(id INTEGER PRIMARY KEY CHECK(id=1), authority TEXT NOT NULL, epoch INTEGER NOT NULL CHECK(epoch>0), version INTEGER NOT NULL CHECK(version>0), digest TEXT NOT NULL);
-                    CREATE TABLE task_controls(task_id TEXT PRIMARY KEY NOT NULL, execution_id TEXT NOT NULL, version INTEGER NOT NULL CHECK(version>=0), cancel_id TEXT UNIQUE, actor TEXT, requested_at TEXT);
-                    CREATE TABLE authorization_operations(operation_id TEXT PRIMARY KEY NOT NULL, task_id TEXT NOT NULL REFERENCES task_controls(task_id), execution_id TEXT NOT NULL, kind INTEGER NOT NULL, generation INTEGER NOT NULL CHECK(generation>0), UNIQUE(task_id,kind,generation));
-                    CREATE UNIQUE INDEX one_initial_admission ON authorization_operations(task_id) WHERE kind=1;
-                    CREATE TABLE approval_requests(approval_id TEXT PRIMARY KEY NOT NULL, operation_id TEXT UNIQUE NOT NULL REFERENCES authorization_operations(operation_id), status INTEGER NOT NULL CHECK(status BETWEEN 0 AND 5), version INTEGER NOT NULL CHECK(version>=0), decision_id TEXT UNIQUE, snapshot TEXT NOT NULL);
-                    CREATE TABLE control_audit(sequence INTEGER PRIMARY KEY AUTOINCREMENT, code INTEGER NOT NULL CHECK(code BETWEEN 0 AND 7), actor TEXT NOT NULL, task_id TEXT NOT NULL, approval_id TEXT, version INTEGER NOT NULL, recorded_at TEXT NOT NULL, policy_epoch INTEGER NOT NULL CHECK(policy_epoch>0), policy_version INTEGER NOT NULL CHECK(policy_version>0));
-                    """, token);
+                await ApprovalDatabase.Execute(c, tx, V2Definition, token);
                 fault?.Invoke(ApprovalCheckpoint.TablesCreated);
                 if (!before.SequenceEqual(await ExecutionBytes(c, tx, token))) throw new InvalidOperationException("ExecutionSnapshotsChanged");
                 await ApprovalDatabase.Execute(c, tx, "PRAGMA user_version=2", token);

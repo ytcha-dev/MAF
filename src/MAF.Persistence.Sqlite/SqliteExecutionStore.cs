@@ -4,8 +4,8 @@ using Microsoft.Data.Sqlite;
 
 namespace MAF.Persistence.Sqlite;
 
-// ExplicitV2 opens an existing v2 database for read/update; direct creation requires admission.
-public enum ExecutionStoreProfile { LegacyV1, ExplicitV2 }
+// Explicit profiles open exactly their schema for read/update; direct creation requires admission.
+public enum ExecutionStoreProfile { LegacyV1, ExplicitV2, ExplicitV3 }
 
 // One local host; OS file ownership survives neither disposal nor process death.
 // The ownership file is not a SQLite transaction and contains no task data.
@@ -33,10 +33,10 @@ public sealed class SqliteExecutionStore : IExecutionStore
             throw new ArgumentException("An absolute local database file path is required.");
         if (!Enum.IsDefined(profile)) throw new ArgumentOutOfRangeException(nameof(profile));
         this.profile = profile;
-        this.databasePath = profile == ExecutionStoreProfile.ExplicitV2 ? ApprovalDatabase.PathFor(databasePath) : Path.GetFullPath(databasePath);
+        this.databasePath = profile != ExecutionStoreProfile.LegacyV1 ? ApprovalDatabase.PathFor(databasePath) : Path.GetFullPath(databasePath);
         connectionString = new SqliteConnectionStringBuilder
         {
-            DataSource = this.databasePath, Pooling = false, DefaultTimeout = 5, Mode = profile == ExecutionStoreProfile.ExplicitV2 ? SqliteOpenMode.ReadWrite : SqliteOpenMode.ReadWriteCreate
+            DataSource = this.databasePath, Pooling = false, DefaultTimeout = 5, Mode = profile != ExecutionStoreProfile.LegacyV1 ? SqliteOpenMode.ReadWrite : SqliteOpenMode.ReadWriteCreate
         }.ToString();
     }
 
@@ -57,7 +57,7 @@ public sealed class SqliteExecutionStore : IExecutionStore
             command.Transaction = transaction;
             command.CommandText = "PRAGMA user_version;";
             var version = Convert.ToInt32(await command.ExecuteScalarAsync(token));
-            if (profile == ExecutionStoreProfile.ExplicitV2 ? version != 2 : version is not (0 or 1)) throw new InvalidOperationException("Unsupported execution database schema.");
+            if (profile == ExecutionStoreProfile.LegacyV1 ? version is not (0 or 1) : version != (profile == ExecutionStoreProfile.ExplicitV2 ? 2 : 3)) throw new InvalidOperationException("Unsupported execution database schema.");
             if (version == 0)
             {
                 command.CommandText = """
@@ -71,6 +71,7 @@ public sealed class SqliteExecutionStore : IExecutionStore
                     """;
                 await command.ExecuteNonQueryAsync(token);
             }
+            if (profile == ExecutionStoreProfile.ExplicitV3) await ApprovalSchema.ValidateV3Async(connection, transaction, token);
             transaction.Commit();
             return connection;
         }
@@ -101,10 +102,10 @@ public sealed class SqliteExecutionStore : IExecutionStore
     }
 
     internal static async ValueTask<IAsyncDisposable> UseAdmissionOwnershipAsync(string database, string task,
-        IExecutionOwnership ownership, CancellationToken token)
+        IExecutionOwnership ownership, CancellationToken token, ExecutionStoreProfile requiredProfile = ExecutionStoreProfile.ExplicitV2)
     {
         if (ownership is not Ownership own || own.TaskId != task || own.Database != database
-            || own.Profile != ExecutionStoreProfile.ExplicitV2)
+            || own.Profile != requiredProfile || requiredProfile == ExecutionStoreProfile.LegacyV1)
             throw new InvalidOperationException("ExecutionOwnershipRequired");
         await own.Gate.WaitAsync(token);
         if (own.Disposed) { own.Gate.Release(); throw new InvalidOperationException("ExecutionOwnershipRequired"); }
@@ -150,7 +151,7 @@ public sealed class SqliteExecutionStore : IExecutionStore
 
     public async Task CreateAsync(DurableExecution execution, IExecutionOwnership ownership, CancellationToken cancellationToken = default)
     {
-        if (profile == ExecutionStoreProfile.ExplicitV2) throw new InvalidOperationException("AtomicAdmissionRequired");
+        if (profile != ExecutionStoreProfile.LegacyV1) throw new InvalidOperationException("AtomicAdmissionRequired");
         CheckOwnership(execution.TaskId, ownership);
         if (execution.State != DurableExecutionState.Created || execution.Version != 0 || execution.CompletedAt is not null
             || execution.SubmissionPhase != SubmissionPhase.None || execution.Handle.ExternalSessionId is not null
