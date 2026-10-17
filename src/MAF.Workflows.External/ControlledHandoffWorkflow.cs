@@ -19,13 +19,14 @@ internal sealed record HandoffRun(WorkflowOutcome Outcome, ImmutableArray<Workfl
 internal sealed class ControlledHandoffWorkflow(ITaskBriefing briefingSource,
     Func<ExternalTaskRequest, PolicyOutcome> assessmentSource, IControlledDelegation delegationSource,
     Func<TaskEvidence, CancellationToken, Task<ReviewAssessment>> reviewSource, ExternalExecutionHandle originalHandle,
-    TimeProvider clock)
+    TimeProvider clock, VerifiedSourceMode? verifiedSources = null)
 {
     readonly ITaskBriefing briefing = briefingSource;
     readonly Func<ExternalTaskRequest, PolicyOutcome> assess = assessmentSource;
     readonly IControlledDelegation delegation = delegationSource;
     readonly Func<TaskEvidence, CancellationToken, Task<ReviewAssessment>> reviewer = reviewSource;
     readonly ExternalExecutionHandle expectedHandle = originalHandle;
+    readonly VerifiedSourceMode? sourceMode = verifiedSources;
     sealed record Entry(HandoffTask Input, Lazy<Task<HandoffRun>> Run);
     readonly ConcurrentDictionary<string, Entry> runs = new(StringComparer.Ordinal);
     readonly object identityGate = new();
@@ -171,11 +172,14 @@ internal sealed class ControlledHandoffWorkflow(ITaskBriefing briefingSource,
                 ["Code-diff review is NotApplicable; no change evidence was supplied.", "Provider summary alone does not prove source-level correctness."]);
             try
             {
-                var assessment = await owner.Within(t => owner.reviewer(evidence, t), input.Input.Task.StageTimeout, token);
+                var assessment = await owner.Within(t => owner.sourceMode is null ? owner.reviewer(evidence, t)
+                    : owner.sourceMode.ReviewAsync(evidence, owner.reviewer, t), input.Input.Task.StageTimeout, token);
+                var allowed = owner.sourceMode is null ? evidence.EvidenceReferences
+                    : assessment.Sources?.Admitted.Select(s => s.Reference).ToImmutableArray() ?? [];
                 if (assessment is null || assessment.TaskId != result.TaskId || assessment.ExecutionId != result.Handle.ExecutionId
                     || !Enum.IsDefined(assessment.Status) || !HandoffValidation.Text(assessment.Summary, 2000)
                     || !HandoffValidation.References(assessment.EvidenceReferences) || !HandoffValidation.References(assessment.Limitations)
-                    || assessment.EvidenceReferences.Any(r => !evidence.EvidenceReferences.Contains(r)))
+                    || assessment.EvidenceReferences.Any(r => !allowed.Contains(r)))
                     return Unavailable(input, "InvalidReviewAssessment");
                 return new(input, assessment, HandoffStageState.Completed, null);
             }
@@ -194,9 +198,11 @@ internal sealed class ControlledHandoffWorkflow(ITaskBriefing briefingSource,
                     : result is null ? HumanGateStatus.Blocked : HumanGateStatus.NeedsHumanReview;
             return ValueTask.FromResult(new WorkflowOutcome(pca.Task.TaskId, pca.Task.WorkflowRunId,
                 pca.Brief?.Status ?? (pca.State == HandoffStageState.Failed ? ComprehensionStatus.Invalid : ComprehensionStatus.Unavailable),
-                result, input.Assessment, gate, Evidence(result),
+                result, input.Assessment, gate, Evidence(result).Concat(input.Assessment?.EvidenceReferences ?? []).Distinct().ToImmutableArray(),
                 [.. (pca.Brief?.Limitations ?? []), .. (result?.Limitations ?? []), .. (input.Assessment?.Limitations ?? []),
-                    "Offline controlled workflow; no real provider or human consent.", "Source evidence and production semantic review remain unverified."],
+                    "Offline controlled workflow; no real provider or human consent.", input.Assessment?.Sources is null
+                        ? "Source evidence and production semantic review remain unverified."
+                        : "Source observations are review-time only; semantic correctness remains unverified."],
                 [new("PCA", pca.State), new("ExternalDelegation", external.State), new("EvidenceReviewer", input.State), new("HumanGate", HandoffStageState.Completed)],
                 input.Reason ?? external.Reason ?? pca.Reason));
         }

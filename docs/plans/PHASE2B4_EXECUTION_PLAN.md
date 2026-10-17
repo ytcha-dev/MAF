@@ -39,6 +39,21 @@ There is no durable outer Workflow engine or new checkpoint schema.
 Live providers, production Host/M3-C, human consent, write tasks, Hybrid routing and
 Registry remain outside 4B unless separately authorized. No automatic next phase.
 
-Next proposed narrow increment: bounded source/evidence provenance for the simulated
-Reviewer after owner-level 4B review. Persistent parent-stage recovery requires its
-own future design/authorization; it is not silently added to this increment.
+## 4C independently acquired source evidence — separately authorized implementation
+
+The existing EvidenceReviewer executor now supports an explicitly selected controlled
+verified-source mode. Test-owned candidates are bound to the original completed child;
+an independent local reader reuses ProjectTools exclusions, strict UTF-8/redaction and
+bounded reads. Exact ranges/anchors, issuer-created immutable snapshots, v1 content
+digests and post-assessment source revalidation establish review-time provenance.
+Missing/mismatched/changed evidence never falls back to simulated summary acceptance.
+
+See [4C results](../acceptance/PHASE2B4_C_REVIEWER_EVIDENCE_RESULTS.md) for limits,
+digest golden, actual protected HTTP counts and filesystem-race limitations. Sufficient
+source evidence is not semantic correctness or human approval. Historical 4A/4B tests
+and native Git-diff Reviewer remain unchanged. No fifth stage, schema or production mode.
+
+Next proposed narrow step requires owner review of those evidence semantics, followed
+only if separately authorized by a bounded structured candidate extraction contract.
+Persistent parent-stage recovery, real semantic models and production trust each need
+their own future authorization; none is silently added here.

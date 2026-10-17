@@ -15,9 +15,15 @@ public sealed record TaskBrief([property: JsonRequired] string TaskId, [property
     [property: JsonRequired] ComprehensionStatus Status, [property: JsonRequired] ImmutableArray<string> SourceReferences,
     [property: JsonRequired] ImmutableArray<string> Limitations);
 public sealed record TaskEvidence(HandoffTask Task, TaskBrief Brief, ExternalTaskResult ExternalResult,
-    ImmutableArray<string> EvidenceReferences, ImmutableArray<string> Limitations);
+    ImmutableArray<string> EvidenceReferences, ImmutableArray<string> Limitations)
+{
+    public SourceEvidenceBatch? Sources { get; init; }
+}
 public sealed record ReviewAssessment(string TaskId, string ExecutionId, EvidenceAssessmentStatus Status,
-    string Summary, ImmutableArray<string> EvidenceReferences, ImmutableArray<string> Limitations);
+    string Summary, ImmutableArray<string> EvidenceReferences, ImmutableArray<string> Limitations)
+{
+    public SourceEvidenceBatch? Sources { get; init; }
+}
 public sealed record HandoffStage(string Name, HandoffStageState State);
 public sealed record WorkflowOutcome(string TaskId, string WorkflowRunId, ComprehensionStatus Comprehension,
     ExternalTaskResult? ExternalResult, ReviewAssessment? Review, HumanGateStatus HumanGate,

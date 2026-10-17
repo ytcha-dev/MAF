@@ -17,6 +17,8 @@ public sealed class SyntheticProtectedHandoff : IDisposable
     public HttpClient Http { get; }
     public int PcaCalls, ReviewCalls;
     public bool BadBrief, ReviewFails;
+    internal Action<TaskEvidence>? OnReview;
+    internal EvidenceAssessmentStatus SourceReviewStatus = EvidenceAssessmentStatus.SufficientEvidence;
     internal Func<HttpRequestMessage, HttpResponseMessage, HttpResponseMessage>? ResponseTransform;
     public HandoffTask Task => new(F.Runtime.Request.TaskId, F.Runtime.Inputs.NewWorkflowRunId, F.Runtime.Root,
         F.Runtime.Request.TaskText, F.Runtime.Request.Timeout);
@@ -36,21 +38,23 @@ public sealed class SyntheticProtectedHandoff : IDisposable
         await F.Store().ActivatePolicyAsync();
     }
     internal ControlledHandoffWorkflow Flow(ProtectedExternalRuntime? runtime = null, ITrustedCallerContext? caller = null,
-        ExternalAdmissionMode mode = ExternalAdmissionMode.Submit, Action? handoff = null, ExternalExecutionHandle? expected = null)
+        ExternalAdmissionMode mode = ExternalAdmissionMode.Submit, Action? handoff = null, ExternalExecutionHandle? expected = null,
+        VerifiedSourceMode? sources = null)
     {
         var original = F.Runtime.Request; var input = F.Runtime.Inputs;
         expected ??= input.PreparedHandle;
         Adapter = new(runtime ?? F.Protected(Http), caller ?? F.Runtime.Caller, original, input.NewWorkflowRunId, expected, mode)
         { BeforeHandoff = handoff };
         return new(new TaskBriefingAdapter(new Chat(this), new ProjectTools(F.Runtime.Root)),
-            _ => PolicyOutcome.Allow, Adapter, Review, expected, TimeProvider.System);
+            _ => PolicyOutcome.Allow, Adapter, Review, expected, TimeProvider.System, sources);
     }
     Task<ReviewAssessment> Review(TaskEvidence evidence, CancellationToken token)
     {
         ReviewCalls++;
+        OnReview?.Invoke(evidence);
         if (ReviewFails) throw new InvalidOperationException("SyntheticReviewUnavailable");
         return System.Threading.Tasks.Task.FromResult(new ReviewAssessment(evidence.Task.TaskId, evidence.ExternalResult.Handle.ExecutionId,
-            EvidenceAssessmentStatus.SufficientEvidence, "Simulated summary evidence review; no production semantic certification.",
+            SourceReviewStatus, "Simulated summary evidence review; no production semantic certification.",
             evidence.EvidenceReferences, evidence.Limitations));
     }
     public SqliteApprovalStore Store(Action<string> gate) => new(F.Runtime.Database, F.Authority(), F.Clock, 10000,

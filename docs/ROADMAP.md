@@ -230,6 +230,15 @@ Inspect recovery with no duplicate POST. This does not implement persistent pare
 resume, live provider or operational Host activation. M3-C remains mandatory/blocked;
 stop for controlled owner acceptance before any next increment.
 
+**4C bounded source provenance:** an explicitly selected mode inside the same Reviewer
+executor independently acquires local source snapshots, matches exact ranges/anchors,
+issues versioned digest references and detects observed source changes before an eligible
+assessment. See [4C results](acceptance/PHASE2B4_C_REVIEWER_EVIDENCE_RESULTS.md).
+Provider summaries/citations remain untrusted; no missing-source fallback to simulated
+success exists. This proves review-time source observation, not semantic correctness,
+historical execution-time content or human acceptance. Production trust/live models,
+parent checkpoints, Registry and Hybrid remain separately gated.
+
 ### 2C — Registry MVP
 
 - Start with two known connector IDs: the existing native path and OpenCode. One disabled mock external connector tests disable behavior without external requests.
