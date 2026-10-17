@@ -214,6 +214,14 @@ Subsequently authorized M2-B foundation: replaceable policy acquisition, operato
 
 **Gate:** repeatable fixed workflow and verified cross-step evidence; no unsanctioned writes.
 
+**4A controlled typed-handoff proof:** the official four-executor graph, native PCA with
+scripted chat, test-only external delegation and simulated independent evidence review
+are implemented; see [execution plan](plans/PHASE2B4_EXECUTION_PLAN.md) and
+[results](acceptance/PHASE2B4_A_TYPED_HANDOFF_RESULTS.md). The final output is an explicit
+human-review handoff, never Accepted. This is not live OpenCode integration, source-level
+semantic acceptance or operational Host authorization. M3-C remains blocked; 4B needs
+separate owner review and authorization.
+
 ### 2C — Registry MVP
 
 - Start with two known connector IDs: the existing native path and OpenCode. One disabled mock external connector tests disable behavior without external requests.
