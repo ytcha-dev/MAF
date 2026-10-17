@@ -106,11 +106,28 @@ internal sealed class ControlledHandoffWorkflow(ITaskBriefing briefingSource,
                         decision == PolicyOutcome.RequireApproval ? "RequireApproval" : "DelegationDenied");
                 token.ThrowIfCancellationRequested();
                 started = true;
-                var result = await owner.Within(t => owner.delegation.DelegateAsync(request, task.WorkflowRunId, t), task.StageTimeout, token);
+                // The protected child already owns a bounded budget and native ownership. Do not
+                // abandon its unwind by racing another wait timer with the same deadline.
+                var result = owner.delegation is ProtectedHandoffDelegation
+                    ? await owner.delegation.DelegateAsync(request, task.WorkflowRunId, token)
+                    : await owner.Within(t => owner.delegation.DelegateAsync(request, task.WorkflowRunId, t), task.StageTimeout, token);
                 if (!owner.ValidResult(result, task)) return new(input, null, HandoffStageState.Failed, "ExternalCorrelationOrShapeInvalid");
                 // Snapshot existing DTO collections before passing them to a different specialist.
                 result = result with { Limitations = result.Limitations.ToImmutableArray(), Trace = result.Trace.ToImmutableArray() };
                 return new(input, result, HandoffStageState.Completed, null);
+            }
+            catch (ExternalHarnessException error) when (error.Code == nameof(PolicyReason.ApprovalRequired))
+            {
+                return new(input, null, HandoffStageState.Skipped, "RequireApproval");
+            }
+            catch (ExternalHarnessException error) when (error.Code is "ProtectedHandoffBindingMismatch" or "ProtectedHandoffIdentityMismatch")
+            {
+                return new(input, null, HandoffStageState.Failed, "ProtectedHandoffIdentityMismatch");
+            }
+            catch (ExternalHarnessException error) when (Enum.TryParse<PolicyReason>(error.Code, out var reason)
+                && Enum.IsDefined(reason) && reason != PolicyReason.Allowed)
+            {
+                return new(input, null, HandoffStageState.Skipped, "ProtectedAdmissionDenied");
             }
             catch (Exception)
             {

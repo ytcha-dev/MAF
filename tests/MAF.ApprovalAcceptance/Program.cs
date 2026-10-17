@@ -4,6 +4,35 @@ using MAF.Persistence.Sqlite;
 
 if (args.Length < 2) throw new ArgumentException("Test-only: seed <db> | read <db> | migrate-crash <db> <checkpoint>");
 var path = Path.GetFullPath(args[1]);
+if (args[0].StartsWith("handoff-", StringComparison.Ordinal))
+{
+    void Gate(string point)
+    {
+        if (args.Length < 3 || args[2] != point) return;
+        Console.WriteLine(point); Console.Out.Flush();
+        if (!Console.In.ReadLineAsync().Wait(TimeSpan.FromSeconds(30))) throw new TimeoutException("HandoffTestGate");
+    }
+    using var f = new SyntheticProtectedHandoff(path, Gate);
+    var store = f.Store(Gate);
+    if (args[0] == "handoff-run")
+    {
+        var run = await f.Flow(f.F.Protected(f.Http, store), handoff: () => Gate("ChildResultBeforeReview")).RunAsync(f.Task);
+        Console.WriteLine(JsonSerializer.Serialize(new { Gate = run.Outcome.HumanGate.ToString(), f.ReviewCalls, Calls = f.Fake.Requests.ToArray() }));
+    }
+    else
+    {
+        try
+        {
+            // Fresh process recovers only the original child; no outer stage checkpoint is fabricated.
+            var run = await f.F.Protected(f.Http).RunAsync(new(MAF.Workflows.External.ExternalAdmissionMode.Inspect,
+                f.Task.TaskId, f.Task.StageTimeout), f.F.Runtime.Caller, true);
+            Console.WriteLine(JsonSerializer.Serialize(new { run.Result.TaskId, run.Result.WorkflowRunId, run.Result.Handle,
+                Status = run.Result.Status.ToString(), Calls = f.Fake.Requests.ToArray(), ParentResumed = false }));
+        }
+        catch (MAF.Core.ExternalHarnessException e) { Console.WriteLine(JsonSerializer.Serialize(new { Error = e.Code, Calls = f.Fake.Requests.ToArray(), ParentResumed = false })); }
+    }
+    return;
+}
 if (args[0].StartsWith("reconcile-", StringComparison.Ordinal))
 {
     var f = new SyntheticReconciliation(path); f.InspectOnly();

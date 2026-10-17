@@ -219,8 +219,16 @@ scripted chat, test-only external delegation and simulated independent evidence 
 are implemented; see [execution plan](plans/PHASE2B4_EXECUTION_PLAN.md) and
 [results](acceptance/PHASE2B4_A_TYPED_HANDOFF_RESULTS.md). The final output is an explicit
 human-review handoff, never Accepted. This is not live OpenCode integration, source-level
-semantic acceptance or operational Host authorization. M3-C remains blocked; 4B needs
-separate owner review and authorization.
+semantic acceptance or operational Host authorization. M3-C remains blocked; the
+separately authorized 4B integration status follows.
+
+**4B protected integration:** the same outer official graph now has an internal adapter
+to the existing protected child Workflow, real M3 admission/effect guards and explicit
+v4 receipts, using synthetic trust/fake HTTP. See [4B results](acceptance/PHASE2B4_B_PROTECTED_HANDOFF_RESULTS.md)
+for actual request accounting, seven OS crash/restart checkpoints and independent
+Inspect recovery with no duplicate POST. This does not implement persistent parent-stage
+resume, live provider or operational Host activation. M3-C remains mandatory/blocked;
+stop for controlled owner acceptance before any next increment.
 
 ### 2C — Registry MVP
 
