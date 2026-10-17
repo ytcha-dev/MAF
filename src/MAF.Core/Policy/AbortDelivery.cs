@@ -25,11 +25,13 @@ public sealed class AbortDeliveryContinuation
     internal readonly PolicyRequest Operation;
     internal readonly string Provider;
     internal readonly Func<CancellationToken, Task> Preflight;
+    internal readonly Func<CancellationToken, Task<IAsyncDisposable>> DispatchUse;
     internal readonly Func<string, string, CancellationToken, Task<AbortDeliveryEvidence>> Complete;
     int consumed;
     internal AbortDeliveryContinuation(PolicyRequest operation, string provider, Func<CancellationToken, Task> preflight,
-        Func<string, string, CancellationToken, Task<AbortDeliveryEvidence>> complete)
-    { Operation = operation; Provider = provider; Preflight = preflight; Complete = complete; }
+        Func<string, string, CancellationToken, Task<AbortDeliveryEvidence>> complete,
+        Func<CancellationToken, Task<IAsyncDisposable>> dispatchUse)
+    { Operation = operation; Provider = provider; Preflight = preflight; Complete = complete; DispatchUse = dispatchUse; }
     internal void Consume()
     { if (Interlocked.Exchange(ref consumed, 1) != 0) throw new InvalidOperationException("DeliveryContinuationUnavailable"); }
 }

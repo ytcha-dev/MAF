@@ -4,6 +4,30 @@ using MAF.Persistence.Sqlite;
 
 if (args.Length < 2) throw new ArgumentException("Test-only: seed <db> | read <db> | migrate-crash <db> <checkpoint>");
 var path = Path.GetFullPath(args[1]);
+if (args[0].StartsWith("reconcile-", StringComparison.Ordinal))
+{
+    var f = new SyntheticReconciliation(path); f.InspectOnly();
+    void Gate(string point)
+    {
+        if (args.Length < 3 || args[2] != point) return;
+        Console.WriteLine(point); Console.Out.Flush();
+        if (!Console.In.ReadLineAsync().Wait(TimeSpan.FromSeconds(30))) throw new TimeoutException("ReconciliationTestGate");
+    }
+    if (args[0] == "reconcile-read")
+    {
+        var execution = (await f.F.Executions.GetAsync("runtime-task"))!;
+        var row = (await f.F.Store().ReadDeliveryStorageAsync("delivery-one"))!;
+        await using var c = new Microsoft.Data.Sqlite.SqliteConnection(ApprovalDatabase.ConnectionString(path, Microsoft.Data.Sqlite.SqliteOpenMode.ReadWrite)); await c.OpenAsync();
+        Console.WriteLine(JsonSerializer.Serialize(new { execution.TaskId, execution.WorkflowRunId, execution.Handle.ExecutionId,
+            execution.Handle.ExternalSessionId, execution.Handle.ExternalRequestId, State = execution.State.ToString(), row.Version, row.Stage, row.Outcome,
+            Digest = row.Observation?.TerminalEvidenceDigest, Integrity = await ApprovalDatabase.Scalar(c, null, "PRAGMA integrity_check", default) })); return;
+    }
+    using var fake = f.Fixture(args.Length > 3 ? args[3] : "Completed"); fake.Provider.LedgerPath = path + ".inspect-http";
+    using var http = MAF.Workflows.External.ReceiptTransport.ForTests(fake);
+    try { var result = await f.Application(http, Gate).ReconcileAsync("delivery-one", "runtime-task", f.F.Runtime.Caller); Console.WriteLine(JsonSerializer.Serialize(result)); }
+    catch (MAF.Core.ExternalHarnessException e) when (e.Code == "ExecutionOwned") { Console.WriteLine("InspectBusy"); }
+    return;
+}
 if (args[0].StartsWith("abort-", StringComparison.Ordinal))
 {
     var a = new SyntheticAbort(path); var f = a.F;

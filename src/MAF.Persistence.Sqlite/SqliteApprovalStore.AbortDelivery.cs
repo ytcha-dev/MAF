@@ -36,6 +36,18 @@ public sealed partial class SqliteApprovalStore : IAbortDeliveryCoordinator
         try { Require(!actual.Disposed, "DeliveryOwnershipReleased"); return await action(); }
         finally { actual.Gate.Release(); }
     }
+    sealed class DeliveryDispatchUse(DeliveryOwner owner) : IAsyncDisposable
+    {
+        DeliveryOwner? held = owner;
+        public ValueTask DisposeAsync() { Interlocked.Exchange(ref held, null)?.Gate.Release(); return ValueTask.CompletedTask; }
+    }
+    async Task<IAsyncDisposable> UseDeliveryDispatch(IDeliveryOwnership owner, string cancel, CancellationToken token)
+    {
+        Require(owner is DeliveryOwner d && d.Database == path && d.CancelRequestId == cancel, "DeliveryOwnershipMismatch");
+        var actual = (DeliveryOwner)owner; await actual.Gate.WaitAsync(token);
+        if (actual.Disposed) { actual.Gate.Release(); throw new InvalidOperationException("DeliveryOwnershipReleased"); }
+        return new DeliveryDispatchUse(actual);
+    }
     static JsonElement DeliveryElement<T>(T value) => JsonDocument.Parse(SessionReceiptFormat.Write(value, 16384)).RootElement.Clone();
 
     public Task<AbortDeliveryContinuation> ReserveAbortAsync(AbortDeliveryCommand command, AbortDeliveryInputs inputs,
@@ -89,7 +101,8 @@ public sealed partial class SqliteApprovalStore : IAbortDeliveryCoordinator
             cancellationCheckpoint?.Invoke("DeliveryIntentCommitted");
             return new AbortDeliveryContinuation(reserved.op, reserved.intent.ProviderId,
                 t => PreflightAbort(command, inputs, caller, owner, reserved.op, reserved.digest, reserved.intent.CallerAuthenticationContextId, t),
-                (stage, diagnostic, t) => CompleteAbort(command, owner, reserved.intent, reserved.digest, reserved.ApprovalId, stage, diagnostic, t));
+                (stage, diagnostic, t) => CompleteAbort(command, owner, reserved.intent, reserved.digest, reserved.ApprovalId, stage, diagnostic, t),
+                t => UseDeliveryDispatch(owner, command.CancelRequestId, t));
         }, token);
 
     void AuthorizeAbort(PolicySnapshot policy, PolicyRequest op, CapabilityDescriptor capability, ITrustedCallerContext caller, DurableExecution e)
@@ -127,9 +140,10 @@ public sealed partial class SqliteApprovalStore : IAbortDeliveryCoordinator
         Require(e is not null && !e.IsTerminal && e.SubmissionPhase >= SubmissionPhase.PromptIntended, "AbortNoActiveSubmission");
         return (receipt, cancel!, control!);
     }
-    Task<bool> PreflightAbort(AbortDeliveryCommand command, AbortDeliveryInputs inputs, ITrustedCallerContext caller,
+    async Task<bool> PreflightAbort(AbortDeliveryCommand command, AbortDeliveryInputs inputs, ITrustedCallerContext caller,
         IDeliveryOwnership owner, PolicyRequest op, string digest, string authenticationContext, CancellationToken token)
-        => WithDeliveryOwner(owner, command.CancelRequestId, async () =>
+    {
+        var verified = await WithDeliveryOwner(owner, command.CancelRequestId, async () =>
         {
             await using var lease = await authority.AcquireAsync(token); var policy = Candidate();
             return await GuardedTransaction(policy, async (c, tx) =>
@@ -145,6 +159,9 @@ public sealed partial class SqliteApprovalStore : IAbortDeliveryCoordinator
                 return true;
             }, token);
         }, token);
+        cancellationCheckpoint?.Invoke("DeliveryPreflightReturned");
+        return verified;
+    }
     async Task<long> AbortAudit(SqliteConnection c, SqliteTransaction tx, PolicyRequest op, string? approval, long version, long ticks, CancellationToken token)
     {
         Require(Convert.ToInt64(await ApprovalDatabase.Scalar(c, tx, "SELECT count(*) FROM control_audit", token)) < auditCapacity, "AuditCapacityReached");

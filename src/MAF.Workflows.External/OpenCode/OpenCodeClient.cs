@@ -17,6 +17,8 @@ public sealed class OpenCodeClient : IResumableExternalHarnessClient
     private readonly IRuntimeAccess access;
     private readonly HttpClient http;
     private readonly OpenCodeOptions options;
+    private readonly TimeProvider evidenceClock;
+    private readonly bool captureTerminal;
     private readonly ConcurrentDictionary<string, Binding> bindings = new();
     private readonly ConcurrentDictionary<string, int> counts = new();
     private readonly ConcurrentDictionary<string, byte> submitted = new();
@@ -68,8 +70,10 @@ public sealed class OpenCodeClient : IResumableExternalHarnessClient
 
     public OpenCodeClient(HttpClient httpClient, OpenCodeOptions configuration) : this(UnavailableRuntimeAccess.Instance, httpClient, configuration) { }
 
-    internal OpenCodeClient(IRuntimeAccess access, HttpClient httpClient, OpenCodeOptions configuration)
+    internal OpenCodeClient(IRuntimeAccess access, HttpClient httpClient, OpenCodeOptions configuration, TimeProvider? evidenceClock = null)
     {
+        this.evidenceClock = evidenceClock ?? TimeProvider.System;
+        captureTerminal = evidenceClock is not null;
         this.access = access;
         configuration.Validate();
         http = httpClient;
@@ -280,7 +284,7 @@ public sealed class OpenCodeClient : IResumableExternalHarnessClient
             using var effect = access.Enter(ProviderEffect.Observe, handle: handle);
             return await ObserveCoreAsync(handle, cancellationToken);
         }
-        catch (Exception error) when (error is JsonException or InvalidOperationException or KeyNotFoundException or ArgumentException)
+        catch (Exception error) when (error is JsonException or InvalidOperationException or KeyNotFoundException or ArgumentException or FormatException or OverflowException)
         {
             throw new ExternalHarnessException("InvalidProviderShape", true);
         }
@@ -323,10 +327,24 @@ public sealed class OpenCodeClient : IResumableExternalHarnessClient
             return new(ExternalExecutionStatus.Running);
         }
         var info = last.GetProperty("info");
+        ExternalObservation Terminal(ExternalObservation observation, string? finishReason, string? errorCode)
+        {
+            if (!captureTerminal) return observation;
+            var id = String(info, "id");
+            bool Id(string? s) => s is { Length: > 0 and <= 160 } && s.All(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '-' or '.' or ':');
+            bool Code(string? s) => s is null || s.Length is > 0 and <= 80 && s.All(c => char.IsAsciiLetterOrDigit(c) || c == '_');
+            if (!Id(id) || !Code(finishReason) || !Code(errorCode)) return observation;
+            if (observation.Status is ExternalExecutionStatus.Failed or ExternalExecutionStatus.Cancelled && errorCode is null) return observation;
+            if (observation.Status is ExternalExecutionStatus.Completed or ExternalExecutionStatus.Partial
+                && (!info.GetProperty("time").GetProperty("completed").TryGetInt64(out var end)
+                    || end < info.GetProperty("time").GetProperty("created").GetInt64())) return observation;
+            return observation with { TerminalEvidence = new(Provider, Scope, handle.ExternalSessionId!, handle.ExternalRequestId!, id!,
+                String(info, "parentID")!, finishReason, errorCode, observation.Status, evidenceClock.GetUtcNow().UtcTicks) };
+        }
         if (info.TryGetProperty("error", out var error) && error.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined))
         {
-            return new(String(error, "name") == "MessageAbortedError" ? ExternalExecutionStatus.Cancelled : ExternalExecutionStatus.Failed,
-                "Provider confirmed a terminal message error.", "ProviderMessageError");
+            return Terminal(new(String(error, "name") == "MessageAbortedError" ? ExternalExecutionStatus.Cancelled : ExternalExecutionStatus.Failed,
+                "Provider confirmed a terminal message error.", "ProviderMessageError"), null, String(error, "name"));
         }
         if (!info.GetProperty("time").TryGetProperty("completed", out var completed) || completed.ValueKind != JsonValueKind.Number)
         {
@@ -345,9 +363,9 @@ public sealed class OpenCodeClient : IResumableExternalHarnessClient
         {
             text = text[..options.SummaryLimit];
         }
-        return new(finish == "stop" && !string.IsNullOrWhiteSpace(text) && !truncated
+        return Terminal(new(finish == "stop" && !string.IsNullOrWhiteSpace(text) && !truncated
             ? ExternalExecutionStatus.Completed : ExternalExecutionStatus.Partial,
-            text, OutputTruncated: truncated);
+            text, OutputTruncated: truncated), finish, null);
     }
 
     private async Task<(List<JsonElement> Items, bool Truncated)> ReadMessagesAsync(Binding binding, CancellationToken cancellationToken)

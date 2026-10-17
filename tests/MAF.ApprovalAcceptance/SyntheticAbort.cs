@@ -24,7 +24,7 @@ public sealed class SyntheticAbort
         await ApprovalSchema.MigrateV2ToV3Async(F.Runtime.Database, SyntheticApproval.Maintenance, F);
         await ApprovalSchema.MigrateV3ToV4Async(F.Runtime.Database, SyntheticApproval.Maintenance, F);
         await F.Store().ActivatePolicyAsync();
-        using var fake = new RuntimeHttpFixture(F.Runtime.Root) { LoseSubmitResponse = true, Running = true };
+        using var fake = new RuntimeHttpFixture(F.Runtime.Root) { LoseSubmitResponse = true, Running = true, StatePath = F.Runtime.Database + ".provider" };
         using var http = MAF.Workflows.External.ReceiptTransport.ForTests(fake);
         if (emptySession) fake.OnRequest = async (request, _) =>
         {

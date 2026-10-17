@@ -342,6 +342,42 @@ public sealed class AbortDeliveryTests(ITestOutputHelper output) : IDisposable
         await Assert.ThrowsAnyAsync<Exception>(() => f.Store().ReserveAbortAsync(a.Command, a.Inputs, f.Runtime.Caller, owner));
         Assert.Empty(target.Requests); Assert.Equal(0L, await Sql("SELECT count(*) FROM cancellation_deliveries"));
     }
+    [Fact]
+    public async Task OwnerDisposalAfterPreflightMustPreventDispatch()
+    {
+        var a = await Seed(); var f = a.F;
+        IDeliveryOwnership? owner = null;
+        var store = f.Store(point =>
+        {
+            if (point == "DeliveryPreflightReturned") owner!.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        });
+        owner = (await store.TryAcquireDeliveryAsync("cancel-one"))!;
+        await using var cleanup = owner;
+        var ticket = await store.ReserveAbortAsync(a.Command, a.Inputs, f.Runtime.Caller, owner);
+        using var fake = new RuntimeHttpFixture(f.Runtime.Root); using var http = ReceiptTransport.ForTests(fake);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => ProtectedAbortDelivery.DeliverAsync(ticket, http, f.Runtime.Options));
+        output.WriteLine($"Disposed after completed preflight: AbortPOST={fake.Requests.Count(x => x.EndsWith("/abort"))}; ledgerStage={(await store.ReadDeliveryStorageAsync("delivery-one"))!.Stage}");
+        Assert.Empty(fake.Requests);
+        Assert.Equal(0, (await store.ReadDeliveryStorageAsync("delivery-one"))!.Stage);
+    }
+    [Fact]
+    public async Task DisposalWaitsForInFlightOwnedDispatchWithoutSqliteLease()
+    {
+        var a = await Seed(); var f = a.F; var store = f.Store();
+        var owner = (await store.TryAcquireDeliveryAsync("cancel-one"))!;
+        await using var cleanup = owner;
+        var ticket = await store.ReserveAbortAsync(a.Command, a.Inputs, f.Runtime.Caller, owner);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var fake = new RuntimeHttpFixture(f.Runtime.Root);
+        fake.OnRequest = async (_, token) => { entered.SetResult(); await release.Task.WaitAsync(token); };
+        using var http = ReceiptTransport.ForTests(fake);
+        var delivery = ProtectedAbortDelivery.DeliverAsync(ticket, http, f.Runtime.Options);
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5)); var disposal = owner.DisposeAsync().AsTask(); Assert.False(disposal.IsCompleted);
+        f.Policy = f.Policy with { Epoch = new(2), Version = new(2), Rules = [] }; await f.Store().ActivatePolicyAsync();
+        release.SetResult(); await Assert.ThrowsAsync<InvalidOperationException>(() => delivery); await disposal;
+        Assert.Single(fake.Requests); Assert.Equal(0, (await store.ReadDeliveryStorageAsync("delivery-one"))!.Stage);
+    }
     sealed class QuarantineHandler(HttpMessageHandler inner) : DelegatingHandler(inner)
     {
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)

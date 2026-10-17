@@ -20,7 +20,10 @@ public sealed record ExternalExecutionHandle(string ExecutionId, string Provider
     string? ExternalSessionId = null, string? ExternalRequestId = null);
 
 public sealed record ExternalObservation(ExternalExecutionStatus Status, string? Summary = null,
-    string? ErrorCode = null, bool OutputTruncated = false);
+    string? ErrorCode = null, bool OutputTruncated = false)
+{
+    internal MAF.Core.Policy.ObservedTerminal? TerminalEvidence { get; init; }
+}
 
 public sealed record ExternalTraceEvent(string Kind, DateTimeOffset Timestamp);
 

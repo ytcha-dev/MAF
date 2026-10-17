@@ -36,6 +36,7 @@ public static class ProtectedAbortDelivery
                 request.Headers.Authorization = new AuthenticationHeaderValue("Basic",
                     Convert.ToBase64String(Encoding.UTF8.GetBytes((options.Username ?? "opencode") + ":" + password)));
             await continuation.Preflight(budget.Token); // No authority lease or SQL transaction survives this await.
+            await using var dispatchUse = await continuation.DispatchUse(budget.Token);
             cancellation.ThrowIfCancellationRequested();
             stage = "SentUncertain"; diagnostic = "ResponseLost";
             using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, budget.Token);
