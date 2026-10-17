@@ -198,7 +198,7 @@ public sealed partial class SqliteApprovalStore : IApprovalStore, IApprovalTrans
         Require(afterSequence >= 0 && limit is >= 1 and <= 100, "InvalidPageLimit");
         return Transaction<IReadOnlyList<ControlAudit>>(async (c, tx) =>
         {
-            using var cmd = ApprovalDatabase.Command(c, tx, "SELECT sequence,code,actor,task_id,approval_id,version,recorded_at,policy_epoch,policy_version," + (profile == ApprovalStoreProfile.ExplicitV3 ? "cancel_request_id" : "NULL") + " FROM control_audit WHERE sequence>$after ORDER BY sequence LIMIT $limit", ("$after", afterSequence), ("$limit", limit));
+            using var cmd = ApprovalDatabase.Command(c, tx, "SELECT sequence,code,actor,task_id,approval_id,version,recorded_at,policy_epoch,policy_version," + (profile is ApprovalStoreProfile.ExplicitV3 or ApprovalStoreProfile.ExplicitV4 ? "cancel_request_id" : "NULL") + " FROM control_audit WHERE sequence>$after ORDER BY sequence LIMIT $limit", ("$after", afterSequence), ("$limit", limit));
             using var r = await cmd.ExecuteReaderAsync(token); var results = new List<ControlAudit>();
             while (await r.ReadAsync(token)) results.Add(new(r.GetInt64(0), (ControlAuditCode)r.GetInt32(1), r.GetString(2), r.GetString(3), r.IsDBNull(4) ? null : r.GetString(4), r.GetInt64(5), DateTimeOffset.Parse(r.GetString(6), CultureInfo.InvariantCulture), new(r.GetInt64(7)), new(r.GetInt64(8)), r.IsDBNull(9) ? null : r.GetString(9))); return results;
         }, token);
