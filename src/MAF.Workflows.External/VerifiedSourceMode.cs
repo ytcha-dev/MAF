@@ -8,6 +8,9 @@ namespace MAF.Workflows.External;
 internal sealed class VerifiedSourceMode(BoundedSourceReader reader,
     Func<TaskEvidence, CancellationToken, Task<ImmutableArray<SourceCandidate>>> candidates)
 {
+    // Provider path: consume only this observation's candidates. No synthetic callback fallback.
+    internal VerifiedSourceMode(BoundedSourceReader reader)
+        : this(reader, (e, _) => Task.FromResult(e.ExternalResult.SourceCandidates)) { }
     internal async Task<ReviewAssessment> ReviewAsync(TaskEvidence evidence,
         Func<TaskEvidence, CancellationToken, Task<ReviewAssessment>> reviewer, CancellationToken token)
     {

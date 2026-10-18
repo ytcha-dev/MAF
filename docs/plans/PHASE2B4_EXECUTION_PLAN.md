@@ -53,7 +53,7 @@ digest golden, actual protected HTTP counts and filesystem-race limitations. Suf
 source evidence is not semantic correctness or human approval. Historical 4A/4B tests
 and native Git-diff Reviewer remain unchanged. No fifth stage, schema or production mode.
 
-Historical 4C handoff is superseded by 4D and its R1 correction below; proposed 4E remains separately gated.
+Historical 4C handoff is superseded by owner-reviewed 4D/R1 and separately authorized 4E below.
 
 ## Deferred Architecture Decisions
 
@@ -65,11 +65,11 @@ See [4C acceptance](../acceptance/PHASE2B4_C_REVIEWER_EVIDENCE_RESULTS.md).
 | D2 — Provenance versus semantic correctness | Verified snapshots/anchors do not prove the model conclusion | 4D native Reviewer integration and subsequent real-model evaluation |
 | D3 — Filesystem TOCTOU | Observed changes are detected; malicious same-principal race-free isolation is not established | Production source-access security review |
 
-4C is complete. 4D Native Reviewer Integration is the current increment, validated offline and awaiting owner review.
-4E Structured Source Candidate Integration is proposed and separately gated.
+4C is complete. 4D/R1 is owner-reviewed as a controlled technical milestone.
+4E Bounded OpenCode Source Candidate Integration is the current authorized increment.
 D1 and D3 are not implemented in 4D.
 
-## 4D Native Reviewer Integration — current increment
+## 4D Native Reviewer Integration — owner-reviewed controlled milestone
 
 The separately authorized controlled composition injects `NativeEvidenceReviewer` through
 EvidenceReviewer's existing callback. It uses the official ChatClientAgent with a fresh
@@ -81,7 +81,7 @@ source currentness before/after the Agent. No Host activation, provider configur
 new reader, schema, generic framework or persistent parent resume is added.
 
 Final test results are recorded in [4D acceptance](../acceptance/PHASE2B4_D_NATIVE_REVIEWER_RESULTS.md).
-241 focused / 1193 offline tests passed; solution build has 0 warnings/errors. Stop for owner review. D2 is reflected in advisory
+241 focused / 1193 offline tests passed; solution build has 0 warnings/errors (historical 4D evidence). D2 is reflected in advisory
 assessment semantics; real-model semantic accuracy and injection robustness remain unverified.
 
 ## 4D-R1 — actual evidence observation correction
@@ -93,12 +93,21 @@ confirms matching SDK Tool-role results before the next model call. Prompt refer
 empty searches and invalid/over-budget results do not count. Valid JSON with missing
 observations is InsufficientEvidence; protocol/tool failures remain ReviewUnavailable.
 4C independent acquisition and post-Agent source revalidation are unchanged.
-See [R1 results](../acceptance/PHASE2B4_D_R1_REVIEW_OBSERVATION_RESULTS.md): 230 focused / 1206 offline passed; build 0 warnings/errors. Ready for owner acceptance; stop after R1.
+See [R1 results](../acceptance/PHASE2B4_D_R1_REVIEW_OBSERVATION_RESULTS.md): 230 focused / 1206 offline passed; build 0 warnings/errors. Owner-reviewed as a controlled milestone; later 4E authorization follows.
 
-## Proposed 4E handoff — separate authorization required
+## 4E bounded OpenCode source candidate integration — current increment
 
-Bounded Structured Source Candidate Integration may translate untrusted harness output
-into existing candidate fields. Candidates must pass independent 4C exact identity,
-range/anchor and budget checks; model output cannot issue VerifiedSourceEvidence or
-expand tool authority. No 4E extraction, live provider work, D1 persistence or D3 source
-snapshot isolation is implemented or authorized by 4D completion.
+One concrete v1.18.35/v1.19.0 completed read-tool metadata.display shape supplies bounded,
+untrusted path/range/text proposals from existing guarded Observe bytes. No summary parsing,
+local anchor derivation, new requests or prompt changes. A transient JSON-ignored location/
+candidate handoff carries trusted application-created execution binding to the existing
+VerifiedSourceMode without a synthetic candidate callback. The unchanged 4C reader and
+R1 Native Reviewer independently verify and actually observe every required source.
+
+Controlled validation: 315 focused / 1265 offline passed, build 0 warnings/errors; ready for owner architecture review.
+See [4E results](../acceptance/PHASE2B4_E_SOURCE_CANDIDATE_RESULTS.md) for exact fields,
+rejection rules, HTTP counts, recovery/persistence limits and actual validation.
+Candidates are not stored or restored as historical evidence: independent authorized
+Inspect can extract fresh proposals from fresh GETs, never resubmit. No automatic outer
+resume, source persistence, new schema, production trust or live-model proof. D1/D3 remain
+deferred and D2 remains a semantic-quality limitation. Stop after 4E for owner review.

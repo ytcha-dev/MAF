@@ -363,9 +363,13 @@ public sealed class OpenCodeClient : IResumableExternalHarnessClient
         {
             text = text[..options.SummaryLimit];
         }
-        return Terminal(new(finish == "stop" && !string.IsNullOrWhiteSpace(text) && !truncated
-            ? ExternalExecutionStatus.Completed : ExternalExecutionStatus.Partial,
-            text, OutputTruncated: truncated), finish, null);
+        var status = finish == "stop" && !string.IsNullOrWhiteSpace(text) && !truncated
+            ? ExternalExecutionStatus.Completed : ExternalExecutionStatus.Partial;
+        return Terminal(new(status, text, OutputTruncated: truncated)
+        {
+            SourceLocations = status == ExternalExecutionStatus.Completed
+                ? OpenCodeReadSources.Extract(relevant, handle, binding.Root, ServerVersion) : []
+        }, finish, null);
     }
 
     private async Task<(List<JsonElement> Items, bool Truncated)> ReadMessagesAsync(Binding binding, CancellationToken cancellationToken)

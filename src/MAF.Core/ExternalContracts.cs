@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Collections.Immutable;
 
 namespace MAF.Core;
 
@@ -23,6 +24,7 @@ public sealed record ExternalObservation(ExternalExecutionStatus Status, string?
     string? ErrorCode = null, bool OutputTruncated = false)
 {
     internal MAF.Core.Policy.ObservedTerminal? TerminalEvidence { get; init; }
+    [JsonIgnore] public ImmutableArray<UntrustedSourceLocation> SourceLocations { get; init; } = [];
 }
 
 public sealed record ExternalTraceEvent(string Kind, DateTimeOffset Timestamp);
@@ -32,6 +34,8 @@ public sealed record ExternalTaskResult(string TaskId, string WorkflowRunId, Ext
     IReadOnlyList<ExternalTraceEvent> Trace, bool AbortRequested = false, string? ErrorCode = null,
     int Requests = 0, double DurationMilliseconds = 0)
 {
+    // Current observation only, never durable historical evidence or serialized input authority.
+    [JsonIgnore] public ImmutableArray<SourceCandidate> SourceCandidates { get; init; } = [];
     public static JsonSerializerOptions JsonOptions { get; } = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true,

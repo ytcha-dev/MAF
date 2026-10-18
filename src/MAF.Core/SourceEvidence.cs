@@ -7,7 +7,9 @@ using System.Text.Json.Serialization;
 
 namespace MAF.Core;
 
-public enum SourceCandidateOrigin { SyntheticTest }
+public enum SourceCandidateOrigin { SyntheticTest, OpenCodeReadDisplay }
+// Provider proposals only; no execution identity or verification authority comes from these fields.
+public sealed record UntrustedSourceLocation(string RelativePath, int StartLine, int EndLine, string ExpectedAnchor);
 public enum SourceEvidenceStatus { Verified, InvalidCandidate, Missing, Mismatch, Redacted, Changed, LimitExceeded, ClaimUnverified, Unavailable }
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record SourceBinding([property: JsonRequired] string TaskId, [property: JsonRequired] string WorkflowRunId,

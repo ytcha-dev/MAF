@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Collections.Immutable;
 using MAF.Core;
 using MAF.Core.Tools;
 using Microsoft.Agents.AI.Workflows;
@@ -34,6 +35,7 @@ public sealed class OpenCodeExecutor : Executor<ExternalTaskRequest, ExternalTas
         var handle = initialHandle ?? new ExternalExecutionHandle(Guid.NewGuid().ToString("N"), client.Provider);
         var trace = new List<ExternalTraceEvent>();
         var limitations = new List<string>();
+        ImmutableArray<SourceCandidate> candidates = [];
         using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, ownerCancellation);
         budget.CancelAfter(request.Timeout);
         var submitted = recoveryOnly;
@@ -45,7 +47,7 @@ public sealed class OpenCodeExecutor : Executor<ExternalTaskRequest, ExternalTas
             Record(status.ToString());
             return new(request.TaskId, workflowRunId, status, handle, ProjectTools.Redact(summary),
                 limitations.Distinct().ToArray(), trace.ToArray(), abort, errorCode,
-                client.GetRequestCount(request.TaskId), watch.Elapsed.TotalMilliseconds);
+                client.GetRequestCount(request.TaskId), watch.Elapsed.TotalMilliseconds) { SourceCandidates = candidates };
         }
 
         try
@@ -112,6 +114,10 @@ public sealed class OpenCodeExecutor : Executor<ExternalTaskRequest, ExternalTas
                 {
                     limitations.Add("Remote completion is unconfirmed; inspect the existing external session before taking further action.");
                 }
+                if (observation.Status == ExternalExecutionStatus.Completed && !observation.SourceLocations.IsDefaultOrEmpty)
+                    candidates = observation.SourceLocations.Select(s => new SourceCandidate(
+                        new(request.TaskId, workflowRunId, handle.ExecutionId, handle.ExternalSessionId!, handle.ExternalRequestId!),
+                        s.RelativePath, s.StartLine, s.EndLine, s.ExpectedAnchor, SourceCandidateOrigin.OpenCodeReadDisplay)).ToImmutableArray();
                 return Result(observation.Status, observation.Summary ?? "External execution state observed.", observation.ErrorCode);
             }
             throw new OperationCanceledException("Observation limit reached.");

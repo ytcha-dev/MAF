@@ -9,16 +9,14 @@
 
 ## Current development increment and next action
 
-**4C and the 4D controlled baseline are implemented; current corrective increment 4D-R1 evidence observation passed controlled offline validation and awaits owner review.**
-The controlled official PCA → protected OpenCode → Reviewer → HumanGate graph exists;
-this is not a production-capable multi-agent service. See [4C evidence](acceptance/PHASE2B4_C_REVIEWER_EVIDENCE_RESULTS.md)
-and the [execution plan](plans/PHASE2B4_EXECUTION_PLAN.md).
-[4D baseline results](acceptance/PHASE2B4_D_NATIVE_REVIEWER_RESULTS.md): 241 focused / 1193 offline passed; build 0 warnings/errors. [R1 correction](acceptance/PHASE2B4_D_R1_REVIEW_OBSERVATION_RESULTS.md) requires actual per-run tool observation, not known references alone. Stop after R1 for owner review. **4E Structured Source Candidate Integration is proposed,
-separately gated and not implemented.** Production Host activation, M3-C/identity, real multi-agent
-provider integration, durable parent resume and Human Approval UI remain incomplete.
-Phase 2B-3, Phase 2C/Registry and Hybrid are also unfinished. Historical milestone next-actions
-at the end are dated evidence, not current development instructions.
-
+**4D/R1 is owner-reviewed as a controlled technical milestone. Current authorized increment:
+4E bounded OpenCode source candidate integration (controlled technical validation passed; owner architecture review pending).**
+The existing protected Observe response supplies untrusted read-display proposals to 4C
+independent verification and R1 native tool observation. See [4E results](acceptance/PHASE2B4_E_SOURCE_CANDIDATE_RESULTS.md)
+and the [execution plan](plans/PHASE2B4_EXECUTION_PLAN.md). Stop after 4E for owner architecture review.
+Production Host activation, M3-C/identity, real multi-agent provider integration, durable
+parent resume and Human Approval UI remain incomplete. Phase 2B-3, Phase 2C/Registry and
+Hybrid are also unfinished. Historical milestone next-actions at the end are dated evidence.
 ## 1. Vision and operating principles
 
 MAF is a **local-first, extensible orchestration platform** coordinating native agents, existing independent harnesses, and optional knowledge/tools/services. It must **not** recreate OpenCode's coding loop or a general-purpose RAG engine.
@@ -68,7 +66,7 @@ Retain PCA/Reviewer as educational and regression references for `IChatClient` v
 | **Phase 2B-1 — Durable execution** | Recover without duplicate submissions | `IExecutionStore` + SQLite + reconciliation + test-only acceptance runners | Controlled home technical gate passed; same-session/no-extra-POST evidence; corporate clearance separate |
 | **Phase 2B-2 — Policy & approvals** | Trustworthy state / safety transitions | Explicit human approval states; lifecycle cleanup | Pending approvals and cancellation remain honest; default deny |
 | **Phase 2B-3 — Diagnostics & artifacts** | Understand cost, latency, outcome | Correlated trace and trusted provenance | Distinguishable provider calls, model usage where supported, and verified result limits |
-| **Phase 2B-4 — Deterministic multi-agent path** | Join specialists safely | Controlled official PCA → OpenCode → Reviewer → human gate | 4A–4D controlled technical proofs passed; 4D owner review pending, production and writes separately gated |
+| **Phase 2B-4 — Deterministic multi-agent path** | Join specialists safely | Controlled official PCA → OpenCode → Reviewer → human gate | 4A–4D/R1 controlled milestones reviewed; 4E current, production and writes separately gated |
 | **Phase 2C — Connector registry & switches** | Optional integrations safely enabled | Registry + disabled-by-default lifecycle + policy checks | Disabled adapter cannot be listed as available to router or invoked via direct API |
 | Phase 3 — Bounded Hybrid | LLM recommends **only allowed** steps | Planner / router with validated typed decisions | Measurable gain against fixed workflow, no policy escalation |
 | Phase 4 — Ecosystem expansion | Multiple harnesses and protocols when justified | Optional Codex, Claude Code, MCP, A2A, knowledge adapters | Each connector has capability negotiation and contract tests |
@@ -253,14 +251,18 @@ success exists. This proves review-time source observation, not semantic correct
 historical execution-time content or human acceptance. Production trust/live models,
 parent checkpoints, Registry and Hybrid remain separately gated.
 
-**4D Native Reviewer Integration — current increment, controlled validation passed:**
+**4D Native Reviewer Integration / R1 — owner-reviewed controlled milestones:**
 Actual official ChatClientAgent and admitted read/search tools consume 4C snapshots with
 original line numbers; separate scripted PCA/Reviewer clients and per-run Sessions remain
 isolated. Exact typed JSON and post-Agent source currentness guard the advisory result.
 See [4D results](acceptance/PHASE2B4_D_NATIVE_REVIEWER_RESULTS.md). No live-model semantics,
-production activation, parent persistence or human approval is implied. **4E Structured
-Source Candidate Integration is proposed only; owner review and separate authorization
-are required.**
+production activation, parent persistence or human approval is implied. R1 requires successful
+per-run tool observation of every required source reference.
+
+**4E — current controlled integration:** [results](acceptance/PHASE2B4_E_SOURCE_CANDIDATE_RESULTS.md)
+record the concrete versioned read-display shape, independent source acquisition, actual
+native Reviewer/R1 observation and zero additional provider requests. Candidate fields
+are transient untrusted proposals; no new schema or production activation. Stop for owner review.
 ### 2C — Registry MVP
 
 - Start with two known connector IDs: the existing native path and OpenCode. One disabled mock external connector tests disable behavior without external requests.
