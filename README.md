@@ -2,15 +2,19 @@
 
 C# / .NET 10 的兩個獨立 Microsoft Agent Framework Agent，以唯讀工具理解與審查本機程式碼。共用 Console Host，不使用自製 Agent Loop。
 
-已完成 Phase 2A 唯讀 OpenCode Workflow PoC 與 Phase 2B-1 持久化／重啟對帳實作。另行授權的家用 Windows 驗證已涵蓋 build、155 個離線測試、跨程序 SQLite／Host crash，以及 OpenCode 1.19.0 免費模型的 same-session recovery；證據與限制見 [家用驗收](docs/acceptance/PHASE2B1_HOME_RESULTS.md)。這不解除公司端安全事件的 execution hold。原生 PCA／Review 保留為基線；Phase 2B-2 已另行完成 M1／M2-A／M2-B foundation，最新 [M2-B 結果](docs/acceptance/PHASE2B2_M2B_RESULTS.md) 為 347 個離線測試通過；正式 Policy Authority 與人類驗證尚未部署，activation／approval 保持關閉，完整 2B-2 尚未驗收。Phase 2C 未開始，後續依 [Roadmap v0.2](docs/ROADMAP.md)。
+目前增量 **4D Native Reviewer Integration 已通過受控離線技術驗證，待 Owner Review**，承接已完成的 4C。現有能力與驗收邊界：
+
+- **Phase 2A**：[受控 live、唯讀 OpenCode PoC](docs/acceptance/PHASE2A_RESULTS.md)；另有 [2B-1 家用持久化／恢復驗收](docs/acceptance/PHASE2B1_HOME_RESULTS.md)，不代表公司端安全相容性 clearance。
+- **M3／M4**：受控 protected execution、durable recovery、synthetic Approval/Resume 與取消／對帳技術證明，見 [M4-C](docs/acceptance/PHASE2B2_M4_C_RESULTS.md)。
+- **4A／4B／4C**：官方 deterministic typed Workflow、protected child runtime + fake HTTP，以及獨立有界來源 provenance，見 [4A](docs/acceptance/PHASE2B4_A_TYPED_HANDOFF_RESULTS.md)、[4B](docs/acceptance/PHASE2B4_B_PROTECTED_HANDOFF_RESULTS.md)、[4C](docs/acceptance/PHASE2B4_C_REVIEWER_EVIDENCE_RESULTS.md)。
+
+- **4D**：實際官方 Native Reviewer Agent 讀取 4C 快照、嚴格驗證 typed assessment；scripted ChatClient／fake HTTP 驗證通過，見 [4D 結果](docs/acceptance/PHASE2B4_D_NATIVE_REVIEWER_RESULTS.md)。
+
+**尚未完成**：正式多 Agent Host 入口、production identity／M3-C、真實多 Agent provider 協作、外層 Workflow durable resume、Human Approval UI。Host external-task／recover／recover-pending 仍拒絕 `ProductionTrustUnavailable`，無 legacy fallback。獨立原生 PCA／Git-diff Review 可用，但不代表已納入 production policy 保護。Phase 2B-3、2C／Registry 與 Hybrid 未完成。
+
+目前建議下一步與各階段邊界集中在 [Roadmap](docs/ROADMAP.md)；4E 需要 Owner Review 與另外授權。
 
 ## 系統用途
-
-M3-A2c 已完成受控 synthetic runtime 的 admission → 官方 Workflow → provider-effect enforcement；[驗收結果](docs/acceptance/PHASE2B2_M3_A2C_RESULTS.md) 為 37 focused／530 offline 通過。**相容性變更：Host 的 external-task／recover／recover-pending 現在拒絕 `ProductionTrustUnavailable`；公開 raw client、Workflow、durable service、executor 缺受保護 context 時 fail closed。** 沒有 production trust、unsafe opt-out 或舊路徑 fallback。PCA／Reviewer 是另外的原生基線，尚未受這套 policy 保護。正式 activation、人類 Approval/Resume 與取消派送仍未啟用。
-
-[M3-B1](docs/acceptance/PHASE2B2_M3_B1_RESULTS.md) 已加入獨立、非執行性的 durable approval request/decision application，30 focused／560 offline 通過。Synthetic Approve/Reject 只保存決定，不啟動 Workflow；Resume 不屬於 B1，production human authentication 尚未部署。
-
-[M3-B2](docs/acceptance/PHASE2B2_M3_B2_RESULTS.md) 另行完成 synthetic Explicit Resume，44 focused／604 offline 通過。RequireApproval 保留，只有原子 Consume+Created 後、綁定當次 owner 的證據能接入 effect guard；重啟僅能 Inspect/recover。Production human authentication／Broker／Abort delivery 仍未啟用。
 
 PCA 讓你指定一個本機專案，以繁體中文提問，取得結合實際程式碼與檔案行號的說明。
 
@@ -23,7 +27,7 @@ PCA 讓你指定一個本機專案，以繁體中文提問，取得結合實際�
 
 執行流程為：CLI 接收問題 → 官方 MAF Agent 決定呼叫工具 → 工具在指定根目錄讀取並過濾內容 → 模型根據工具證據回答。連續問題共用同一個記憶體 Session，結束程序後不保留對話。
 
-Agents 不會修改目標專案、執行任意 shell／建置／測試，也不提供 Web UI、長期記憶或多 Agent 協作。
+Agents 不會修改目標專案、執行任意 shell／建置／測試，也不提供 Web UI、長期記憶或正式多 Agent 執行入口；受控多 Agent Workflow 的邊界見上述驗收。
 
 ## 啟動
 
@@ -172,7 +176,7 @@ Phase 1 歷史驗收見 [TEST_RESULTS.md](TEST_RESULTS.md)：當時 22／22 測�
 
 ## Phase 2A — OpenCode 外部 Workflow
 
-以下是歷史 PoC／2B-1 操作說明。M3-A2c 起，這些 Host external CLI 命令已停用，不能用環境變數恢復；live acceptance helpers 亦不能繞過新 guard。受控測試透過 `ProtectedExternalRuntime`、明確 v2 store、test-only trust 與 fake HTTP 執行，不連線真實 OpenCode。
+以下是歷史 PoC／2B-1 操作說明。M3-A2c 起，這些 Host external CLI 命令已停用，不能用環境變數恢復；live acceptance helpers 亦不能繞過新 guard。受控測試透過 `ProtectedExternalRuntime`、明確版本 store（4B–4D 為 v4）、test-only trust 與 fake HTTP 執行，不連線真實 OpenCode。
 
 執行路徑為 **官方 MAF Workflow → OpenCodeExecutor → OpenCode Server**。這個模式不呼叫 PCA／Review，不需要 Host 的模型設定；模型由 OpenCode 配置。使用者須自行啟動或明確授權啟動 server。本機原生 CLI 範例：`opencode serve --hostname 127.0.0.1 --port 4096`；本公司環境請使用原生 executable，不執行 `.ps1` shim。
 

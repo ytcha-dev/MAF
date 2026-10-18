@@ -1,11 +1,23 @@
 # MAF — Product & Engineering Roadmap
 
-> **Proposed v0.2** · 2026-10-15 · Project: `ytcha-dev/MAF`  
-> **Status:** Proposal for owner review, not an implementation authorization  
+> **Roadmap v0.2 — current status aligned 2026-10-18** · original proposal 2026-10-15 · Project: `ytcha-dev/MAF`
+> **Status:** Controlled implementation evidence below; future stages still require owner authorization
 > **Decision retained:** deterministic Workflow-first (A), then bounded Hybrid orchestration (C).  
 > **Deployment preference:** company-local / offline-capable first; portability and optional remote access later, subject to organizational authorization.
 
 > **Architecture guardrails:** [Seven ownership boundaries and delivery discipline](architecture/ARCHITECTURE_GUARDRAILS.md). These are design constraints, not claims of implemented enforcement.
+
+## Current development increment and next action
+
+**4C completed; current increment 4D Native Reviewer Integration passed controlled offline validation and awaits owner review.**
+The controlled official PCA → protected OpenCode → Reviewer → HumanGate graph exists;
+this is not a production-capable multi-agent service. See [4C evidence](acceptance/PHASE2B4_C_REVIEWER_EVIDENCE_RESULTS.md)
+and the [execution plan](plans/PHASE2B4_EXECUTION_PLAN.md).
+[4D results](acceptance/PHASE2B4_D_NATIVE_REVIEWER_RESULTS.md): 241 focused / 1193 offline passed; build 0 warnings/errors. Stop for owner review. **4E Structured Source Candidate Integration is proposed,
+separately gated and not implemented.** Production Host activation, M3-C/identity, real multi-agent
+provider integration, durable parent resume and Human Approval UI remain incomplete.
+Phase 2B-3, Phase 2C/Registry and Hybrid are also unfinished. Historical milestone next-actions
+at the end are dated evidence, not current development instructions.
 
 ## 1. Vision and operating principles
 
@@ -28,13 +40,13 @@ Existing modules:
 - Native PCA (Comprehension) and separate Review service.
 - `MAF.Workflows.External`: official custom Workflow executor and OpenCode API client, read-only and bounded.
 
-**Not yet delivered:** an operator approval interface, authorized write execution, PCA → external harness → Reviewer as one automatic workflow, a connector registry/activation switch, a remote gateway, Hybrid LLM routing, additional production harness adapters, A2A integration. Durable cross-process state and same-session recovery are implemented and have controlled home acceptance evidence below. Registry rules remain target requirements; current execution uses explicit approved endpoint/workspace configuration and read-only provider checks.
+**Not yet delivered:** an operator approval interface, authorized write execution, a production-capable PCA → external harness → Reviewer entrypoint, a connector registry/activation switch, a remote gateway, Hybrid LLM routing, additional production harness adapters, A2A integration. Durable cross-process state and same-session recovery are implemented and have controlled home acceptance evidence below. Registry rules remain target requirements; current execution uses explicit approved endpoint/workspace configuration and read-only provider checks.
 
 Known observations: long-running tasks may generate hundreds of HTTP observations; current OpenCode permission cancellation can leave a pending permission even after abort acknowledgment; completed execution does not guarantee accurate repository analysis.
 
-Current boundaries: ephemeral mode keeps in-memory run mapping/single-flight (100 retained identities, default concurrency 2). Opt-in durable mode adds SQLite identity/state and same-machine, same-DB-path OS ownership; copying/changing the DB does not deduplicate. The provider remains loopback-only with explicit HTTP opt-in, one approved root and read-only permissions; no automatic permission/question replies. Timeout and remote cancellation differ; abort acknowledgment is not terminal evidence. Harness permissions are not an OS sandbox; redaction is best effort. See [ADR-003](architecture/ADR-003_OPENCODE_WORKFLOW_EXECUTOR.md) and [ADR-004](architecture/ADR-004_DURABLE_EXECUTION_RECOVERY.md).
+Historical Phase 2A/2B-1 boundaries (current Host external modes fail closed pending production trust): ephemeral mode keeps in-memory run mapping/single-flight (100 retained identities, default concurrency 2). Opt-in durable mode adds SQLite identity/state and same-machine, same-DB-path OS ownership; copying/changing the DB does not deduplicate. The provider remains loopback-only with explicit HTTP opt-in, one approved root and read-only permissions; no automatic permission/question replies. Timeout and remote cancellation differ; abort acknowledgment is not terminal evidence. Harness permissions are not an OS sandbox; redaction is best effort. See [ADR-003](architecture/ADR-003_OPENCODE_WORKFLOW_EXECUTOR.md) and [ADR-004](architecture/ADR-004_DURABLE_EXECUTION_RECOVERY.md).
 
-Phase 2B-1 home acceptance (2026-10-15): the separately authorized personal environment passed build, 43 focused tests, 155 offline regression cases, six cross-process SQLite checkpoints, seven actual Host-crash fake-provider variants and three live OpenCode 1.19.0 / opencode/big-pickle variants. Same run/execution/session/message IDs survive recovery; each live variant has session/prompt POST counts 1/1 and unchanged source/index/status. See [home results and reliability limits](acceptance/PHASE2B1_HOME_RESULTS.md). This satisfies the bounded home technical gate, not production readiness or corporate compatibility. The [corporate security event](acceptance/PHASE2B1_SECURITY_EVENT.md) and [historical pending results](acceptance/PHASE2B1_RESULTS.md) remain unchanged; corporate execution hold requires its own clearance. Do not advance automatically to Phase 2B-2 or Phase 2C.
+Phase 2B-1 home acceptance (2026-10-15): the separately authorized personal environment passed build, 43 focused tests, 155 offline regression cases, six cross-process SQLite checkpoints, seven actual Host-crash fake-provider variants and three live OpenCode 1.19.0 / opencode/big-pickle variants. Same run/execution/session/message IDs survive recovery; each live variant has session/prompt POST counts 1/1 and unchanged source/index/status. See [home results and reliability limits](acceptance/PHASE2B1_HOME_RESULTS.md). This satisfies the bounded home technical gate, not production readiness or corporate compatibility. The [corporate security event](acceptance/PHASE2B1_SECURITY_EVENT.md) and [historical pending results](acceptance/PHASE2B1_RESULTS.md) remain unchanged; corporate execution hold requires its own clearance. This historical gate did not authorize later phases; subsequent controlled increments are recorded below.
 
 The [Windows setup](setup/WINDOWS_VALIDATION_SETUP.md) and [original home validation sequence](acceptance/PHASE2B1_HOME_VALIDATION_PLAN.md) retain the preparation-time Pending statuses and runner specifications. Actual home evidence now exists in [PHASE2B1_HOME_RESULTS](acceptance/PHASE2B1_HOME_RESULTS.md), with reproducible [test-only runners](../tests/MAF.Acceptance/README.md). Neither the preparation nor home results authorize corporate material transfer or lift the corporate execution hold.
 
@@ -56,7 +68,7 @@ Retain PCA/Reviewer as educational and regression references for `IChatClient` v
 | **Phase 2B-1 — Durable execution** | Recover without duplicate submissions | `IExecutionStore` + SQLite + reconciliation + test-only acceptance runners | Controlled home technical gate passed; same-session/no-extra-POST evidence; corporate clearance separate |
 | **Phase 2B-2 — Policy & approvals** | Trustworthy state / safety transitions | Explicit human approval states; lifecycle cleanup | Pending approvals and cancellation remain honest; default deny |
 | **Phase 2B-3 — Diagnostics & artifacts** | Understand cost, latency, outcome | Correlated trace and trusted provenance | Distinguishable provider calls, model usage where supported, and verified result limits |
-| **Phase 2B-4 — Deterministic multi-agent path** | Join specialists safely | PCA → OpenCode → Reviewer → human gate | Typed handoff and failure boundaries; first read-only, write pilot separately approved |
+| **Phase 2B-4 — Deterministic multi-agent path** | Join specialists safely | Controlled official PCA → OpenCode → Reviewer → human gate | 4A–4D controlled technical proofs passed; 4D owner review pending, production and writes separately gated |
 | **Phase 2C — Connector registry & switches** | Optional integrations safely enabled | Registry + disabled-by-default lifecycle + policy checks | Disabled adapter cannot be listed as available to router or invoked via direct API |
 | Phase 3 — Bounded Hybrid | LLM recommends **only allowed** steps | Planner / router with validated typed decisions | Measurable gain against fixed workflow, no policy escalation |
 | Phase 4 — Ecosystem expansion | Multiple harnesses and protocols when justified | Optional Codex, Claude Code, MCP, A2A, knowledge adapters | Each connector has capability negotiation and contract tests |
@@ -66,7 +78,7 @@ Stages are **outcome gates**, not fixed deadlines. Phase 2C is a logical milesto
 
 ## 4. Target architecture
 
-This diagram includes **unimplemented target components**: registry, runtime approval gates and optional ingress. The local execution store is implemented; protected v2 runtime integration is pending. Local-first/offline-capable is a deployment goal, not evidence that the configured OpenCode model is local or that current tasks work without network access.
+This diagram includes **unimplemented target components**: Registry, operational approval gates and optional ingress. Local v1–v4 storage and controlled protected runtime integration are implemented. Production Host activation and trustworthy human approval remain unavailable. The controlled typed graph is implemented; Registry and operational approval UI in this target diagram are not. Local-first/offline-capable is a deployment goal, not evidence that the configured OpenCode model is local or that current tasks work without network access.
 
 ```mermaid
 flowchart TB
@@ -185,6 +197,8 @@ This is a future conceptual registry example, **not** an existing `appsettings.j
 
 ### 2B-2 — Approval and cancellation semantics
 
+Historical design/M1/M2 snapshots below retain their then-current limitations and counts. Later controlled M3/M4 proofs are indexed in the historical implementation milestones; production identity/activation and full-phase acceptance remain incomplete.
+
 Architecture/planning only (2026-10-16): [ADR-005](architecture/ADR-005_POLICY_APPROVAL_CANCELLATION.md), [execution plan](plans/PHASE2B2_EXECUTION_PLAN.md) and [acceptance plan](acceptance/PHASE2B2_ACCEPTANCE_PLAN.md) propose default-deny MAF task authorization, durable exact-scope human decisions and cancellation reconciliation. MAF approval does not grant OpenCode internal tool permissions; approval resume first revalidates current policy/control/provider state and never resubmits an existing execution. These documents do not implement Phase 2B-2 or authorize runtime work; operator trust and schema migration decisions require owner review before implementation.
 
 M1 baseline: independent Core policy contracts, immutable snapshot evaluator, trusted-context interface and versioned canonical binding are implemented; 98 focused cases and 253 offline cases passed ([M1 results](acceptance/PHASE2B2_M1_RESULTS.md)). The evaluator remains outside submission/recovery and supplies no production authentication or approval bypass. Subsequent persistence progress and remaining runtime gates follow.
@@ -239,6 +253,14 @@ success exists. This proves review-time source observation, not semantic correct
 historical execution-time content or human acceptance. Production trust/live models,
 parent checkpoints, Registry and Hybrid remain separately gated.
 
+**4D Native Reviewer Integration — current increment, controlled validation passed:**
+Actual official ChatClientAgent and admitted read/search tools consume 4C snapshots with
+original line numbers; separate scripted PCA/Reviewer clients and per-run Sessions remain
+isolated. Exact typed JSON and post-Agent source currentness guard the advisory result.
+See [4D results](acceptance/PHASE2B4_D_NATIVE_REVIEWER_RESULTS.md). No live-model semantics,
+production activation, parent persistence or human approval is implied. **4E Structured
+Source Candidate Integration is proposed only; owner review and separate authorization
+are required.**
 ### 2C — Registry MVP
 
 - Start with two known connector IDs: the existing native path and OpenCode. One disabled mock external connector tests disable behavior without external requests.
@@ -291,12 +313,12 @@ ADR-001/002 are decision-log entries; no standalone files currently exist. ADR-0
 **Actual ADR index (supersedes the old proposed numbering):**
 
 - [ADR-004](architecture/ADR-004_DURABLE_EXECUTION_RECOVERY.md) — implemented local-first durable execution and reconciliation boundary.
-- [ADR-005](architecture/ADR-005_POLICY_APPROVAL_CANCELLATION.md) — policy, human approval and cancellation design; M1/M2-A/M2-B foundation exists, production trust and runtime enforcement do not.
+- [ADR-005](architecture/ADR-005_POLICY_APPROVAL_CANCELLATION.md) — policy, human approval and cancellation design; foundation plus controlled M3/M4 runtime enforcement exists; production trust and operational activation do not.
 - [ADR-006](architecture/ADR-006_TRUSTED_BROKER_BOUNDARY.md) — **adopted for architecture planning only**: replaceable trusted policy/approval authority, with an isolated Broker as a future deployment option. No Broker or production approval activation is implemented. Connector lifecycle and remote ingress ADRs need new numbers if separately proposed.
 
-**M3-0 documentation instructions:** Read the [M3 architecture gate](plans/PHASE2B2_M3_ARCHITECTURE_GATE.md) and verify actual code-level call paths before proposing runtime interfaces. Keep this roadmap a stage-level index; record detailed trust choices, verification gaps and gate decisions in the dedicated plan/ADR. Do not authorize M3-A, Broker deployment, live provider execution or production approval through a docs-only commit.
+**Historical M3-0 documentation instructions (superseded by the increments below):** Read the [M3 architecture gate](plans/PHASE2B2_M3_ARCHITECTURE_GATE.md) and verify actual code-level call paths before proposing runtime interfaces. Keep this roadmap a stage-level index; record detailed trust choices, verification gaps and gate decisions in the dedicated plan/ADR. Do not authorize M3-A, Broker deployment, live provider execution or production approval through a docs-only commit.
 
-### Immediate next action
+### Historical implementation milestones and then-current next actions
 
 **M3-0 is accepted; separately authorized M3-A1, M3-A2a, M3-A2b and M3-A2c increments are complete.** [A2b](acceptance/PHASE2B2_M3_A2B_RESULTS.md) provides atomic Allow admission and owner-bound continuation. [A2c](acceptance/PHASE2B2_M3_A2C_RESULTS.md) connects controlled synthetic admission to the existing official Workflow and mandatory provider-effect guards (37 focused / 530 offline passed). Public external/raw entrypoints fail closed without protected context; Host external modes are disabled because production trust is unavailable. Ephemeral/batch/list/Abort are denied; native PCA/Reviewer remain separate unprotected routes. Explicit-only activation is preserved. Production Broker/identity, human approval/resume and cancellation delivery remain disabled. M3-B/M3-C/M4 require separate owner authorization; do not proceed automatically.
 

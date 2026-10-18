@@ -39,14 +39,14 @@ public sealed class SyntheticProtectedHandoff : IDisposable
     }
     internal ControlledHandoffWorkflow Flow(ProtectedExternalRuntime? runtime = null, ITrustedCallerContext? caller = null,
         ExternalAdmissionMode mode = ExternalAdmissionMode.Submit, Action? handoff = null, ExternalExecutionHandle? expected = null,
-        VerifiedSourceMode? sources = null)
+        VerifiedSourceMode? sources = null, Func<TaskEvidence, CancellationToken, Task<ReviewAssessment>>? reviewer = null)
     {
         var original = F.Runtime.Request; var input = F.Runtime.Inputs;
         expected ??= input.PreparedHandle;
         Adapter = new(runtime ?? F.Protected(Http), caller ?? F.Runtime.Caller, original, input.NewWorkflowRunId, expected, mode)
         { BeforeHandoff = handoff };
         return new(new TaskBriefingAdapter(new Chat(this), new ProjectTools(F.Runtime.Root)),
-            _ => PolicyOutcome.Allow, Adapter, Review, expected, TimeProvider.System, sources);
+            _ => PolicyOutcome.Allow, Adapter, reviewer ?? Review, expected, TimeProvider.System, sources);
     }
     Task<ReviewAssessment> Review(TaskEvidence evidence, CancellationToken token)
     {

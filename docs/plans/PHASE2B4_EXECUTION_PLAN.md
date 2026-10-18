@@ -53,7 +53,44 @@ digest golden, actual protected HTTP counts and filesystem-race limitations. Suf
 source evidence is not semantic correctness or human approval. Historical 4A/4B tests
 and native Git-diff Reviewer remain unchanged. No fifth stage, schema or production mode.
 
-Next proposed narrow step requires owner review of those evidence semantics, followed
+Historical 4C handoff (superseded by the separately authorized 4D below): owner review of evidence semantics, followed
 only if separately authorized by a bounded structured candidate extraction contract.
 Persistent parent-stage recovery, real semantic models and production trust each need
 their own future authorization; none is silently added here.
+
+## Deferred Architecture Decisions
+
+See [4C acceptance](../acceptance/PHASE2B4_C_REVIEWER_EVIDENCE_RESULTS.md).
+
+| Decision | Current boundary | Future trigger |
+| --- | --- | --- |
+| D1 — VerifiedSourceEvidence persistence/rehydration | Reader-issued evidence is output-only; arbitrary JSON cannot restore trust | Durable outer Workflow checkpoint/recovery |
+| D2 — Provenance versus semantic correctness | Verified snapshots/anchors do not prove the model conclusion | 4D native Reviewer integration and subsequent real-model evaluation |
+| D3 — Filesystem TOCTOU | Observed changes are detected; malicious same-principal race-free isolation is not established | Production source-access security review |
+
+4C is complete. 4D Native Reviewer Integration is the current increment, validated offline and awaiting owner review.
+4E Structured Source Candidate Integration is proposed and separately gated.
+D1 and D3 are not implemented in 4D.
+
+## 4D Native Reviewer Integration — current increment
+
+The separately authorized controlled composition injects `NativeEvidenceReviewer` through
+EvidenceReviewer's existing callback. It uses the official ChatClientAgent with a fresh
+Session and separate scripted client; tools read/search only admitted immutable 4C
+snapshots, retaining original line numbers. Strict bounded JSON remains advisory and
+cannot grant execution or human approval. Existing Git-diff ReviewService is unchanged.
+The real protected child and original identities remain intact; 4C independently checks
+source currentness before/after the Agent. No Host activation, provider configuration,
+new reader, schema, generic framework or persistent parent resume is added.
+
+Final test results are recorded in [4D acceptance](../acceptance/PHASE2B4_D_NATIVE_REVIEWER_RESULTS.md).
+241 focused / 1193 offline tests passed; solution build has 0 warnings/errors. Stop for owner review. D2 is reflected in advisory
+assessment semantics; real-model semantic accuracy and injection robustness remain unverified.
+
+## Proposed 4E handoff — separate authorization required
+
+Bounded Structured Source Candidate Integration may translate untrusted harness output
+into existing candidate fields. Candidates must pass independent 4C exact identity,
+range/anchor and budget checks; model output cannot issue VerifiedSourceEvidence or
+expand tool authority. No 4E extraction, live provider work, D1 persistence or D3 source
+snapshot isolation is implemented or authorized by 4D completion.
