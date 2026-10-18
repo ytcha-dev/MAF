@@ -53,10 +53,7 @@ digest golden, actual protected HTTP counts and filesystem-race limitations. Suf
 source evidence is not semantic correctness or human approval. Historical 4A/4B tests
 and native Git-diff Reviewer remain unchanged. No fifth stage, schema or production mode.
 
-Historical 4C handoff (superseded by the separately authorized 4D below): owner review of evidence semantics, followed
-only if separately authorized by a bounded structured candidate extraction contract.
-Persistent parent-stage recovery, real semantic models and production trust each need
-their own future authorization; none is silently added here.
+Historical 4C handoff is superseded by 4D and its R1 correction below; proposed 4E remains separately gated.
 
 ## Deferred Architecture Decisions
 
@@ -86,6 +83,17 @@ new reader, schema, generic framework or persistent parent resume is added.
 Final test results are recorded in [4D acceptance](../acceptance/PHASE2B4_D_NATIVE_REVIEWER_RESULTS.md).
 241 focused / 1193 offline tests passed; solution build has 0 warnings/errors. Stop for owner review. D2 is reflected in advisory
 assessment semantics; real-model semantic accuracy and injection robustness remain unverified.
+
+## 4D-R1 — actual evidence observation correction
+
+SufficientEvidence requires every admitted reference to have successfully returned real
+source content through registered ReadEvidence or a matching SearchEvidence result.
+The per-run context records only bounded successful outputs; the existing client observer
+confirms matching SDK Tool-role results before the next model call. Prompt references,
+empty searches and invalid/over-budget results do not count. Valid JSON with missing
+observations is InsufficientEvidence; protocol/tool failures remain ReviewUnavailable.
+4C independent acquisition and post-Agent source revalidation are unchanged.
+See [R1 results](../acceptance/PHASE2B4_D_R1_REVIEW_OBSERVATION_RESULTS.md): 230 focused / 1206 offline passed; build 0 warnings/errors. Ready for owner acceptance; stop after R1.
 
 ## Proposed 4E handoff — separate authorization required
 

@@ -185,7 +185,133 @@ public sealed class NativeEvidenceReviewerTests(ITestOutputHelper output) : IDis
         Assert.All(client.InitialPrompts, p => Assert.DoesNotContain("FunctionResult", p));
     }
 
-    static string Report(string reference) => JsonSerializer.Serialize(new { status = "SufficientEvidence", summary = "Available observations support the bounded conclusion.", evidenceReferences = new[] { reference }, limitations = Array.Empty<string>() });
+    [Theory]
+    [InlineData("no-tool", false, EvidenceAssessmentStatus.InsufficientEvidence)]
+    [InlineData("partial", true, EvidenceAssessmentStatus.InsufficientEvidence)]
+    [InlineData("complete", true, EvidenceAssessmentStatus.SufficientEvidence)]
+    [InlineData("search", false, EvidenceAssessmentStatus.SufficientEvidence)]
+    [InlineData("search-partial", true, EvidenceAssessmentStatus.InsufficientEvidence)]
+    [InlineData("search-all", true, EvidenceAssessmentStatus.SufficientEvidence)]
+    [InlineData("empty-search", false, EvidenceAssessmentStatus.InsufficientEvidence)]
+    [InlineData("invalid-search", false, EvidenceAssessmentStatus.ReviewUnavailable)]
+    [InlineData("invalid-range", false, EvidenceAssessmentStatus.ReviewUnavailable)]
+    [InlineData("invented-reference", false, EvidenceAssessmentStatus.ReviewUnavailable)]
+    [InlineData("unsupported-tool", false, EvidenceAssessmentStatus.ReviewUnavailable)]
+    [InlineData("output-budget", true, EvidenceAssessmentStatus.ReviewUnavailable)]
+    public async Task SufficientAssessmentRequiresActualToolObservation(string variant, bool twoSources, EvidenceAssessmentStatus expected)
+    {
+        using var f = await Fixture();
+        if (variant == "output-budget") Source(f, new string('a', 4500));
+        if (twoSources) File.WriteAllText(Path.Combine(f.F.Runtime.Root, "Second.cs"), string.Join('\n',
+            Enumerable.Repeat("// padding", 119).Concat(new[] { variant == "output-budget" ? new string('b', 4500) : "return 99;", "// end" })));
+        var mode = new VerifiedSourceMode(new(f.F.Runtime.Root, f.F.Clock), (e, _) => Task.FromResult<ImmutableArray<SourceCandidate>>(
+            (twoSources ? new[] { "Example.cs", "Second.cs" } : new[] { "Example.cs" }).Select(path =>
+                new SourceCandidate(BoundedSourceReader.Binding(e), path, 120, 121, "// end", SourceCandidateOrigin.SyntheticTest)).ToImmutableArray()));
+        using var client = new ObservationScript(variant);
+        var run = await f.Flow(sources: mode, reviewer: new NativeEvidenceReviewer(client).ReviewAsync).RunAsync(f.Task);
+        Assert.Equal(expected, run.Outcome.Review!.Status);
+        Assert.Equal(expected == EvidenceAssessmentStatus.SufficientEvidence ? HumanGateStatus.ReadyForHumanReview : HumanGateStatus.NeedsHumanReview, run.Outcome.HumanGate);
+        Assert.Equal(twoSources ? 2 : 1, run.Outcome.Review.Sources!.Admitted.Length);
+        Assert.Equal(variant is "no-tool" or "unsupported-tool" ? 1 : 2, client.Calls);
+        if (variant is "complete" or "search-all")
+        { Assert.Contains("Example.cs:120: return 42;", client.ToolEvidence); Assert.Contains("Second.cs:120: return 99;", client.ToolEvidence); }
+        if (variant == "search") Assert.Contains("Example.cs:120: return 42;", client.ToolEvidence);
+        if (variant is "partial" or "search-partial") Assert.DoesNotContain("Second.cs:", client.ToolEvidence);
+        if (variant == "empty-search") Assert.DoesNotContain("Example.cs:", client.ToolEvidence);
+        if (variant == "output-budget")
+        { Assert.Contains("Evidence output budget exhausted.", client.ToolEvidence); Assert.DoesNotContain("Second.cs:", client.ToolEvidence); }
+        Assert.Equal(ExternalExecutionStatus.Completed, run.Outcome.ExternalResult!.Status);
+        Assert.Equal(DurableExecutionState.Completed, (await f.F.Executions.GetAsync(f.Task.TaskId))!.State);
+        Assert.Equal(SessionReceiptStatus.Verified, (await f.F.Store().GetSessionReceiptAsync(f.Task.TaskId))!.Status);
+        Assert.Equal(new[] { 1, 1, 9, 0 }, Counts(f));
+        output.WriteLine($"{variant}: admitted={run.Outcome.Review.Sources.Admitted.Length}; result={run.Outcome.Review.Status}; gate={run.Outcome.HumanGate}; model calls={client.Calls}; Create/Prompt/GET/Abort=1/1/9/0");
+        if (variant != "output-budget") output.WriteLine("SDK tool results received by model=" + client.ToolEvidence);
+    }
+
+    [Fact]
+    public async Task ConcurrentObservationStateCannotAuthorizeAnotherRunWithTheSameReference()
+    {
+        using var f = await Fixture("observed"); using var g = await Fixture("unobserved");
+        // Identical paths/content yield the SAME digest references even across independent roots.
+        using var client = new IsolatedObservationScript(); var reviewer = new NativeEvidenceReviewer(client);
+        var runs = await Task.WhenAll(f.Flow(sources: Mode(f), reviewer: reviewer.ReviewAsync).RunAsync(f.Task),
+            g.Flow(sources: Mode(g), reviewer: reviewer.ReviewAsync).RunAsync(g.Task));
+        Assert.Equal(2, client.InitialCalls); Assert.Equal(1, client.DeliveredCalls);
+        Assert.Single(client.References.Distinct());
+        Assert.Single(runs, r => r.Outcome.Review!.Status == EvidenceAssessmentStatus.SufficientEvidence);
+        Assert.Single(runs, r => r.Outcome.Review!.Status == EvidenceAssessmentStatus.InsufficientEvidence);
+        Assert.Single(runs, r => r.Outcome.HumanGate == HumanGateStatus.ReadyForHumanReview);
+        Assert.Single(runs, r => r.Outcome.HumanGate == HumanGateStatus.NeedsHumanReview);
+        Assert.Equal(new[] { 1, 1, 9, 0 }, Counts(f)); Assert.Equal(new[] { 1, 1, 9, 0 }, Counts(g));
+    }
+
+    sealed class IsolatedObservationScript : IChatClient
+    {
+        readonly TaskCompletionSource bothStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        readonly TaskCompletionSource delivered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public readonly System.Collections.Concurrent.ConcurrentBag<string> References = [];
+        public int InitialCalls, DeliveredCalls;
+        public async Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            var list = messages.ToArray(); var reference = Extract(list);
+            if (list.Any(m => m.Role == ChatRole.Tool && m.Contents.OfType<FunctionResultContent>().Any()))
+            {
+                Assert.Contains("Example.cs:120: return 42;", string.Join('\n', list.SelectMany(m => m.Contents).OfType<FunctionResultContent>().Select(r => r.Result?.ToString())));
+                Interlocked.Increment(ref DeliveredCalls); delivered.SetResult(); await bothStarted.Task.WaitAsync(cancellationToken);
+                return new(new ChatMessage(ChatRole.Assistant, Report(reference)));
+            }
+            References.Add(reference);
+            if (Interlocked.Increment(ref InitialCalls) == 1)
+                return new(new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("read", "ReadEvidence",
+                    new Dictionary<string, object?> { ["reference"] = reference, ["startLine"] = 120, ["endLine"] = 120 })]));
+            bothStarted.SetResult(); await delivered.Task.WaitAsync(cancellationToken);
+            return new(new ChatMessage(ChatRole.Assistant, Report(reference))); // Correct ref, but never observed by THIS run.
+        }
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default) { await Task.CompletedTask; yield break; }
+        public object? GetService(Type type, object? key = null) => null;
+        public void Dispose() { }
+    }
+
+    sealed class ObservationScript(string variant) : IChatClient
+    {
+        public int Calls; public string ToolEvidence = "";
+        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            Calls++; var list = messages.ToArray(); var refs = ExtractAll(list);
+            if (Calls == 1 && variant != "no-tool")
+            {
+                FunctionCallContent Read(string id, string reference, int start = 120) => new(id,
+                    variant == "unsupported-tool" ? "Shell" : "ReadEvidence",
+                    new Dictionary<string, object?> { ["reference"] = reference, ["startLine"] = start, ["endLine"] = 120 });
+                AIContent[] calls = variant switch
+                {
+                    "complete" => refs.Select((r, i) => Read("read" + i, r)).ToArray(),
+                    "search" or "search-partial" or "search-all" or "empty-search" or "invalid-search" =>
+                        [new FunctionCallContent("search", "SearchEvidence", new Dictionary<string, object?>
+                        { ["keyword"] = variant == "invalid-search" ? "" : variant == "empty-search" ? "absent-marker" : variant == "search-all" ? "return" : "return 42;" })],
+                    "output-budget" => Enumerable.Range(0, 8).Select(i => Read("read" + i, refs[i == 7 ? 1 : 0])).ToArray(),
+                    _ => [Read("read", variant == "invented-reference" ? "source-v1:invented" : refs[0], variant == "invalid-range" ? 1 : 120)]
+                };
+                return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, calls)));
+            }
+            ToolEvidence = string.Join('\n', list.Where(m => m.Role == ChatRole.Tool).SelectMany(m => m.Contents)
+                .OfType<FunctionResultContent>().Select(c => c.Result?.ToString()));
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, ReportAll(refs))));
+        }
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default) { await Task.CompletedTask; yield break; }
+        public object? GetService(Type type, object? key = null) => null;
+        public void Dispose() { }
+    }
+    static string[] ExtractAll(ChatMessage[] messages)
+    {
+        var data = messages.Last(m => m.Role == ChatRole.User).Text!;
+        using var json = JsonDocument.Parse(data["Untrusted task data: ".Length..]);
+        return json.RootElement.GetProperty("Sources").EnumerateArray().Select(s => s.GetProperty("Reference").GetString()!).ToArray();
+    }
+    static string ReportAll(string[] references) => JsonSerializer.Serialize(new { status = "SufficientEvidence", summary = "Available observations support the bounded conclusion.", evidenceReferences = references, limitations = Array.Empty<string>() });
+    static string Report(string reference) => ReportAll([reference]);
     sealed class Script : IChatClient
     {
         public string Variant = "ok", Prompt = "", ToolEvidence = ""; public string[] Tools = []; public int Calls; public Action? During;

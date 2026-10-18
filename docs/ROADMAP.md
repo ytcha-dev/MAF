@@ -9,11 +9,11 @@
 
 ## Current development increment and next action
 
-**4C completed; current increment 4D Native Reviewer Integration passed controlled offline validation and awaits owner review.**
+**4C and the 4D controlled baseline are implemented; current corrective increment 4D-R1 evidence observation passed controlled offline validation and awaits owner review.**
 The controlled official PCA → protected OpenCode → Reviewer → HumanGate graph exists;
 this is not a production-capable multi-agent service. See [4C evidence](acceptance/PHASE2B4_C_REVIEWER_EVIDENCE_RESULTS.md)
 and the [execution plan](plans/PHASE2B4_EXECUTION_PLAN.md).
-[4D results](acceptance/PHASE2B4_D_NATIVE_REVIEWER_RESULTS.md): 241 focused / 1193 offline passed; build 0 warnings/errors. Stop for owner review. **4E Structured Source Candidate Integration is proposed,
+[4D baseline results](acceptance/PHASE2B4_D_NATIVE_REVIEWER_RESULTS.md): 241 focused / 1193 offline passed; build 0 warnings/errors. [R1 correction](acceptance/PHASE2B4_D_R1_REVIEW_OBSERVATION_RESULTS.md) requires actual per-run tool observation, not known references alone. Stop after R1 for owner review. **4E Structured Source Candidate Integration is proposed,
 separately gated and not implemented.** Production Host activation, M3-C/identity, real multi-agent
 provider integration, durable parent resume and Human Approval UI remain incomplete.
 Phase 2B-3, Phase 2C/Registry and Hybrid are also unfinished. Historical milestone next-actions

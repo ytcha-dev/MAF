@@ -23,7 +23,8 @@ public sealed class NativeEvidenceReviewer(IChatClient chatClient)
         Distinguish observations from inference; report uncertainty or insufficient evidence.
         Return ONLY JSON with required fields status, summary, evidenceReferences, limitations.
         status: SufficientEvidence, NeedsHumanReview, InsufficientEvidence or ReviewUnavailable.
-        Cite admitted references only; SufficientEvidence requires every admitted reference.
+        Cite admitted references only; SufficientEvidence requires actual successful tool
+        observation of every admitted reference. References in this prompt are not observation.
         This is advisory assessment, never authorization or proof of semantic correctness.
         """;
 
@@ -47,7 +48,7 @@ public sealed class NativeEvidenceReviewer(IChatClient chatClient)
                 || !evidence.EvidenceReferences.SequenceEqual(sources.Select(s => s.Reference)))
                 return Failure(EvidenceAssessmentStatus.ReviewUnavailable);
             var context = new EvidenceContext(sources);
-            var guardedClient = new BoundedClient(chatClient);
+            var guardedClient = new BoundedClient(chatClient, context);
             var agent = new ChatClientAgent(guardedClient, name: "TaskEvidenceReviewer", instructions: Instructions,
                 tools: [AIFunctionFactory.Create(context.ReadEvidence), AIFunctionFactory.Create(context.SearchEvidence)]);
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
@@ -77,6 +78,9 @@ public sealed class NativeEvidenceReviewer(IChatClient chatClient)
                 || report.Status == "SufficientEvidence" && refs.Any(r => !report.EvidenceReferences.Contains(r))
                 || UnsafeClaim(report.Summary) || report.Limitations.Any(UnsafeClaim))
                 return Failure(EvidenceAssessmentStatus.ReviewUnavailable);
+            if (report.Status == "SufficientEvidence" && !context.HasObservedAll(refs))
+                return Failure(EvidenceAssessmentStatus.InsufficientEvidence) with
+                { Summary = "Required admitted sources were not observed through evidence tools." };
             return new(evidence.Task.TaskId, evidence.ExternalResult.Handle.ExecutionId,
                 Enum.Parse<EvidenceAssessmentStatus>(report.Status), ProjectTools.Redact(report.Summary), report.EvidenceReferences,
                 [..report.Limitations.Select(ProjectTools.Redact), "Advisory model assessment; semantic accuracy and human approval are not established."]);
@@ -94,14 +98,16 @@ public sealed class NativeEvidenceReviewer(IChatClient chatClient)
         [property: JsonRequired] ImmutableArray<string> EvidenceReferences, [property: JsonRequired] ImmutableArray<string> Limitations);
 
     // Observes SDK responses; the official Agent still owns all tool execution and iteration.
-    sealed class BoundedClient(IChatClient inner) : DelegatingChatClient(inner)
+    sealed class BoundedClient(IChatClient inner, EvidenceContext context) : DelegatingChatClient(inner)
     {
         int calls;
         public bool Violated { get; private set; }
         public override async Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
         {
             if (++calls > 8) { Violated = true; throw new InvalidOperationException("ReviewerBudgetExceeded"); }
-            var response = await base.GetResponseAsync(messages, options, cancellationToken);
+            var input = messages.ToArray();
+            context.RecordDeliveredResults(input);
+            var response = await base.GetResponseAsync(input, options, cancellationToken);
             var functions = response.Messages.SelectMany(m => m.Contents).OfType<FunctionCallContent>().ToArray();
             if (functions.Length > 8 || functions.Any(f => f.Name is not ("ReadEvidence" or "SearchEvidence")))
             { Violated = true; throw new InvalidOperationException("UnsupportedEvidenceTool"); }
@@ -111,30 +117,52 @@ public sealed class NativeEvidenceReviewer(IChatClient chatClient)
 
     sealed class EvidenceContext(ImmutableArray<VerifiedSourceEvidence> sources)
     {
+        readonly object sync = new();
+        readonly Dictionary<string, ImmutableArray<string>> successfulResults = new(StringComparer.Ordinal);
+        readonly HashSet<string> observed = new(StringComparer.Ordinal);
         int returned;
-        public bool Violated { get; private set; }
+        int violated;
+        public bool Violated => Volatile.Read(ref violated) != 0;
+        public bool HasObservedAll(ImmutableArray<string> references)
+        { lock (sync) return references.All(observed.Contains); }
+        // The existing SDK client observer sees actual Tool-role results before the next model call.
+        // Match only outputs produced successfully by this run's registered functions, never prompt text.
+        public void RecordDeliveredResults(IEnumerable<ChatMessage> messages)
+        {
+            lock (sync)
+                foreach (var result in messages.Where(m => m.Role == ChatRole.Tool).SelectMany(m => m.Contents).OfType<FunctionResultContent>())
+                {
+                    if (result.Exception is not null) { Interlocked.Exchange(ref violated, 1); continue; }
+                    if (result.Result?.ToString() is { } text && successfulResults.TryGetValue(text, out var references))
+                        observed.UnionWith(references);
+                }
+        }
         [Description("Read only an admitted source reference using original inclusive one-based source lines. No filesystem access.")]
         public string ReadEvidence(string reference, int startLine, int endLine)
         {
             var source = sources.SingleOrDefault(s => s.Reference == reference);
             if (source is null || startLine < source.StartLine || endLine > source.EndLine || endLine < startLine)
-            { Violated = true; return "Invalid admitted reference or original range."; }
+            { Interlocked.Exchange(ref violated, 1); return "Invalid admitted reference or original range."; }
             return Bound(string.Join('\n', source.Content.Split('\n').Skip(startLine - source.StartLine).Take(endLine - startLine + 1)
-                .Select((line, i) => $"{source.Reference} {source.RelativePath}:{startLine + i}: {line}")));
+                .Select((line, i) => $"{source.Reference} {source.RelativePath}:{startLine + i}: {line}")), [source.Reference]);
         }
         [Description("Literal search only within admitted sanitized snapshots, retaining original source line numbers.")]
         public string SearchEvidence(string keyword)
         {
-            if (string.IsNullOrWhiteSpace(keyword) || keyword.Length > 200) { Violated = true; return "Invalid keyword."; }
-            return Bound(string.Join('\n', sources.SelectMany(s => s.Content.Split('\n').Select((line, i) => (s, line, i)))
-                .Where(x => x.line.Contains(keyword, StringComparison.Ordinal)).Select(x => $"{x.s.Reference} {x.s.RelativePath}:{x.s.StartLine + x.i}: {x.line}")));
+            if (string.IsNullOrWhiteSpace(keyword) || keyword.Length > 200) { Interlocked.Exchange(ref violated, 1); return "Invalid keyword."; }
+            var hits = sources.SelectMany(s => s.Content.Split('\n').Select((line, i) => (s, line, i)))
+                .Where(x => x.line.Contains(keyword, StringComparison.Ordinal)).ToArray();
+            return Bound(string.Join('\n', hits.Select(x => $"{x.s.Reference} {x.s.RelativePath}:{x.s.StartLine + x.i}: {x.line}")),
+                hits.Select(x => x.s.Reference).Distinct().ToImmutableArray());
         }
-        string Bound(string text)
+        string Bound(string text, ImmutableArray<string> references)
         {
-            lock (this)
+            lock (sync)
             {
-                if (text.Length > 32768 - returned) { Violated = true; return "Evidence output budget exhausted."; }
-                returned += text.Length; return text;
+                if (text.Length > 32768 - returned) { Interlocked.Exchange(ref violated, 1); return "Evidence output budget exhausted."; }
+                returned += text.Length;
+                if (text.Length > 0 && !references.IsEmpty) successfulResults[text] = references;
+                return text;
             }
         }
     }

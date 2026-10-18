@@ -1,14 +1,13 @@
-# MAF — Comprehension / Code Review Agents
+# MAF — Local-first Multi-Agent Orchestration
 
-C# / .NET 10 的兩個獨立 Microsoft Agent Framework Agent，以唯讀工具理解與審查本機程式碼。共用 Console Host，不使用自製 Agent Loop。
+MAF 以 C# / .NET 10 與官方 Microsoft Agent Framework，逐步建立 local-first 多 Agent 協調平台。原生 PCA 與 Review 是獨立元件，外部 Harness 承擔專業任務；MAF 負責協調，不自製 Agent Loop。受控多 Agent Workflow composition 尚非正式 Host 執行入口。
 
-目前增量 **4D Native Reviewer Integration 已通過受控離線技術驗證，待 Owner Review**，承接已完成的 4C。現有能力與驗收邊界：
+4D Native Reviewer 已有受控離線整合證據，**4D-R1 實際來源觀察修正已通過受控離線驗證，待 Owner Review**；承接已完成的 4C。現有能力與驗收邊界：
 
 - **Phase 2A**：[受控 live、唯讀 OpenCode PoC](docs/acceptance/PHASE2A_RESULTS.md)；另有 [2B-1 家用持久化／恢復驗收](docs/acceptance/PHASE2B1_HOME_RESULTS.md)，不代表公司端安全相容性 clearance。
 - **M3／M4**：受控 protected execution、durable recovery、synthetic Approval/Resume 與取消／對帳技術證明，見 [M4-C](docs/acceptance/PHASE2B2_M4_C_RESULTS.md)。
 - **4A／4B／4C**：官方 deterministic typed Workflow、protected child runtime + fake HTTP，以及獨立有界來源 provenance，見 [4A](docs/acceptance/PHASE2B4_A_TYPED_HANDOFF_RESULTS.md)、[4B](docs/acceptance/PHASE2B4_B_PROTECTED_HANDOFF_RESULTS.md)、[4C](docs/acceptance/PHASE2B4_C_REVIEWER_EVIDENCE_RESULTS.md)。
-
-- **4D**：實際官方 Native Reviewer Agent 讀取 4C 快照、嚴格驗證 typed assessment；scripted ChatClient／fake HTTP 驗證通過，見 [4D 結果](docs/acceptance/PHASE2B4_D_NATIVE_REVIEWER_RESULTS.md)。
+- **4D**：實際官方 Native Reviewer Agent 讀取 4C 快照、嚴格驗證 typed assessment；scripted ChatClient／fake HTTP 驗證通過，見 [4D 歷史結果](docs/acceptance/PHASE2B4_D_NATIVE_REVIEWER_RESULTS.md)；[R1 修正](docs/acceptance/PHASE2B4_D_R1_REVIEW_OBSERVATION_RESULTS.md) 要求實際工具觀察每個必要 Reference。
 
 **尚未完成**：正式多 Agent Host 入口、production identity／M3-C、真實多 Agent provider 協作、外層 Workflow durable resume、Human Approval UI。Host external-task／recover／recover-pending 仍拒絕 `ProductionTrustUnavailable`，無 legacy fallback。獨立原生 PCA／Git-diff Review 可用，但不代表已納入 production policy 保護。Phase 2B-3、2C／Registry 與 Hybrid 未完成。
 
@@ -119,7 +118,9 @@ dotnet test MAF.slnx
 | MAF.Host | Console 入口、環境設定、OpenAI client、DI、互動對話 |
 | MAF.Core | `IAgentFactory` 契約，回傳官方 `AIAgent`，不依賴具體 Agent |
 | MAF.Agents.Comprehension | `ChatClientAgent` 建立、Instructions、五個工具 |
-| MAF.Agents.Review | 獨立 Review Agent、變更與上下文 pipeline、Roslyn syntax、證據驗證與 JSON 報告 |
+| MAF.Agents.Review | 獨立 Git-diff Review 與 Native Evidence Reviewer、有界來源工具及報告驗證 |
+| MAF.Workflows.External | 官方 deterministic Workflow、protected child runtime、OpenCode adapter 與恢復／effect guard |
+| MAF.Persistence.Sqlite | 明確 schema profile、Durable Execution／Approval／Control 與取消證據持久化 |
 | MAF.Tests | xUnit 安全、Git、Session 與 Function Calling 整合測試 |
 
 - 官方 `Microsoft.Agents.AI` / `Microsoft.Agents.AI.Abstractions` **1.24.0**。
