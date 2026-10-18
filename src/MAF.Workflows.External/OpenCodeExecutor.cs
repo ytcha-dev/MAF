@@ -115,9 +115,12 @@ public sealed class OpenCodeExecutor : Executor<ExternalTaskRequest, ExternalTas
                     limitations.Add("Remote completion is unconfirmed; inspect the existing external session before taking further action.");
                 }
                 if (observation.Status == ExternalExecutionStatus.Completed && !observation.SourceLocations.IsDefaultOrEmpty)
+                {
+                    limitations.AddRange(observation.SourceLocations.Select(s => s.CoverageLimitation).OfType<string>());
                     candidates = observation.SourceLocations.Select(s => new SourceCandidate(
                         new(request.TaskId, workflowRunId, handle.ExecutionId, handle.ExternalSessionId!, handle.ExternalRequestId!),
                         s.RelativePath, s.StartLine, s.EndLine, s.ExpectedAnchor, SourceCandidateOrigin.OpenCodeReadDisplay)).ToImmutableArray();
+                }
                 return Result(observation.Status, observation.Summary ?? "External execution state observed.", observation.ErrorCode);
             }
             throw new OperationCanceledException("Observation limit reached.");

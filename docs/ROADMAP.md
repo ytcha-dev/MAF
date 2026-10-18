@@ -9,11 +9,12 @@
 
 ## Current development increment and next action
 
-**4D/R1 is owner-reviewed as a controlled technical milestone. Current authorized increment:
-4E bounded OpenCode source candidate integration (controlled technical validation passed; owner architecture review pending).**
-The existing protected Observe response supplies untrusted read-display proposals to 4C
-independent verification and R1 native tool observation. See [4E results](acceptance/PHASE2B4_E_SOURCE_CANDIDATE_RESULTS.md)
-and the [execution plan](plans/PHASE2B4_EXECUTION_PLAN.md). Stop after 4E for owner architecture review.
+**Current authorized increment: 4F source evidence coverage calibration — controlled validation passed; owner review pending.**
+Pinned official-source-derived fixtures calibrate bounded excerpts, known unrelated tools
+and exact duplicate reads. Independent 4C verification and R1 native tool observation remain
+mandatory. 357 focused / 1307 offline tests pass; these are not live-provider success rates.
+See [4F results](acceptance/PHASE2B4_F_EVIDENCE_COVERAGE_RESULTS.md) and the
+[execution plan](plans/PHASE2B4_EXECUTION_PLAN.md). Stop after 4F for owner review.
 Production Host activation, M3-C/identity, real multi-agent provider integration, durable
 parent resume and Human Approval UI remain incomplete. Phase 2B-3, Phase 2C/Registry and
 Hybrid are also unfinished. Historical milestone next-actions at the end are dated evidence.
@@ -66,7 +67,7 @@ Retain PCA/Reviewer as educational and regression references for `IChatClient` v
 | **Phase 2B-1 — Durable execution** | Recover without duplicate submissions | `IExecutionStore` + SQLite + reconciliation + test-only acceptance runners | Controlled home technical gate passed; same-session/no-extra-POST evidence; corporate clearance separate |
 | **Phase 2B-2 — Policy & approvals** | Trustworthy state / safety transitions | Explicit human approval states; lifecycle cleanup | Pending approvals and cancellation remain honest; default deny |
 | **Phase 2B-3 — Diagnostics & artifacts** | Understand cost, latency, outcome | Correlated trace and trusted provenance | Distinguishable provider calls, model usage where supported, and verified result limits |
-| **Phase 2B-4 — Deterministic multi-agent path** | Join specialists safely | Controlled official PCA → OpenCode → Reviewer → human gate | 4A–4D/R1 controlled milestones reviewed; 4E current, production and writes separately gated |
+| **Phase 2B-4 — Deterministic multi-agent path** | Join specialists safely | Controlled official PCA → OpenCode → Reviewer → human gate | 4A–4E controlled evidence recorded; 4F calibration validated, production and writes separately gated |
 | **Phase 2C — Connector registry & switches** | Optional integrations safely enabled | Registry + disabled-by-default lifecycle + policy checks | Disabled adapter cannot be listed as available to router or invoked via direct API |
 | Phase 3 — Bounded Hybrid | LLM recommends **only allowed** steps | Planner / router with validated typed decisions | Measurable gain against fixed workflow, no policy escalation |
 | Phase 4 — Ecosystem expansion | Multiple harnesses and protocols when justified | Optional Codex, Claude Code, MCP, A2A, knowledge adapters | Each connector has capability negotiation and contract tests |
@@ -259,7 +260,7 @@ See [4D results](acceptance/PHASE2B4_D_NATIVE_REVIEWER_RESULTS.md). No live-mode
 production activation, parent persistence or human approval is implied. R1 requires successful
 per-run tool observation of every required source reference.
 
-**4E — current controlled integration:** [results](acceptance/PHASE2B4_E_SOURCE_CANDIDATE_RESULTS.md)
+**4E — historical controlled integration:** [results](acceptance/PHASE2B4_E_SOURCE_CANDIDATE_RESULTS.md)
 record the concrete versioned read-display shape, independent source acquisition, actual
 native Reviewer/R1 observation and zero additional provider requests. Candidate fields
 are transient untrusted proposals; no new schema or production activation. Stop for owner review.

@@ -2,7 +2,7 @@
 
 MAF 以 C# / .NET 10 與官方 Microsoft Agent Framework，逐步建立 local-first 多 Agent 協調平台。原生 PCA 與 Review 是獨立元件，外部 Harness 承擔專業任務；MAF 負責協調，不自製 Agent Loop。受控多 Agent Workflow composition 尚非正式 Host 執行入口。
 
-4D／R1 已由 Owner Review 作為受控技術里程碑；目前增量是 **4E 有界 OpenCode 來源候選整合（受控技術驗證通過，待 Owner 架構審查）**。現有能力與驗收邊界：
+4D／R1 已由 Owner Review 作為受控技術里程碑；目前增量是 **4F 來源證據覆蓋校準（受控技術驗證通過，待 Owner 審查）**。現有能力與驗收邊界：
 
 - **Phase 2A**：[受控 live、唯讀 OpenCode PoC](docs/acceptance/PHASE2A_RESULTS.md)；另有 [2B-1 家用持久化／恢復驗收](docs/acceptance/PHASE2B1_HOME_RESULTS.md)，不代表公司端安全相容性 clearance。
 - **M3／M4**：受控 protected execution、durable recovery、synthetic Approval/Resume 與取消／對帳技術證明，見 [M4-C](docs/acceptance/PHASE2B2_M4_C_RESULTS.md)。
@@ -10,9 +10,11 @@ MAF 以 C# / .NET 10 與官方 Microsoft Agent Framework，逐步建立 local-fi
 - **4D**：實際官方 Native Reviewer Agent 讀取 4C 快照、嚴格驗證 typed assessment；scripted ChatClient／fake HTTP 驗證通過，見 [4D 歷史結果](docs/acceptance/PHASE2B4_D_NATIVE_REVIEWER_RESULTS.md)；[R1 修正](docs/acceptance/PHASE2B4_D_R1_REVIEW_OBSERVATION_RESULTS.md) 要求實際工具觀察每個必要 Reference。
 - **4E**：從既有受保護 Observe 的 `read` 工具結構擷取不可信候選，再由 4C 獨立驗證及 R1 實際工具觀察；見 [4E 結果](docs/acceptance/PHASE2B4_E_SOURCE_CANDIDATE_RESULTS.md)。
 
+- **4F**：以官方原始碼衍生離線 fixtures 校準有界 excerpt、混合工具與精確重複讀取；357 focused／1307 offline 通過，非 live-provider 成功率，見 [4F 結果](docs/acceptance/PHASE2B4_F_EVIDENCE_COVERAGE_RESULTS.md)。
+
 **尚未完成**：正式多 Agent Host 入口、production identity／M3-C、真實多 Agent provider 協作、外層 Workflow durable resume、Human Approval UI。Host external-task／recover／recover-pending 仍拒絕 `ProductionTrustUnavailable`，無 legacy fallback。獨立原生 PCA／Git-diff Review 可用，但不代表已納入 production policy 保護。Phase 2B-3、2C／Registry 與 Hybrid 未完成。
 
-目前建議下一步與各階段邊界集中在 [Roadmap](docs/ROADMAP.md)；本輪停在 4E，完成後交由 Owner Review，再另行授權後續工作。
+目前建議下一步與各階段邊界集中在 [Roadmap](docs/ROADMAP.md)；本輪停在 4F，完成後交由 Owner Review，再另行授權後續工作。
 
 ## 系統用途
 
@@ -178,7 +180,7 @@ Phase 1 歷史驗收見 [TEST_RESULTS.md](TEST_RESULTS.md)：當時 22／22 測�
 
 ## Phase 2A — OpenCode 外部 Workflow
 
-以下是歷史 PoC／2B-1 操作說明。M3-A2c 起，這些 Host external CLI 命令已停用，不能用環境變數恢復；live acceptance helpers 亦不能繞過新 guard。受控測試透過 `ProtectedExternalRuntime`、明確版本 store（4B–4E 為 v4）、test-only trust 與 fake HTTP 執行，不連線真實 OpenCode。
+以下是歷史 PoC／2B-1 操作說明。M3-A2c 起，這些 Host external CLI 命令已停用，不能用環境變數恢復；live acceptance helpers 亦不能繞過新 guard。受控測試透過 `ProtectedExternalRuntime`、明確版本 store（4B–4F 為 v4）、test-only trust 與 fake HTTP 執行，不連線真實 OpenCode。
 
 執行路徑為 **官方 MAF Workflow → OpenCodeExecutor → OpenCode Server**。這個模式不呼叫 PCA／Review，不需要 Host 的模型設定；模型由 OpenCode 配置。使用者須自行啟動或明確授權啟動 server。本機原生 CLI 範例：`opencode serve --hostname 127.0.0.1 --port 4096`；本公司環境請使用原生 executable，不執行 `.ps1` shim。
 

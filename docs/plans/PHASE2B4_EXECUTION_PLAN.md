@@ -66,7 +66,7 @@ See [4C acceptance](../acceptance/PHASE2B4_C_REVIEWER_EVIDENCE_RESULTS.md).
 | D3 — Filesystem TOCTOU | Observed changes are detected; malicious same-principal race-free isolation is not established | Production source-access security review |
 
 4C is complete. 4D/R1 is owner-reviewed as a controlled technical milestone.
-4E Bounded OpenCode Source Candidate Integration is the current authorized increment.
+4E source candidate integration is recorded below; 4F coverage calibration is the current authorized increment.
 D1 and D3 are not implemented in 4D.
 
 ## 4D Native Reviewer Integration — owner-reviewed controlled milestone
@@ -95,7 +95,7 @@ observations is InsufficientEvidence; protocol/tool failures remain ReviewUnavai
 4C independent acquisition and post-Agent source revalidation are unchanged.
 See [R1 results](../acceptance/PHASE2B4_D_R1_REVIEW_OBSERVATION_RESULTS.md): 230 focused / 1206 offline passed; build 0 warnings/errors. Owner-reviewed as a controlled milestone; later 4E authorization follows.
 
-## 4E bounded OpenCode source candidate integration — current increment
+## 4E bounded OpenCode source candidate integration — historical milestone
 
 One concrete v1.18.35/v1.19.0 completed read-tool metadata.display shape supplies bounded,
 untrusted path/range/text proposals from existing guarded Observe bytes. No summary parsing,
@@ -111,3 +111,18 @@ Candidates are not stored or restored as historical evidence: independent author
 Inspect can extract fresh proposals from fresh GETs, never resubmit. No automatic outer
 resume, source persistence, new schema, production trust or live-model proof. D1/D3 remain
 deferred and D2 remains a semantic-quality limitation. Stop after 4E for owner review.
+
+## 4F source evidence coverage calibration — current increment
+
+Pinned v1.18.35/v1.19.0 official source-derived offline fixtures cover read ranges,
+preview/display differences, mixed grep/glob, duplicates, truncation and retained limits.
+A complete-line prefix of at most 20 lines / 512 characters may become an untrusted
+excerpt; omitted/provider-truncated coverage is disclosed. Exact identical reads deduplicate;
+conflicts, malformed tools and oversized envelopes still fail closed. No new requests.
+The unchanged 4C reader verifies the excerpt; R1 requires actual native tool observation.
+
+[4F results](../acceptance/PHASE2B4_F_EVIDENCE_COVERAGE_RESULTS.md): 357 focused /
+1307 offline passed, build 0 warnings/errors. Source-derived fixtures are not genuine live
+traces or statistical success measurements. D1–D3 remain deferred; no Host activation,
+schema changes or durable parent resume. Stop after 4F for owner review; subsequent work
+requires separate authorization.
