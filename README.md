@@ -2,7 +2,7 @@
 
 MAF 以 C# / .NET 10 與官方 Microsoft Agent Framework，逐步建立 local-first 多 Agent 協調平台。原生 PCA 與 Review 是獨立元件，外部 Harness 承擔專業任務；MAF 負責協調，不自製 Agent Loop。受控多 Agent Workflow composition 尚非正式 Host 執行入口。
 
-4D／R1 已由 Owner Review 作為受控技術里程碑；目前增量是 **Local Solo MVP-S2A（受控 Workflow → Host 結果映射驗證通過，待 Owner acceptance）**。現有能力與驗收邊界：
+4D／R1 已由 Owner Review 作為受控技術里程碑；目前增量是 **Local Solo MVP-S2B（離線 readiness 與有界限制顯示驗證通過，待 Owner acceptance）**。現有能力與驗收邊界：
 
 - **Phase 2A**：[受控 live、唯讀 OpenCode PoC](docs/acceptance/PHASE2A_RESULTS.md)；另有 [2B-1 家用持久化／恢復驗收](docs/acceptance/PHASE2B1_HOME_RESULTS.md)，不代表公司端安全相容性 clearance。
 - **M3／M4**：受控 protected execution、durable recovery、synthetic Approval/Resume 與取消／對帳技術證明，見 [M4-C](docs/acceptance/PHASE2B2_M4_C_RESULTS.md)。
@@ -16,7 +16,9 @@ MAF 以 C# / .NET 10 與官方 Microsoft Agent Framework，逐步建立 local-fi
 
 目前進度與後續邊界集中在 [Roadmap](docs/ROADMAP.md)；Local Solo S1-R1 離線 Host foundation 已通過個人 Windows 驗證（56 focused／32 narrow regression；建置 0 警告／錯誤），正式受保護組裝與實際 provider 執行仍須另行授權。
 
-S2A 重用既有內部官方四階段 Workflow 與 protected handoff，將實際離線旅程結果映射至中立 Host view；輸出標記 `ControlledOfflineFixture / NotLiveProvider`。新增 12／Host 88／protected-source-Reviewer 201 案例通過，見 [S2A 結果](docs/acceptance/LOCAL_SOLO_MVP_S2A_WORKFLOW_COMPOSITION_RESULTS.md)。無新增公開執行入口，`--local submit` 仍封鎖；本輪停在 S2A。
+S2A 重用既有內部官方四階段 Workflow 與 protected handoff，將實際離線旅程結果映射至中立 Host view；輸出標記 `ControlledOfflineFixture / NotLiveProvider`。新增 12／Host 88／protected-source-Reviewer 201 案例通過，見 [S2A 結果](docs/acceptance/LOCAL_SOLO_MVP_S2A_WORKFLOW_COMPOSITION_RESULTS.md)。無新增公開執行入口，`--local submit` 仍封鎖；S2A 歷史結果保留。
+
+S2B 新增 `--local readiness [--workspace <absolute-local-directory>]`：檢視候選設定、三條資料流及缺少的信任／custody 條件；總結固定 `Blocked / ProductionTrustUnavailable`，不是執行授權。23 focused／301 scoped regression 通過，見 [S2B 結果](docs/acceptance/LOCAL_SOLO_MVP_S2B_READINESS_RESULTS.md)。重要限制不再被前八筆資訊遮蔽；本輪停在 S2B。
 
 ## 系統用途
 
@@ -40,6 +42,7 @@ Agents 不會修改目標專案、執行任意 shell／建置／測試，也不�
 ```text
 --local help
 --local config [--workspace <absolute-local-directory>]
+--local readiness [--workspace <absolute-local-directory>]
 --local preview --workspace <absolute-local-directory> --objective <bounded-single-line-text>
 --local sample [--diagnostics]
 --local submit [--workspace <directory> --objective <text>]

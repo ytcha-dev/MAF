@@ -29,9 +29,18 @@ internal static class LocalSoloOutcomeMapper
             TaskId = outcome.TaskId, WorkflowRunId = outcome.WorkflowRunId,
             Harness = external?.Handle.Provider, ExecutionId = external?.Handle.ExecutionId,
             Status = external?.Status, Summary = external?.Summary,
-            Limitations = outcome.Limitations.Concat(external?.Limitations ?? []).Concat(review?.Limitations ?? []).Distinct().Take(16).Concat(new[]
-                { "Controlled offline dependencies; scripted models and fake transport are not live-provider evidence.",
-                  "Display references cannot restore VerifiedSourceEvidence or authorize execution." }).ToArray(),
+            // Fixed semantic summaries precede bounded source lists; no heuristic severity parser.
+            Limitations = new[]
+                { "Operational execution blocked / ProductionTrustUnavailable; controlled fixture output grants no execution rights.",
+                  external?.Status == ExternalExecutionStatus.Unknown
+                    ? "Unknown execution outcome; not Failed/Cancelled or safely retryable. No automatic replacement or resubmission."
+                    : $"External status: {external?.Status.ToString() ?? "Unavailable"}; completion is not human acceptance.",
+                  $"Evidence/Reviewer: {review?.Status.ToString() ?? "Unavailable"}; source provenance is not semantic correctness." }
+                .Concat(review?.Limitations.Take(16) ?? [])
+                .Concat(external?.Limitations.Take(16) ?? [])
+                .Concat(outcome.Limitations.Take(50)).Distinct()
+                .Concat(new[] { "Controlled offline dependencies; scripted models and fake transport are not live-provider evidence.",
+                    "Display references cannot restore VerifiedSourceEvidence or authorize execution." }).ToArray(),
             Evidence = evidence, Assessment = review?.Summary, ReviewStatus = review?.Status,
             Readiness = outcome.HumanGate,
             Stages = outcome.Stages.Take(8).Select(s => $"{s.Name}: {s.State}").ToArray(),

@@ -4,7 +4,7 @@ namespace MAF.Host;
 
 internal static class LocalSoloConsole
 {
-    public const string Help = "Offline Local Solo: --local config [--workspace <absolute-local-directory>] | --local preview --workspace <directory> --objective <text> | --local sample [--diagnostics] | --local submit (blocked: ProductionTrustUnavailable). No provider/model calls or database writes.";
+    public const string Help = "Offline Local Solo: --local config [--workspace <absolute-local-directory>] | --local readiness [--workspace <absolute-local-directory>] | --local preview --workspace <directory> --objective <text> | --local sample [--diagnostics] | --local submit (blocked: ProductionTrustUnavailable). No provider/model calls or database writes.";
 
     public static int Run(string[] args, TextWriter output, TextWriter error,
         Func<string, string?>? configuration = null)
@@ -19,7 +19,9 @@ internal static class LocalSoloConsole
             else
             {
                 configuration ??= Environment.GetEnvironmentVariable;
-                if (action == "config")
+                if (action == "readiness")
+                    LocalSoloPresentation.Readiness(output, LocalSoloApplication.Profile(options.GetValueOrDefault("--workspace"), configuration));
+                else if (action == "config")
                     LocalSoloPresentation.Profile(output, LocalSoloApplication.Profile(options.GetValueOrDefault("--workspace"), configuration));
                 else
                     LocalSoloPresentation.Preview(output, LocalSoloApplication.Preview(options["--workspace"], options["--objective"], configuration));
@@ -47,7 +49,7 @@ internal static class LocalSoloConsole
     private static (string Action, Dictionary<string, string> Options) Parse(string[] args)
     {
         if (args.Length < 2 || args.Length > 8 || args[0] != "--local"
-            || args[1] is not ("config" or "preview" or "sample" or "submit" or "help"))
+            || args[1] is not ("config" or "readiness" or "preview" or "sample" or "submit" or "help"))
             throw new ArgumentException("Invalid local mode.");
         var action = args[1];
         var options = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -59,7 +61,7 @@ internal static class LocalSoloConsole
                 if (!options.TryAdd(key, "true")) throw new ArgumentException("Duplicate option.");
                 continue;
             }
-            if ((action is not ("config" or "preview" or "submit"))
+            if ((action is not ("config" or "readiness" or "preview" or "submit"))
                 || (key != "--workspace" && !((action is "preview" or "submit") && key == "--objective"))
                 || ++i >= args.Length || args[i].StartsWith("--", StringComparison.Ordinal)
                 || !options.TryAdd(key, args[i]))

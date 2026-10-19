@@ -62,6 +62,28 @@ internal static class LocalSoloPresentation
         output.WriteLine("Required: genuine caller/policy/activation trust, approved data flows and applicable security clearance.");
     }
 
+    // Prerequisite display only: no result DTO, mutable ready flag, probing or grant.
+    public static void Readiness(TextWriter output, LocalProfile profile)
+    {
+        output.WriteLine("Local Solo readiness / AdvisoryOnly / CandidateOnly / No execution attempted");
+        Profile(output, profile);
+        output.WriteLine("Trusted caller verification: NotEstablished");
+        output.WriteLine("Exact-operation human intention: NotEstablished; Local Solo/login/CLI flags are not proof.");
+        output.WriteLine("Genuine policy issuer/current policy: NotEstablished");
+        output.WriteLine("Exact operation/scope authorization: NotEstablished");
+        output.WriteLine("Explicit capability activation and revocation: NotEstablished");
+        output.WriteLine("Protected configuration/durable-state custody: NotEstablished");
+        output.WriteLine("Restore/anti-rollback protection: NotEstablished");
+        output.WriteLine("Provider credential/bypass protection: NotEstablished");
+        output.WriteLine($"PCA -> native model: metadata {Binding(profile.PcaBindingPresent)}; recipient/data-flow authorization NotEstablished");
+        output.WriteLine("Harness -> its model/provider and downstream tools: recipient/configuration NotEstablished; data-flow authorization NotEstablished; candidate Harness name is not activation.");
+        output.WriteLine($"Reviewer -> native model: metadata {Binding(profile.ReviewerBindingPresent)}; recipient/data-flow authorization NotEstablished");
+        output.WriteLine("Deployment execution clearance: NotEstablished here; applicable endpoint/security clearance required.");
+        output.WriteLine("Corporate execution hold is not lifted; personal Windows validation is not corporate compatibility clearance.");
+        output.WriteLine("Overall execution readiness: Blocked / ProductionTrustUnavailable");
+        output.WriteLine("Inspection succeeded is not readiness granted. This display is not a PolicyDecision, permit, approval receipt or dispatch ticket.");
+    }
+
     public static void Preview(TextWriter output, LocalTaskPreview preview)
     {
         Profile(output, preview.Profile);
@@ -87,7 +109,7 @@ internal static class LocalSoloPresentation
         output.WriteLine("Freshness: NotEstablished (no current source/provider check)");
         output.WriteLine($"Summary: {Safe(view.Summary)}");
         output.WriteLine("Limitations:");
-        Lines(output, view.Limitations);
+        Limitations(output, view.Limitations);
         output.WriteLine("Evidence (display references only, not trusted proof):");
         if (view.Evidence.Count == 0) output.WriteLine("- Unavailable; provenance: NotEstablished");
         foreach (var evidence in view.Evidence.Take(8))
@@ -119,6 +141,20 @@ internal static class LocalSoloPresentation
         HumanChoice = LocalHumanChoice.Undecided,
         AdapterDiagnostics = ["Unavailable; no adapter instantiated."]
     };
+
+    // Valid controlled outcomes have at most 50 distinct specialist/gate limitations,
+    // plus five mapper summaries/disclaimers. Show all within a finite 64 x 512-char budget;
+    // do not let eight early informational entries suppress a later critical limitation.
+    private static void Limitations(TextWriter output, IReadOnlyList<string> values)
+    {
+        if (values.Count == 0) output.WriteLine("- Unavailable");
+        foreach (var value in values.Take(64))
+        {
+            var safe = Safe(value);
+            output.WriteLine("- " + (safe.Length > 512 ? safe[..512] + " [truncated]" : safe));
+        }
+        if (values.Count > 64) output.WriteLine("- [truncated; additional limitations omitted]");
+    }
 
     private static string Binding(bool present) => present ? "ConfiguredMetadataOnly / NotValidated" : "Unavailable";
     private static void Lines(TextWriter output, IReadOnlyList<string> values)

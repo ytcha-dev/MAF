@@ -9,8 +9,9 @@
 
 ## Current development increment and next action
 
-**Current increment: Local Solo MVP-S2A — controlled official Workflow outcome → Host integration validated; ready for owner acceptance. External Host activation remains BLOCKED; corporate execution hold is unchanged.**
-See [S2A results](acceptance/LOCAL_SOLO_MVP_S2A_WORKFLOW_COMPOSITION_RESULTS.md): reuse existing internal composition (no new public facade/factory), explicit ControlledOfflineFixture / NotLiveProvider presentation, 12 focused + 88 Host + 201 protected/source/Reviewer passing cases. No production clients, trust registration or CLI routing added. Stop after S2A.
+**Current increment: Local Solo MVP-S2B — offline readiness and bounded critical limitations validated; ready for owner acceptance. External Host activation remains BLOCKED; corporate execution hold is unchanged.**
+See [S2B results](acceptance/LOCAL_SOLO_MVP_S2B_READINESS_RESULTS.md): strict `--local readiness` reuses the existing candidate application boundary; trust/custody/three data flows remain NotEstablished and overall Blocked. 23 focused + 301 scoped regression cases pass; no operational facade, authority source or provider activation added. Stop after S2B.
+See [S2A results](acceptance/LOCAL_SOLO_MVP_S2A_WORKFLOW_COMPOSITION_RESULTS.md): reuse existing internal composition (no new public facade/factory), explicit ControlledOfflineFixture / NotLiveProvider presentation, 12 focused + 88 Host + 201 protected/source/Reviewer passing cases. No production clients, trust registration or CLI routing added. Historical S2A controlled evidence retained.
 The [S1 results and verification limits](acceptance/LOCAL_SOLO_MVP_S1_HOST_FOUNDATION_RESULTS.md)
 record `--local config`, explicit-workspace `preview`, `OfflineSample / NotExecuted` presentation
 and unconditional blocked `submit`. No client, Workflow, trust provider or database is composed.
@@ -29,8 +30,8 @@ The [Safe Host design](plans/SAFE_HOST_COMPOSITION_USER_FLOW_DESIGN.md) and
 The [M3-C-W0 report](plans/M3C_CORPORATE_WORKSTATION_TRUST_FEASIBILITY.md) is retained as
 deferred enterprise-trust planning evidence; its corporate-first sequencing is superseded
 by this Local Solo priority, without waiving security holds, genuine authorization,
-native-model outbound controls or fail-closed guards. S1 is the offline foundation; S2A adds only controlled outcome integration.
-Neither establishes production trust nor authorizes S2B/provider activation.
+native-model outbound controls or fail-closed guards. S1 is the offline foundation; S2A adds controlled outcome integration and S2B adds advisory readiness.
+These do not establish production trust or authorize S2C/provider activation.
 Pinned official-source-derived fixtures calibrate bounded excerpts, known unrelated tools
 and exact duplicate reads. Independent 4C verification and R1 native tool observation remain
 mandatory. 357 focused / 1307 offline tests pass; these are not live-provider success rates.
