@@ -4,7 +4,7 @@ using MAF.Core;
 
 namespace MAF.Host;
 
-internal enum LocalViewKind { Observation, OfflineSample }
+internal enum LocalViewKind { Observation, OfflineSample, ControlledOfflineFixture }
 internal enum LocalHumanChoice { NotEstablished, Undecided, Accepted, Rejected }
 internal sealed record LocalEvidenceView(string? Reference, string? Provenance);
 
@@ -14,6 +14,7 @@ internal sealed record LocalResultView
     public LocalViewKind Kind { get; init; }
     public string? Harness { get; init; }
     public string? TaskId { get; init; }
+    public string? WorkflowRunId { get; init; }
     public string? ExecutionId { get; init; }
     public ExternalExecutionStatus? Status { get; init; }
     public DateTimeOffset? ObservedAt { get; init; }
@@ -21,6 +22,9 @@ internal sealed record LocalResultView
     public IReadOnlyList<string> Limitations { get; init; } = [];
     public IReadOnlyList<LocalEvidenceView> Evidence { get; init; } = [];
     public string? Assessment { get; init; }
+    public EvidenceAssessmentStatus? ReviewStatus { get; init; }
+    public HumanGateStatus? Readiness { get; init; }
+    public IReadOnlyList<string> Stages { get; init; } = [];
     public string? MafApproval { get; init; }
     public string? HarnessPermission { get; init; }
     public LocalHumanChoice HumanChoice { get; init; } = LocalHumanChoice.NotEstablished;
@@ -72,9 +76,11 @@ internal static class LocalSoloPresentation
     {
         var sample = view.Kind == LocalViewKind.OfflineSample;
         output.WriteLine(sample ? "OfflineSample / NotExecuted / ApplicationOwnedSample / NotVerified"
+            : view.Kind == LocalViewKind.ControlledOfflineFixture ? "ControlledOfflineFixture / NotLiveProvider / display only; not execution authority"
             : "Result observation / display only; not execution authority");
         output.WriteLine($"Harness: {Safe(view.Harness)}");
         output.WriteLine($"Task: {Safe(view.TaskId)}");
+        output.WriteLine($"Workflow run: {Safe(view.WorkflowRunId)}");
         output.WriteLine($"Execution: {Safe(view.ExecutionId)}");
         output.WriteLine($"Observed status: {(sample ? "NotExecuted" : view.Status?.ToString() ?? "Unavailable")}");
         output.WriteLine($"Observed at: {(sample ? "Unavailable" : view.ObservedAt?.ToString("O", CultureInfo.InvariantCulture) ?? "Unavailable")}");
@@ -88,6 +94,9 @@ internal static class LocalSoloPresentation
             output.WriteLine($"- {Safe(evidence.Reference)}; provenance: {Safe(evidence.Provenance)}");
         if (view.Evidence.Count > 8) output.WriteLine("- [truncated]");
         output.WriteLine($"Advisory assessment: {Safe(view.Assessment)}");
+        output.WriteLine($"Review status: {view.ReviewStatus?.ToString() ?? "Unavailable"} (advisory; not semantic correctness)");
+        output.WriteLine($"HumanGate readiness: {view.Readiness?.ToString() ?? "Unavailable"} (not Accepted)");
+        if (view.Stages.Count > 0) { output.WriteLine("Workflow stages:"); Lines(output, view.Stages); }
         output.WriteLine($"MAF pre-dispatch approval: {Safe(view.MafApproval ?? "NotEstablished")}");
         output.WriteLine($"Harness tool permission: {Safe(view.HarnessPermission ?? "NotEstablished")}");
         output.WriteLine($"Human result choice: {view.HumanChoice} (display only; no consent proof or durable acceptance)");
