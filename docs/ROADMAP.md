@@ -3,20 +3,25 @@
 > **Roadmap v0.2 — current status aligned 2026-10-18** · original proposal 2026-10-15 · Project: `ytcha-dev/MAF`
 > **Status:** Controlled implementation evidence below; future stages still require owner authorization
 > **Decision retained:** deterministic Workflow-first (A), then bounded Hybrid orchestration (C).  
-> **Deployment preference:** company-local / offline-capable first; portability and optional remote access later, subject to organizational authorization.
+> **Deployment decision — 2026-10-19:** independent MAF instances on authorized engineers' corporate Windows workstations first. Personal lab is secondary compatibility/reference context. Future centralized orchestration with workstation/remote harness workers is an evolution, not a prerequisite; offline operation remains conditional on demonstrated trust and organizational authorization.
 
 > **Architecture guardrails:** [Seven ownership boundaries and delivery discipline](architecture/ARCHITECTURE_GUARDRAILS.md). These are design constraints, not claims of implemented enforcement.
 
 ## Current development increment and next action
 
-**Current gate: Safe Host composition/user-flow design owner review — documentation only; no operational activation.**
-Following the owner-accepted [closeout and productization gap review](acceptance/PHASE2B4_CLOSEOUT_REVIEW.md),
-the [single-fixture CLI design](plans/SAFE_HOST_COMPOSITION_USER_FLOW_DESIGN.md) specifies
-the proposed fixed OpenCode journey, separate native-model data authorization, ephemeral
-human outcome decisions and child-only Inspect. Its recommended next step is a separately
-authorized minimal M3-C trust-contract/deployment-feasibility gate; unresolved genuine trust
-keeps Host activation blocked in both personal-lab and corporate profiles. No implementation,
-live evaluation, infrastructure increment or activation is authorized by this design.
+**Current gate: M3-C-W0 corporate-workstation trust/deployment feasibility — documentation only; operational Host activation BLOCKED.**
+The [W0 feasibility review](plans/M3C_CORPORATE_WORKSTATION_TRUST_FEASIBILITY.md) conditionally
+prefers reuse of a suitable enterprise authority plus independently proven local enforcement,
+writer/credential custody and provider-access protection. Next is owner/IT confirmation of
+actual capabilities and exact-operation contracts; no corporate infrastructure is assumed
+available or approved. If unsuitable, consider only a separately approved protected-local
+feasibility gate; do not fall back to same-user in-process authority for activation.
+The [single-fixture CLI design](plans/SAFE_HOST_COMPOSITION_USER_FLOW_DESIGN.md) remains the
+functional baseline with a dated corporate-first priority note, following the accepted
+[closeout review](acceptance/PHASE2B4_CLOSEOUT_REVIEW.md). Personal lab is secondary;
+central orchestration, Registry and bounded Hybrid planning are not first-use prerequisites.
+No runtime implementation, service installation, identity/network probe, test/live execution
+or activation is authorized by W0; corporate security holds remain independent requirements.
 Pinned official-source-derived fixtures calibrate bounded excerpts, known unrelated tools
 and exact duplicate reads. Independent 4C verification and R1 native tool observation remain
 mandatory. 357 focused / 1307 offline tests pass; these are not live-provider success rates.

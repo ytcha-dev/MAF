@@ -2,6 +2,8 @@
 
 日期：2026-10-19（Asia/Taipei）。狀態：**Design gate delivered for owner review；全部未實作，operational activation 仍 Blocked。**
 
+> **2026-10-19 owner deployment-priority update — M3-C-W0：** 初始目標改為每位獲授權工程師的公司 Windows 工作站獨立部署 MAF；本文原有 Profile A personal-lab-first／非公司環境優先與其後續排序已被取代，保留為 secondary compatibility/reference context。Profile B 的企業信任、資料流、資安 clearance 與 custody 前置成為 primary；機能旅程與歷史設計理由保留。見 [corporate-workstation trust feasibility](M3C_CORPORATE_WORKSTATION_TRUST_FEASIBILITY.md) 的 C-first 條件式建議、IT evidence gate 與 corporate outcome-decision 待決事項。未來中央 orchestration／remote-local workers 是演進方向，不是當前依賴；本更新不授權 runtime、服務、模型或 Host activation。
+
 ## 1. 範圍、baseline 與證據
 
 Repository：`ytcha-dev/MAF`。本輪開始 HEAD 為 `838a9af8d657de6bd4a2f5ea0f7522503a9da871`，分支 `main`，與本機 `origin/main` 記錄相同；工作目錄僅有未追蹤 `.opencode/`，保留、不讀取、不提交。此紀錄不宣稱檢查開始時已向遠端 refresh。
