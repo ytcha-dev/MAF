@@ -9,7 +9,12 @@
 
 ## Current development increment and next action
 
-**Current authorized increment: 4F source evidence coverage calibration — controlled validation passed; owner review pending.**
+**Current gate: Phase 2B-4 closeout owner review — 4F controlled validation passed; owner acceptance and any next milestone require separate authorization.**
+The documentation-only [closeout and productization gap review](acceptance/PHASE2B4_CLOSEOUT_REVIEW.md)
+checks the actual 4A–4F call paths and evidence boundaries. Its primary recommendation is
+a separately authorized safe Host composition/user-flow design, with M3-C still mandatory
+before user-facing activation. This review does not authorize implementation, another
+infrastructure increment, live evaluation or activation.
 Pinned official-source-derived fixtures calibrate bounded excerpts, known unrelated tools
 and exact duplicate reads. Independent 4C verification and R1 native tool observation remain
 mandatory. 357 focused / 1307 offline tests pass; these are not live-provider success rates.
