@@ -9,17 +9,20 @@
 
 ## Current development increment and next action
 
-**Current gate: Phase 2B-4 closeout owner review — 4F controlled validation passed; owner acceptance and any next milestone require separate authorization.**
-The documentation-only [closeout and productization gap review](acceptance/PHASE2B4_CLOSEOUT_REVIEW.md)
-checks the actual 4A–4F call paths and evidence boundaries. Its primary recommendation is
-a separately authorized safe Host composition/user-flow design, with M3-C still mandatory
-before user-facing activation. This review does not authorize implementation, another
-infrastructure increment, live evaluation or activation.
+**Current gate: Safe Host composition/user-flow design owner review — documentation only; no operational activation.**
+Following the owner-accepted [closeout and productization gap review](acceptance/PHASE2B4_CLOSEOUT_REVIEW.md),
+the [single-fixture CLI design](plans/SAFE_HOST_COMPOSITION_USER_FLOW_DESIGN.md) specifies
+the proposed fixed OpenCode journey, separate native-model data authorization, ephemeral
+human outcome decisions and child-only Inspect. Its recommended next step is a separately
+authorized minimal M3-C trust-contract/deployment-feasibility gate; unresolved genuine trust
+keeps Host activation blocked in both personal-lab and corporate profiles. No implementation,
+live evaluation, infrastructure increment or activation is authorized by this design.
 Pinned official-source-derived fixtures calibrate bounded excerpts, known unrelated tools
 and exact duplicate reads. Independent 4C verification and R1 native tool observation remain
 mandatory. 357 focused / 1307 offline tests pass; these are not live-provider success rates.
 See [4F results](acceptance/PHASE2B4_F_EVIDENCE_COVERAGE_RESULTS.md) and the
-[execution plan](plans/PHASE2B4_EXECUTION_PLAN.md). Stop after 4F for owner review.
+[execution plan](plans/PHASE2B4_EXECUTION_PLAN.md). These remain historical controlled evidence;
+the current design gate above governs the next action.
 Production Host activation, M3-C/identity, real multi-agent provider integration, durable
 parent resume and Human Approval UI remain incomplete. Phase 2B-3, Phase 2C/Registry and
 Hybrid are also unfinished. Historical milestone next-actions at the end are dated evidence.
