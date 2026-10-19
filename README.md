@@ -2,7 +2,7 @@
 
 MAF 以 C# / .NET 10 與官方 Microsoft Agent Framework，逐步建立 local-first 多 Agent 協調平台。原生 PCA 與 Review 是獨立元件，外部 Harness 承擔專業任務；MAF 負責協調，不自製 Agent Loop。受控多 Agent Workflow composition 尚非正式 Host 執行入口。
 
-4D／R1 已由 Owner Review 作為受控技術里程碑；目前增量是 **4F 來源證據覆蓋校準（受控技術驗證通過，待 Owner 審查）**。現有能力與驗收邊界：
+4D／R1 已由 Owner Review 作為受控技術里程碑；目前增量是 **Local Solo MVP-S1-R1（個人 Windows 離線驗證通過，待 Owner execution-acceptance review）**。現有能力與驗收邊界：
 
 - **Phase 2A**：[受控 live、唯讀 OpenCode PoC](docs/acceptance/PHASE2A_RESULTS.md)；另有 [2B-1 家用持久化／恢復驗收](docs/acceptance/PHASE2B1_HOME_RESULTS.md)，不代表公司端安全相容性 clearance。
 - **M3／M4**：受控 protected execution、durable recovery、synthetic Approval/Resume 與取消／對帳技術證明，見 [M4-C](docs/acceptance/PHASE2B2_M4_C_RESULTS.md)。
@@ -14,7 +14,7 @@ MAF 以 C# / .NET 10 與官方 Microsoft Agent Framework，逐步建立 local-fi
 
 **尚未完成**：正式多 Agent Host 入口、production identity／M3-C、真實多 Agent provider 協作、外層 Workflow durable resume、Human Approval UI。Host external-task／recover／recover-pending 仍拒絕 `ProductionTrustUnavailable`，無 legacy fallback。獨立原生 PCA／Git-diff Review 可用，但不代表已納入 production policy 保護。Phase 2B-3、2C／Registry 與 Hybrid 未完成。
 
-目前進度與後續邊界集中在 [Roadmap](docs/ROADMAP.md)；Local Solo S1 已撰寫離線 Host foundation（Build／Tests NotRun），受保護組裝與實際執行仍須另行授權。
+目前進度與後續邊界集中在 [Roadmap](docs/ROADMAP.md)；Local Solo S1-R1 離線 Host foundation 已通過個人 Windows 驗證（56 focused／32 narrow regression；建置 0 警告／錯誤），受保護組裝與實際執行仍須另行授權。
 
 ## 系統用途
 
@@ -33,7 +33,7 @@ Agents 不會修改目標專案、執行任意 shell／建置／測試，也不�
 
 ## Local Solo MVP-S1：離線 Host foundation
 
-新增 provider-neutral Host 參數（**已撰寫，Build／Tests：NotRun**；公司 execution hold 未解除，不在受限環境執行下列範例）：
+新增 provider-neutral Host 參數（**S1-R1 個人 Windows 離線驗證通過**；[驗收紀錄](docs/acceptance/LOCAL_SOLO_MVP_S1_HOST_FOUNDATION_RESULTS.md) 保留原 S1 NotRun 歷史；公司 execution hold 未解除，不在受限環境執行下列範例）：
 
 ```text
 --local help

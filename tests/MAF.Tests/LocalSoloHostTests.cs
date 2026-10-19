@@ -6,9 +6,14 @@ namespace MAF.Tests;
 // Authored for a separately cleared environment. No provider/server/model/test trust composition.
 public sealed class LocalSoloHostTests : IDisposable
 {
-    private readonly string workspace = Directory.CreateTempSubdirectory("maf-local-s1-").FullName;
+    private readonly Lazy<string> ownedWorkspace = new(() => Directory.CreateTempSubdirectory("maf-local-s1-").FullName);
+    private string workspace => ownedWorkspace.Value;
     private static string? EmptyConfiguration(string _) => null;
-    public void Dispose() => Directory.Delete(workspace); // owned, empty fixture only; non-recursive
+    public void Dispose()
+    {
+        if (ownedWorkspace.IsValueCreated)
+            Directory.Delete(ownedWorkspace.Value); // owned, empty fixture only; non-recursive
+    }
 
     private static (int Exit, string Output, string Error) Run(string[] args, Func<string, string?>? config = null)
     {
@@ -53,7 +58,7 @@ public sealed class LocalSoloHostTests : IDisposable
         Assert.Contains("PCA model-role binding: Unavailable", result.Output);
         Assert.Contains("Reviewer model-role binding: Unavailable", result.Output);
         Assert.Contains("Database: NotEstablished", result.Output);
-        Assert.Empty(Directory.EnumerateFileSystemEntries(workspace));
+        Assert.False(ownedWorkspace.IsValueCreated);
     }
 
     [Theory]
@@ -67,6 +72,7 @@ public sealed class LocalSoloHostTests : IDisposable
         Assert.Equal(2, result.Exit);
         Assert.Empty(result.Output);
         Assert.Equal("InvalidLocalInput: use --local help; no execution attempted." + Environment.NewLine, result.Error);
+        Assert.False(ownedWorkspace.IsValueCreated);
     }
 
     [Theory]
@@ -78,7 +84,10 @@ public sealed class LocalSoloHostTests : IDisposable
     [InlineData("C:relative")]
     [InlineData("C:\\project\u001b[2J")]
     public void UnsafeWorkspaceShapeIsRejected(string path)
-        => Assert.Throws<ArgumentException>(() => LocalSoloApplication.ValidateWorkspace(path));
+    {
+        Assert.Throws<ArgumentException>(() => LocalSoloApplication.ValidateWorkspace(path));
+        Assert.False(ownedWorkspace.IsValueCreated);
+    }
 
     [Fact]
     public void ExplicitExistingWorkspaceIsOnlyAnAvailableCandidate()
@@ -110,7 +119,10 @@ public sealed class LocalSoloHostTests : IDisposable
     [InlineData("task\tother")]
     [InlineData("task\u202Eother")]
     public void UnsafeObjectiveIsRejected(string objective)
-        => Assert.Throws<ArgumentException>(() => LocalSoloApplication.Preview(workspace, objective, EmptyConfiguration));
+    {
+        Assert.Throws<ArgumentException>(() => LocalSoloApplication.Preview("unused", objective, EmptyConfiguration));
+        Assert.False(ownedWorkspace.IsValueCreated);
+    }
 
     [Fact]
     public void ObjectiveLengthIsBounded()
@@ -165,6 +177,7 @@ public sealed class LocalSoloHostTests : IDisposable
         var result = Run(args, _ => throw new InvalidOperationException("Must not read"));
         Assert.Equal(2, result.Exit);
         Assert.Empty(result.Output);
+        Assert.False(ownedWorkspace.IsValueCreated);
     }
 
     [Theory]
@@ -178,7 +191,7 @@ public sealed class LocalSoloHostTests : IDisposable
         Assert.Equal(1, result.Exit);
         Assert.Empty(result.Output);
         Assert.Equal("ProductionTrustUnavailable" + Environment.NewLine, result.Error);
-        Assert.Empty(Directory.EnumerateFileSystemEntries(workspace));
+        Assert.False(ownedWorkspace.IsValueCreated);
     }
 
     [Fact]
@@ -195,6 +208,7 @@ public sealed class LocalSoloHostTests : IDisposable
         Assert.DoesNotContain("Adapter diagnostics", result.Output);
         Assert.DoesNotContain("HTTP requests", result.Output);
         Assert.DoesNotContain("External session", result.Output);
+        Assert.False(ownedWorkspace.IsValueCreated);
     }
 
     [Fact]
@@ -207,6 +221,7 @@ public sealed class LocalSoloHostTests : IDisposable
         Assert.Contains("Observed status: NotExecuted", text);
         Assert.Contains("Observed at: Unavailable", text);
         Assert.DoesNotContain("Observed status: Completed", text);
+        Assert.False(ownedWorkspace.IsValueCreated);
     }
 
     private static string Present(LocalResultView view, bool diagnostics = false)
@@ -231,6 +246,7 @@ public sealed class LocalSoloHostTests : IDisposable
         Assert.Contains("MAF pre-dispatch approval: NotEstablished", text);
         Assert.Contains("Harness tool permission: NotEstablished", text);
         Assert.Contains("Human result choice: NotEstablished", text);
+        Assert.False(ownedWorkspace.IsValueCreated);
     }
 
     [Fact]
@@ -248,6 +264,7 @@ public sealed class LocalSoloHostTests : IDisposable
         Assert.Contains("Human result choice: Rejected", text);
         Assert.Contains("HumanGate readiness is not Accepted", text);
         Assert.Contains("Observed status: WaitingForApproval", text);
+        Assert.False(ownedWorkspace.IsValueCreated);
     }
 
     [Fact]
@@ -257,6 +274,7 @@ public sealed class LocalSoloHostTests : IDisposable
         Assert.DoesNotContain("opaque adapter identifier", Present(view));
         Assert.Contains("opaque adapter identifier", Present(view, true));
         Assert.Contains("Unavailable; provenance: Unavailable", Present(view));
+        Assert.False(ownedWorkspace.IsValueCreated);
     }
 
     [Theory]
@@ -277,6 +295,7 @@ public sealed class LocalSoloHostTests : IDisposable
         }, true);
         Assert.DoesNotContain(secret, text);
         Assert.Contains("REDACTED", text);
+        Assert.False(ownedWorkspace.IsValueCreated);
     }
 
     [Fact]
@@ -294,6 +313,7 @@ public sealed class LocalSoloHostTests : IDisposable
         Assert.DoesNotContain("\nSpoof", text);
         Assert.Contains("[truncated]", text);
         Assert.True(text.Length < 40000);
+        Assert.False(ownedWorkspace.IsValueCreated);
     }
 
     [Theory]
@@ -302,9 +322,9 @@ public sealed class LocalSoloHostTests : IDisposable
     [InlineData("--recover-pending")]
     public async Task ExistingExternalDenialStillPrecedesAnyConfigurationRead(string mode)
     {
-        var error = await Assert.ThrowsAsync<ExternalHarnessException>(() => ExternalConsole.RunAsync([mode], workspace,
+        var error = await Assert.ThrowsAsync<ExternalHarnessException>(() => ExternalConsole.RunAsync([mode], "unused",
             _ => throw new InvalidOperationException("Must not read")));
         Assert.Equal("ProductionTrustUnavailable", error.Code);
-        Assert.Empty(Directory.EnumerateFileSystemEntries(workspace));
+        Assert.False(ownedWorkspace.IsValueCreated);
     }
 }

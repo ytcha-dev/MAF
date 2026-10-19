@@ -130,3 +130,102 @@ text-only display projection，不是 serialized execution input、authority pro
 5. bounded operational view mapping、human decision 語義／是否只同 session、parent checkpoint 缺口與 child-only Inspect 另定驗收；不以 SQLite ledger 假裝完整 result/parent 可還原。
 
 目前停止在 offline foundation。**沒有 S2、Host activation、第二 Harness、Registry、general IAM 或服務安裝；真正提交仍 BLOCKED。**
+
+
+## 9. S1-R1 follow-up — Personal Windows validation (2026-10-19)
+
+**Offline foundation validation passed / Owner execution-acceptance review ready / Operational activation BLOCKED.**
+Original sections 1–8 above preserve S1's authored-only / NotRun evidence. These results
+were obtained later on the owner's explicitly authorized personal Windows development
+machine, not on the affected corporate workstation and not as corporate clearance.
+
+### Baseline and exact correction
+
+HEAD, branch and fetched origin/main were `8aa93ef1fbec6d6ce30ba9ec334d9fffd391bc5b`,
+`main`; no intervening changes. Unrelated untracked `.vscode/` was left untouched and
+excluded from the commit. No untracked OpenCode data, secrets or company content was read.
+
+xUnit constructs a class instance for each case. The eager `CreateTempSubdirectory`
+field therefore allocated a workspace even for pure parser/presenter and blocked-submit
+cases. The field now owns a `Lazy<string>`; only tests requiring an existing workspace
+access its Value. Dispose checks IsValueCreated before accessing Value and deletes only
+that fixture-owned empty directory, non-recursively. Prefix and temporary location are
+unchanged; no security-control evasion or global fixture/cleanup framework.
+
+Pure tests now assert IsValueCreated is false. Empty-directory assertions which themselves
+allocated a workspace were replaced only in no-workspace cases. Invalid-objective and
+external-denial cases pass inert `unused` input instead of evaluating the lazy property;
+their original rejection/code/configuration assertions remain. Six cases still allocate
+real isolated directories for metadata validation, preview/profile and objective-limit
+behavior; the other 50 S1 cases do not allocate the test-owned workspace. This counts
+fixture allocation by reviewed code/IsValueCreated assertions, not system-wide filesystem
+instrumentation. Cleanup cannot initialize an unused fixture.
+
+Changed files:
+
+- [LocalSoloHostTests](../../tests/MAF.Tests/LocalSoloHostTests.cs): lazy ownership and pure-case assertions.
+- This report: dated R1 evidence appended; historical S1 results retained.
+- [Roadmap](../ROADMAP.md): current personal validation status and next gate.
+- [README](../../README.md): matching concise current status / S1 validation labels.
+
+No production source, package, Host route, protected runtime, policy, schema, Workflow,
+provider, source-evidence or Native Reviewer code changed. No S1-local compilation or
+behavior bug was found; the correction is confined to test fixture isolation.
+
+### Actual commands and results
+
+Personal Windows; installed SDKs 10.0.201 and 10.0.401; selected `dotnet --version` =
+10.0.401, target net10.0. Project/package references were inspected. Existing dependency
+assets/cache sufficed: no restore, new packages or external restore source was used.
+
+```powershell
+dotnet --list-sdks
+dotnet --version
+dotnet build src/MAF.Host/MAF.Host.csproj --no-restore
+dotnet build tests/MAF.Tests/MAF.Tests.csproj --no-restore
+dotnet test tests/MAF.Tests/MAF.Tests.csproj --no-build --no-restore --filter 'FullyQualifiedName~LocalSoloHostTests' --logger 'trx;LogFileName=local-solo-s1-r1-focused.trx' --results-directory TestResults/home-validation
+dotnet test tests/MAF.Tests/MAF.Tests.csproj --no-build --no-restore --filter 'FullyQualifiedName~ExternalConsoleOutputTests|FullyQualifiedName~RuntimeEnforcementTests.HostDoesNotConstructLegacyRuntimeWithoutProductionTrust' --logger 'trx;LogFileName=local-solo-s1-r1-regression.trx' --results-directory TestResults/home-validation
+```
+
+| Verification | Actual outcome |
+| --- | --- |
+| SDK inspection | Exit 0; SDK 10.0.401 selected |
+| Host build | Exit 0; 0 warnings / 0 errors; 6.18s |
+| Test-project build and referenced projects | Exit 0; 0 warnings / 0 errors; 4.91s |
+| Focused S1 | Exit 0; discovered 56 / passed 56 / failed 0 / skipped 0; 220ms |
+| Narrow regression | Exit 0; discovered 32 / passed 32 / failed 0 / skipped 0; 139ms |
+
+The runner confirms the earlier static estimate of 56 cases. The narrow regression is
+29 ExternalConsoleOutput cases plus three pre-existing Host denial cases, not the whole
+RuntimeEnforcement suite. Those three retain their own empty temporary-directory fixture;
+no DB is created and the rest of that class is excluded. TRX artifacts are ignored under
+TestResults/home-validation. No full suite, launcher, server, live provider, model, native
+inference, company service or uncontrolled workspace execution was performed.
+
+No antivirus/endpoint block, security alert or testhost crash was observed in command
+results. Security-product telemetry was not queried; successful execution does not certify
+absence of alerts elsewhere or grant corporate clearance. No security policy/ACL changes.
+The historical [corporate security-event report](PHASE2B1_SECURITY_EVENT.md) is unchanged.
+
+### Invariants and remaining gates
+
+Assertions cover bounded/non-disclosing CLI errors, sample NotExecuted / NotVerified,
+Unknown/Partial/WaitingForApproval without inferred human acceptance, separate permission
+and approval displays, opt-in diagnostics, provider-neutral missing identifiers and all
+three external denials. Static review confirms Program's local branch returns before
+native client/DI construction, LocalSoloApplication.Submit always throws
+ProductionTrustUnavailable, and S1 owns no HTTP/client/store/trust dependencies. These are
+assertion plus call-path evidence, not system-wide network/process/DB instrumentation;
+passing tests alone are not claimed to prove zero effects.
+
+No unresolved build/test failures. Reparse/junction/mapped-drive behavior and malicious
+same-principal filesystem races remain unvalidated platform boundaries. Redaction remains
+heuristic. S1 is ready for owner **offline execution-acceptance review**, not operational
+provider acceptance. Corporate affected execution clearance remains outstanding.
+
+S2 still requires separate owner authorization, genuine caller/current policy and explicit
+activation/custody/rollback boundaries, separately authorized PCA/Harness-model/Reviewer
+data flows and budgets, and deliberate protected composition with original identity,
+effect/receipt guards and mandatory 4C/R1 verification. RequireApproval must not become
+Allow; parent durable resume remains out of scope. No S2 implementation or provider
+activation was performed. **STOP after S1-R1.**

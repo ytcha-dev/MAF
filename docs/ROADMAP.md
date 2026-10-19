@@ -9,14 +9,14 @@
 
 ## Current development increment and next action
 
-**Current increment: Local Solo MVP-S1 offline Host foundation — source and tests authored; Build/Tests NotRun under the corporate execution hold. External Host activation remains BLOCKED.**
+**Current increment: Local Solo MVP-S1-R1 — personal Windows offline validation passed; ready for owner execution-acceptance review. External Host activation remains BLOCKED; corporate execution hold is unchanged.**
 The [S1 results and verification limits](acceptance/LOCAL_SOLO_MVP_S1_HOST_FOUNDATION_RESULTS.md)
 record `--local config`, explicit-workspace `preview`, `OfflineSample / NotExecuted` presentation
 and unconditional blocked `submit`. No client, Workflow, trust provider or database is composed.
 The [Harness extensibility review](acceptance/LOCAL_SOLO_MVP_HARNESS_EXTENSIBILITY_REVIEW.md)
 finds reusable Core/Workflow/evidence seams but concrete OpenCode protected-composition,
 source-origin and cancellation/receipt constraints. The provider-neutral Host application/view
-boundary is now authored for the bounded offline journey, not accepted operational execution.
+boundary is validated for the bounded offline journey (56 focused / 32 narrow regression passed; Host/test builds 0 warnings/errors), not accepted operational execution. Historical S1 NotRun evidence is preserved in the report.
 Next: separately authorize safe protected OpenCode composition only after defining genuine trust,
 activation/storage custody, role-specific native egress and Harness/model data-flow prerequisites;
 missing evidence keeps activation blocked. Real-provider evaluation requires its own authorization.
