@@ -3,25 +3,29 @@
 > **Roadmap v0.2 — current status aligned 2026-10-18** · original proposal 2026-10-15 · Project: `ytcha-dev/MAF`
 > **Status:** Controlled implementation evidence below; future stages still require owner authorization
 > **Decision retained:** deterministic Workflow-first (A), then bounded Hybrid orchestration (C).  
-> **Deployment decision — 2026-10-19:** independent MAF instances on authorized engineers' corporate Windows workstations first. Personal lab is secondary compatibility/reference context. Future centralized orchestration with workstation/remote harness workers is an evolution, not a prerequisite; offline operation remains conditional on demonstrated trust and organizational authorization.
+> **Product decision — 2026-10-19, Local Solo MVP-S0:** local-first single-operator CLI, one profile/workspace, OpenCode first, separate native PCA/Reviewer model bindings and SQLite per installation. Local Solo is a UX/deployment assumption, not trusted identity or independent human consent. Shared multi-user infrastructure, central IAM and centralized orchestration are deferred; corporate execution and data restrictions remain in force.
 
 > **Architecture guardrails:** [Seven ownership boundaries and delivery discipline](architecture/ARCHITECTURE_GUARDRAILS.md). These are design constraints, not claims of implemented enforcement.
 
 ## Current development increment and next action
 
-**Current gate: M3-C-W0 corporate-workstation trust/deployment feasibility — documentation only; operational Host activation BLOCKED.**
-The [W0 feasibility review](plans/M3C_CORPORATE_WORKSTATION_TRUST_FEASIBILITY.md) conditionally
-prefers reuse of a suitable enterprise authority plus independently proven local enforcement,
-writer/credential custody and provider-access protection. Next is owner/IT confirmation of
-actual capabilities and exact-operation contracts; no corporate infrastructure is assumed
-available or approved. If unsuitable, consider only a separately approved protected-local
-feasibility gate; do not fall back to same-user in-process authority for activation.
-The [single-fixture CLI design](plans/SAFE_HOST_COMPOSITION_USER_FLOW_DESIGN.md) remains the
-functional baseline with a dated corporate-first priority note, following the accepted
-[closeout review](acceptance/PHASE2B4_CLOSEOUT_REVIEW.md). Personal lab is secondary;
-central orchestration, Registry and bounded Hybrid planning are not first-use prerequisites.
-No runtime implementation, service installation, identity/network probe, test/live execution
-or activation is authorized by W0; corporate security holds remain independent requirements.
+**Current gate: Local Solo MVP-S0 extensibility review — documentation only; external Host activation remains BLOCKED.**
+The [Harness extensibility review](acceptance/LOCAL_SOLO_MVP_HARNESS_EXTENSIBILITY_REVIEW.md)
+finds reusable Core/Workflow/evidence seams but concrete OpenCode protected-composition,
+source-origin and cancellation/receipt constraints. Next proposed coding increment is a
+provider-neutral Host foundation with a bounded, explicitly offline user journey; it needs
+separate owner authorization. Then compose protected OpenCode subject to genuine trust and
+data-flow prerequisites, followed by separately authorized real-provider evaluation.
+OpenCode is the first adapter, not the permanent architecture. Codex CLI, Claude Code and
+other CLI/API/A2A Harnesses are future candidates, not implemented integrations. No Registry,
+multi-provider UI, generalized approval/IAM platform or Hybrid planner is needed first.
+The [Safe Host design](plans/SAFE_HOST_COMPOSITION_USER_FLOW_DESIGN.md) and
+[closeout review](acceptance/PHASE2B4_CLOSEOUT_REVIEW.md) remain functional/safety references.
+The [M3-C-W0 report](plans/M3C_CORPORATE_WORKSTATION_TRUST_FEASIBILITY.md) is retained as
+deferred enterprise-trust planning evidence; its corporate-first sequencing is superseded
+by this Local Solo priority, without waiving security holds, genuine authorization,
+native-model outbound controls or fail-closed guards. No runtime work or activation is
+authorized by S0; offline foundation does not establish a production trust provider.
 Pinned official-source-derived fixtures calibrate bounded excerpts, known unrelated tools
 and exact duplicate reads. Independent 4C verification and R1 native tool observation remain
 mandatory. 357 focused / 1307 offline tests pass; these are not live-provider success rates.
