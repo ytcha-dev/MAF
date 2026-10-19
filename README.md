@@ -14,7 +14,7 @@ MAF 以 C# / .NET 10 與官方 Microsoft Agent Framework，逐步建立 local-fi
 
 **尚未完成**：正式多 Agent Host 入口、production identity／M3-C、真實多 Agent provider 協作、外層 Workflow durable resume、Human Approval UI。Host external-task／recover／recover-pending 仍拒絕 `ProductionTrustUnavailable`，無 legacy fallback。獨立原生 PCA／Git-diff Review 可用，但不代表已納入 production policy 保護。Phase 2B-3、2C／Registry 與 Hybrid 未完成。
 
-目前建議下一步與各階段邊界集中在 [Roadmap](docs/ROADMAP.md)；本輪停在 4F，完成後交由 Owner Review，再另行授權後續工作。
+目前進度與後續邊界集中在 [Roadmap](docs/ROADMAP.md)；Local Solo S1 已撰寫離線 Host foundation（Build／Tests NotRun），受保護組裝與實際執行仍須另行授權。
 
 ## 系統用途
 
@@ -30,6 +30,24 @@ PCA 讓你指定一個本機專案，以繁體中文提問，取得結合實際�
 執行流程為：CLI 接收問題 → 官方 MAF Agent 決定呼叫工具 → 工具在指定根目錄讀取並過濾內容 → 模型根據工具證據回答。連續問題共用同一個記憶體 Session，結束程序後不保留對話。
 
 Agents 不會修改目標專案、執行任意 shell／建置／測試，也不提供 Web UI、長期記憶或正式多 Agent 執行入口；受控多 Agent Workflow 的邊界見上述驗收。
+
+## Local Solo MVP-S1：離線 Host foundation
+
+新增 provider-neutral Host 參數（**已撰寫，Build／Tests：NotRun**；公司 execution hold 未解除，不在受限環境執行下列範例）：
+
+```text
+--local help
+--local config [--workspace <absolute-local-directory>]
+--local preview --workspace <absolute-local-directory> --objective <bounded-single-line-text>
+--local sample [--diagnostics]
+--local submit [--workspace <directory> --objective <text>]
+```
+
+這些是傳給既有 Host 的參數。`config` 只顯示候選 profile；`preview` 必須明選 workspace，只檢查有界輸入與目錄 metadata，不讀專案內容，路徑存在不代表已核准。`sample` 全畫面標示 `OfflineSample / NotExecuted`；證據是未讀取的 illustrative reference，不是 verified proof。`submit` 一律拒絕 `ProductionTrustUnavailable`（exit 1），不建立 client、Workflow、DB 或 task identity。
+
+單一候選 profile 可使用非秘密 metadata：`MAF_LOCAL_HARNESS`（預設 `OpenCode`，只是一個名稱）、`MAF_LOCAL_WORKSPACE`（僅供 config fallback）、`MAF_LOCAL_PCA_MODEL`、`MAF_LOCAL_REVIEWER_MODEL`（只顯示是否有設定，不顯示值、不驗證模型）。不可放 credentials；這些設定不授權執行。兩個 model-role bindings 不會繼承舊 `AI_*` 設定。預覽時間預算固定為候選值 120 秒，並非可執行 grant。
+
+新模式採 text output；exit 0 僅表示離線檢視成功，2 表示參數／候選輸入錯誤，1 表示 submission blocked 或本地檢查失敗。沒有 status／Inspect／accept／reject 新命令；human choice 目前只是 view 欄位，不保存或證明人類決定。舊 PCA／Review 與 external/recovery 路徑保留，後者仍 blocked。詳見 [S1 範圍與未執行驗證](docs/acceptance/LOCAL_SOLO_MVP_S1_HOST_FOUNDATION_RESULTS.md)。
 
 ## 啟動
 

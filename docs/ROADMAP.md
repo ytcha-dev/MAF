@@ -9,13 +9,17 @@
 
 ## Current development increment and next action
 
-**Current gate: Local Solo MVP-S0 extensibility review — documentation only; external Host activation remains BLOCKED.**
+**Current increment: Local Solo MVP-S1 offline Host foundation — source and tests authored; Build/Tests NotRun under the corporate execution hold. External Host activation remains BLOCKED.**
+The [S1 results and verification limits](acceptance/LOCAL_SOLO_MVP_S1_HOST_FOUNDATION_RESULTS.md)
+record `--local config`, explicit-workspace `preview`, `OfflineSample / NotExecuted` presentation
+and unconditional blocked `submit`. No client, Workflow, trust provider or database is composed.
 The [Harness extensibility review](acceptance/LOCAL_SOLO_MVP_HARNESS_EXTENSIBILITY_REVIEW.md)
 finds reusable Core/Workflow/evidence seams but concrete OpenCode protected-composition,
-source-origin and cancellation/receipt constraints. Next proposed coding increment is a
-provider-neutral Host foundation with a bounded, explicitly offline user journey; it needs
-separate owner authorization. Then compose protected OpenCode subject to genuine trust and
-data-flow prerequisites, followed by separately authorized real-provider evaluation.
+source-origin and cancellation/receipt constraints. The provider-neutral Host application/view
+boundary is now authored for the bounded offline journey, not accepted operational execution.
+Next: separately authorize safe protected OpenCode composition only after defining genuine trust,
+activation/storage custody, role-specific native egress and Harness/model data-flow prerequisites;
+missing evidence keeps activation blocked. Real-provider evaluation requires its own authorization.
 OpenCode is the first adapter, not the permanent architecture. Codex CLI, Claude Code and
 other CLI/API/A2A Harnesses are future candidates, not implemented integrations. No Registry,
 multi-provider UI, generalized approval/IAM platform or Hybrid planner is needed first.
@@ -24,8 +28,8 @@ The [Safe Host design](plans/SAFE_HOST_COMPOSITION_USER_FLOW_DESIGN.md) and
 The [M3-C-W0 report](plans/M3C_CORPORATE_WORKSTATION_TRUST_FEASIBILITY.md) is retained as
 deferred enterprise-trust planning evidence; its corporate-first sequencing is superseded
 by this Local Solo priority, without waiving security holds, genuine authorization,
-native-model outbound controls or fail-closed guards. No runtime work or activation is
-authorized by S0; offline foundation does not establish a production trust provider.
+native-model outbound controls or fail-closed guards. S1 authorizes only the offline foundation;
+it does not establish a production trust provider or authorize S2/provider activation.
 Pinned official-source-derived fixtures calibrate bounded excerpts, known unrelated tools
 and exact duplicate reads. Independent 4C verification and R1 native tool observation remain
 mandatory. 357 focused / 1307 offline tests pass; these are not live-provider success rates.
