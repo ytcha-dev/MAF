@@ -15,7 +15,7 @@ public sealed class PersonalLabFirstRunBoundaryTests(ITestOutputHelper output) :
     readonly SourceCandidateIntegrationTests fixtures = new(output); // Paths only, no eager allocation.
     // Scripted OpenAI wire replies. The official native Agent executes the evidence tool;
     // this handler neither runs tools nor substitutes an orchestration/result object.
-    sealed class NativeHttp(LocalExecutionPreparation p, bool review, bool unavailable) : HttpMessageHandler
+    internal sealed class NativeHttp(LocalExecutionPreparation p, bool review, bool unavailable) : HttpMessageHandler
     {
         public int Calls; public bool ToolResultObserved;
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)

@@ -2,7 +2,7 @@
 
 MAF 以 C# / .NET 10 與官方 Microsoft Agent Framework，逐步建立 local-first 多 Agent 協調平台。原生 PCA 與 Review 是獨立元件，外部 Harness 承擔專業任務；MAF 負責協調，不自製 Agent Loop。受控多 Agent Workflow composition 尚非正式 Host 執行入口。
 
-4D／R1 已由 Owner Review 作為受控技術里程碑；S2D-A 已條件接受為離線基礎。目前增量是 **Local Solo MVP-S2D-C（離線 Lab 原始 response／receipt 與 OpenCode model-selection 邊界；實際執行仍封鎖）**。現有能力與驗收邊界：
+4D／R1 已由 Owner Review 作為受控技術里程碑；S2D-A 已條件接受為離線基礎。目前增量是 **S2D-D 獨立 PersonalLab offline runtime（受控驗證完成，建議 Conditional Owner acceptance；無 live activation）**。現有能力與驗收邊界：
 
 - **Phase 2A**：[受控 live、唯讀 OpenCode PoC](docs/acceptance/PHASE2A_RESULTS.md)；另有 [2B-1 家用持久化／恢復驗收](docs/acceptance/PHASE2B1_HOME_RESULTS.md)，不代表公司端安全相容性 clearance。
 - **M3／M4**：受控 protected execution、durable recovery、synthetic Approval/Resume 與取消／對帳技術證明，見 [M4-C](docs/acceptance/PHASE2B2_M4_C_RESULTS.md)。
@@ -16,7 +16,7 @@ MAF 以 C# / .NET 10 與官方 Microsoft Agent Framework，逐步建立 local-fi
 
 目前進度與後續邊界集中在 [Roadmap](docs/ROADMAP.md)；Local Solo S1-R1 離線 Host foundation 已通過個人 Windows 驗證（56 focused／32 narrow regression；建置 0 警告／錯誤），正式受保護組裝與實際 provider 執行仍須另行授權。
 
-[S2D-C 結果](docs/acceptance/LOCAL_SOLO_MVP_S2D_C_FIRST_REAL_RUN_BOUNDARY_RESULTS.md)：Lab journal 分開記錄 session candidate、原始 exchange correlation 與 fixture-only receipt；Prompt 明確選擇 provider/model，observed labels 不符則封鎖。沿用 owned native clients、官方 Workflow 與獨立 evidence tools。**HOLD：最後測試回合中止，Owner 回報撞到防毒軟體；已停止測試，交由 GPT／Owner 靜態審查，未完成最終驗證。** 下游 egress attestation、Lab live delegation 與 operational transport 仍未建立；所有 Network／公開執行入口保持封鎖。歷史 [S2D-B 結果](docs/acceptance/LOCAL_SOLO_MVP_S2D_B_OFFLINE_PROVENANCE_RECIPIENT_RESULTS.md) 與失敗證據保留。
+[S2D-C 結果](docs/acceptance/LOCAL_SOLO_MVP_S2D_C_FIRST_REAL_RUN_BOUNDARY_RESULTS.md)：Lab journal 分開記錄 session candidate、原始 exchange correlation 與 fixture-only receipt；Prompt 明確選擇 provider/model，observed labels 不符則封鎖。沿用 owned native clients、官方 Workflow 與獨立 evidence tools。**歷史 HOLD／防毒事件保留；後續 Owner 確認的非公司管理個人機器已完成 15/15 最終快照 focused 重驗。** 下游 egress attestation、Lab live delegation 與 operational transport 仍未建立；所有 Network／公開執行入口保持封鎖。歷史 [S2D-B 結果](docs/acceptance/LOCAL_SOLO_MVP_S2D_B_OFFLINE_PROVENANCE_RECIPIENT_RESULTS.md) 與失敗證據保留。
 
 S2A 重用既有內部官方四階段 Workflow 與 protected handoff，將實際離線旅程結果映射至中立 Host view；輸出標記 `ControlledOfflineFixture / NotLiveProvider`。新增 12／Host 88／protected-source-Reviewer 201 案例通過，見 [S2A 結果](docs/acceptance/LOCAL_SOLO_MVP_S2A_WORKFLOW_COMPOSITION_RESULTS.md)。無新增公開執行入口，`--local submit` 仍封鎖；S2A 歷史結果保留。
 
@@ -25,6 +25,8 @@ S2B 新增 `--local readiness [--workspace <absolute-local-directory>]`：檢視
 S2C 新增內部 execution preparation：綁定 task／workspace／ReadOnly／Harness／profile／預算與三組 recipient configuration；native adapters 分別檢查 PCA、Reviewer client metadata。metadata 相符不是 outbound 授權，OpenCode 下游 recipient 尚無可驗證接線；沒有新增 CLI route。歷史風險邊界見 [S2C 結果](docs/acceptance/LOCAL_SOLO_MVP_S2C_PERSONAL_EXECUTION_BOUNDARY_RESULTS.md)。
 
 S2D-A 修正 S2C eager test directory，新增單次 PersonalLab offline admission、完整 effect binding、期限／撤銷／取消／預算檢查與 Create／Prompt 單次 attempt。既有官方四階段 Workflow、v4 protected fixtures、獨立來源及 native Reviewer 工具觀測均重用，輸出仍為 `ControlledOfflineFixture / NotLiveProvider`；Lab admission 不提供 production authority，network target 一律拒絕。新增 46＋S2C 36 案例通過；完整 source／protected 分組各有一次失敗，診斷重跑通過，原因仍待釐清。實作、驗證與尚缺的 recipient／storage 接線見 [S2D-A 結果](docs/acceptance/LOCAL_SOLO_MVP_S2D_A_PERSONAL_LAB_ADMISSION_RESULTS.md)。沒有啟用任何公開執行指令；本輪停在 S2D-A。
+
+S2D-D：獨立 Lab child 重用既有 OpenCode protocol／官方 Workflow，不借用 protected synthetic authority；19 focused、15 相容性、52 provenance/recipient、14 protected guard 結果通過（有重疊，97 unique）。見 [S2D-D 結果](docs/acceptance/LOCAL_SOLO_MVP_S2D_D_INDEPENDENT_LAB_RUNTIME_RESULTS.md)。Network、公開提交及真模型仍封鎖；公司 execution hold 未解除。
 
 ## 系統用途
 

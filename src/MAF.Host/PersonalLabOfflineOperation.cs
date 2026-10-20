@@ -46,6 +46,16 @@ internal sealed class PersonalLabOfflineOperation : IDisposable
     internal ExternalExecutionHandle OriginalHandle => identity.Handle;
     bool protocolBound;
     int receiptStep;
+    internal string? DemandActiveSession()
+    {
+        lock (sync)
+        {
+            ObjectDisposedException.ThrowIf(disposed, this);
+            if (faulted) throw new IOException("LabJournalUnavailable");
+            admission.DemandRunning(preparation);
+            return receiptStep == 3 ? session : null;
+        }
+    }
     internal void BindLabProtocol(LabOpenCodeProtocol protocol)
     {
         lock (sync)

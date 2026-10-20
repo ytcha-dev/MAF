@@ -6,7 +6,7 @@ namespace MAF.Workflows.External;
 // Internal controlled composition only. The outer filter is never an authorization grant.
 internal sealed class ProtectedHandoffDelegation(ProtectedExternalRuntime runtime, ITrustedCallerContext caller,
     ExternalTaskRequest original, string originalRunId, ExternalExecutionHandle originalHandle,
-    ExternalAdmissionMode mode = ExternalAdmissionMode.Submit) : IControlledDelegation
+    ExternalAdmissionMode mode = ExternalAdmissionMode.Submit) : IOwnedHandoffDelegation
 {
     internal ExternalWorkflowRun? InnerRun { get; private set; }
     internal Action? BeforeHandoff { get; init; }

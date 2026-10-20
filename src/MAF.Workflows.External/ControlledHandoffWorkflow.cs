@@ -14,6 +14,9 @@ internal interface IControlledDelegation
     Task<ExternalTaskResult> DelegateAsync(ExternalTaskRequest request, string workflowRunId, CancellationToken token);
 }
 
+// Owned delegates must bound and await their own child unwind before releasing resources.
+internal interface IOwnedHandoffDelegation : IControlledDelegation { }
+
 internal sealed record HandoffRun(WorkflowOutcome Outcome, ImmutableArray<WorkflowEvent> Events);
 
 internal sealed class ControlledHandoffWorkflow(ITaskBriefing briefingSource,
@@ -109,7 +112,7 @@ internal sealed class ControlledHandoffWorkflow(ITaskBriefing briefingSource,
                 started = true;
                 // The protected child already owns a bounded budget and native ownership. Do not
                 // abandon its unwind by racing another wait timer with the same deadline.
-                var result = owner.delegation is ProtectedHandoffDelegation
+                var result = owner.delegation is IOwnedHandoffDelegation
                     ? await owner.delegation.DelegateAsync(request, task.WorkflowRunId, token)
                     : await owner.Within(t => owner.delegation.DelegateAsync(request, task.WorkflowRunId, t), task.StageTimeout, token);
                 if (!owner.ValidResult(result, task)) return new(input, null, HandoffStageState.Failed, "ExternalCorrelationOrShapeInvalid");

@@ -69,7 +69,7 @@ public sealed class SourceCandidateIntegrationTests(ITestOutputHelper output) : 
             time = new { created, completed = created + 1 }, finish, modelID = "scripted", providerID = "synthetic", mode = "build", agent = "maf_readonly",
             path = new { cwd = f.F.Runtime.Root, root = f.F.Runtime.Root }, cost = 0,
             tokens = new { input = 0, output = 0, reasoning = 0, cache = new { read = 0, write = 0 } } }, parts })!;
-    static JsonNode Tool(string path, string text, int index) => JsonSerializer.SerializeToNode(new
+    internal static JsonNode Tool(string path, string text, int index) => JsonSerializer.SerializeToNode(new
     {
         id = "prt_read" + index, sessionID = "ses_runtime", messageID = "msg_tools", type = "tool", callID = "call_read" + index, tool = "read",
         state = new { status = "completed", input = new { filePath = path, offset = 120, limit = 2 },
