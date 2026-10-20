@@ -244,3 +244,150 @@ static GPT/Owner review of this commit and the explicit cooperative routing assu
 the endpoint-protection event before authorizing any affected execution. No next milestone is started.
 Any first live task still needs a separate exact workspace/objective/budgets/three-recipient approval
 after software blockers are resolved. **STOP after S2D-C; no live run is authorized here.**
+
+
+## Personal-machine final-snapshot revalidation — 2026-10-20 (Asia/Taipei)
+
+**15/15 authorized focused cases passed. Ready for Owner review of this bounded offline
+final-snapshot gate; not operational activation or corporate execution clearance.**
+This follow-up supplements, and does not rewrite, the original HOLD/interrupted run and
+historical failures above. The affected company-managed device remains on hold.
+
+### Environment, snapshot and authorization
+
+Owner explicitly confirmed in this chat: personally owned, non-corporate-managed Windows
+PC (not a company device taken home). This confirmation preceded build/test execution;
+no domain, identity, credential or security-configuration probe was used to infer ownership.
+Checkout C:/WK/MAF, branch main, HEAD and recorded origin/main both
+`b658e5a44bc654e5f88f5c7ea9b2bf64ae77f06f`; implementation commit
+`a0c5cb109ae9b36b3ffd01ebad9a1fe3a11a2051`. Only unrelated untracked .vscode/ existed
+and was preserved/excluded; no untracked .opencode/ content was read or changed.
+No production/test implementation changed during this recovery. No restore/package
+installation or external dependency access was performed.
+
+The three exact methods and their fixture dependencies were reviewed before execution:
+custom HttpMessageHandler fakes and scripted native HTTP/model responses, no socket-backed
+provider transport. Official Workflow/Agent and existing SQLite/journal code execute;
+real OpenCode/model/server, corporate endpoints and process-crash tests do not.
+
+### Commands, independent sessions and actual counts
+
+Build (exit 0, 0 warnings / 0 errors, elapsed 11.30s):
+
+```powershell
+dotnet build tests/MAF.Tests/MAF.Tests.csproj --no-restore -m:1 -nr:false -v minimal
+```
+
+Each following command was executed once, sequentially, in an independent VSTest session.
+Exit code and TRX ResultSummary counters were inspected before starting the next group.
+No automatic retry or parallel test execution. Every destination was checked absent first;
+unique semantic result names do not overwrite previous evidence or rename any test fixture.
+
+```powershell
+dotnet test tests/MAF.Tests/MAF.Tests.csproj --no-build --no-restore --filter 'FullyQualifiedName=MAF.Tests.LabOpenCodeBoundaryTests.OriginalExchangeAndUncertainDeliveryRemainDistinct' --logger 'trx;LogFileName=s2dc-home-receipt-20261020141620473-f4fd5e24.trx' --results-directory TestResults/home-validation -- RunConfiguration.MaxCpuCount=1 RunConfiguration.TestSessionTimeout=180000 xUnit.ParallelizeTestCollections=false xUnit.ParallelizeAssemblies=false xUnit.MaxParallelThreads=1
+dotnet test tests/MAF.Tests/MAF.Tests.csproj --no-build --no-restore --filter 'FullyQualifiedName=MAF.Tests.PersonalLabFirstRunBoundaryTests.OriginalSessionModelPinAndOwnedNativeClientsUseOfficialWorkflow' --logger 'trx;LogFileName=s2dc-home-workflow-20261020141620473-f4fd5e24.trx' --results-directory TestResults/home-validation -- RunConfiguration.MaxCpuCount=1 RunConfiguration.TestSessionTimeout=180000 xUnit.ParallelizeTestCollections=false xUnit.ParallelizeAssemblies=false xUnit.MaxParallelThreads=1
+dotnet test tests/MAF.Tests/MAF.Tests.csproj --no-build --no-restore --filter 'FullyQualifiedName=MAF.Tests.PersonalLabDurableWorkflowTests.DurableOfflineBoundaryFeedsExistingOfficialWorkflow' --logger 'trx;LogFileName=s2dc-home-compatibility-20261020141620473-f4fd5e24.trx' --results-directory TestResults/home-validation -- RunConfiguration.MaxCpuCount=1 RunConfiguration.TestSessionTimeout=180000 xUnit.ParallelizeTestCollections=false xUnit.ParallelizeAssemblies=false xUnit.MaxParallelThreads=1
+```
+
+| Group | Expected | Discovered / executed | Passed | Failed | Skipped | Duration: summed cases / TRX session |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| Receipt | 3 | 3 | 3 | 0 | 0 | 0.255s / 1.817s |
+| Workflow | 7 | 7 | 7 | 0 | 0 | 2.665s / 3.417s |
+| Compatibility | 5 | 5 | 5 | 0 | 0 | 1.649s / 2.383s |
+
+All three command exits 0; timeout, aborted, error, notExecuted and disconnected counters
+are zero. Expected 15 cases were all discovered and completed. This does not rerun or
+replace historical 236/94 groups, the original interrupted selection or a full suite.
+
+Actual method names and variant rows (prefix MAF.Tests.):
+
+- LabOpenCodeBoundaryTests.OriginalExchangeAndUncertainDeliveryRemainDistinct:
+  valid, lost-create, lost-prompt.
+- PersonalLabFirstRunBoundaryTests.OriginalSessionModelPinAndOwnedNativeClientsUseOfficialWorkflow:
+  valid, lost-create, lost-prompt, missing, reviewer-unavailable, changed-model, missing-model.
+- PersonalLabDurableWorkflowTests.DurableOfflineBoundaryFeedsExistingOfficialWorkflow:
+  valid, lost-create, lost-prompt, reviewer-unavailable, missing.
+
+### Observed behavior and request accounting
+
+Receipt cases retain original exchange/receipt prerequisite assertions before Prompt and
+Observe, exact model pin, duplicate Create/Prompt rejection, original-session GET and
+inspection-only durable reopen. Their assertions establish Create/Prompt/GET = 1/1/1 for
+valid and lost-prompt; lost-create has 1/0 and no GET branch. No raw whole-session ledger
+is emitted by these three cases; this is assertion/code-path evidence, not packet capture.
+
+Workflow group B emits the fake-handler method/path list in TRX:
+
+| Variant | External / review | Create / Prompt / GET / Abort |
+| --- | --- | --- |
+| valid | Completed / SufficientEvidence | 1 / 1 / 9 / 0 |
+| lost-prompt | Completed / SufficientEvidence, durable Uncertain retained | 1 / 1 / 9 / 0 |
+| lost-create | Unknown / no review, TransportDisconnected | 1 / 0 / 3 / 0 |
+| missing | Completed / InsufficientEvidence | 1 / 1 / 9 / 0 |
+| reviewer-unavailable | Completed / ReviewUnavailable | 1 / 1 / 9 / 0 |
+| changed-model | Unknown / no review, LabAdmissionRevoked | 1 / 1 / 9 / 0 |
+| missing-model | Unknown / no review, LabAdmissionRevoked | 1 / 1 / 9 / 0 |
+
+No unexpected Unknown or Timeout: the three Unknown results above are intentional negative
+cases. Successful/lost-prompt rows reach original-session observation rather than another
+POST. Assertions retain the original task/run/execution, four executor stages, exact model,
+owned native adapter integration, two source reads/tool results for eligible rows and human
+choice NotEstablished. They never infer human acceptance from completion or readiness.
+
+Compatibility group C preserves the earlier **unbound** journal behavior: receipt remains
+NotEstablished and CanResume false. Each case asserts one Create, one Prompt except
+lost-create (zero), and zero Abort/reply; GET totals/status logs are not emitted by this
+method and are not newly claimed as measured counts. Lost-create stays Unknown; remaining
+rows stay Completed with their expected review/uncertainty semantics.
+
+### Filesystem/process effects and cleanup limits
+
+Existing fixture names/locations/extensions were unchanged. All 15 cases require real
+journal persistence; groups B/C also require isolated SQLite/source verification. Reviewed
+and exercised resource roles:
+
+- Receipt: explicitly allocated maf-lab-provenance-* root, owned workspace/ subdirectory,
+  app-owned operation-id.lab-journal outside workspace; reopen validates persisted events.
+  Cleanup disposes the journal, deletes owned flat files, then empty workspace/root, non-recursively.
+- Workflow/compatibility: existing maf-provider-sources-<run-id> owned fixture with
+  synthetic.db plus SQLite ownership/sidecar resources as needed, source files Example.cs /
+  Second.cs, synthetic.db.provider fake JSON state and synthetic.db.http request ledger;
+  separate maf-lab-original-response-* or maf-lab-journal-store-* journal directory outside
+  the ReadOnly source workspace. Flat journal files are deleted after handle disposal;
+  existing source/SQLite fixture cleanup clears SQLite pools and recursively removes only
+  its exact run-owned root. No global cleanup or arbitrary parent deletion was invoked.
+- Build output remains under existing bin/obj; three actual TRX files above remain under
+  ignored TestResults/home-validation, preserving prior TRX files. They are not committed
+  because raw test output can carry machine/path metadata.
+
+Successful assertions include journal reopen, fixture receipt distinctions and cleanup
+completion (no disposal failure). Artifact roles are grounded in executed source paths;
+no OS-wide filesystem tracing or survey of unrelated temp directories was performed, and
+exact generated temp suffixes were not collected. Existing platform-generated directory
+names may resemble extensions; no rename/relocation was used as a detection workaround.
+
+The expected dotnet/VSTest/testhost chain ran successfully. No provider/server process
+launch is in these selections; process/security telemetry was not queried. No endpoint-
+security alert, intervention or testhost interruption was observed in command/TRX results;
+this is not a claim that independent security logs were exhaustively audited. No security
+setting, exclusion, filename/extension or ACL changes. Corporate incident and original
+interrupted evidence remain untouched; the company's clearance/root cause stays unresolved.
+
+### Acceptance recommendation and remaining concurrency gap
+
+The final operation-level receipt prerequisite and compatibility behavior now have the
+specified **3 + 7 + 5 focused functional evidence on the final source snapshot**. Recommend
+Owner acceptance of this bounded personal-machine offline revalidation, not full-suite,
+corporate compatibility, production trust or first-live-run acceptance.
+
+The lazy HTTP client lock was exercised through ordinary sequential initialization only.
+These cases do **not** establish simultaneous multi-threaded initialization, single handler
+chain publication under contention or initialization/disposal interaction. A separate
+barrier-synchronized deterministic concurrency test is warranted before claiming that
+property; it was neither implemented nor executed, pending separate Owner authorization.
+
+All previously recorded software/deployment blockers remain: no operational Lab-owned
+child/transport, no downstream-recipient attestation/custody proof, no genuine production
+trust and no public activation. No --local personal-run, S2D-D, live provider/model session
+or additional milestone was started. Only this appended evidence and the minimal Roadmap
+status line are delivered. **STOP after validation and reporting.**
