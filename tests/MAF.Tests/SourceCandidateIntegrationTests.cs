@@ -175,6 +175,11 @@ public sealed class SourceCandidateIntegrationTests(ITestOutputHelper output) : 
     {
         using var f = await Fixture(variant: variant); var reader = new BoundedSourceReader(f.F.Runtime.Root, f.F.Clock); using var chat = new Reviewer();
         var run = await f.Flow(sources: new VerifiedSourceMode(reader), reviewer: new NativeEvidenceReviewer(chat).ReviewAsync).RunAsync(f.Task);
+        if (run.Outcome.ExternalResult is not { Status: ExternalExecutionStatus.Completed })
+            output.WriteLine($"Metadata prerequisite unavailable: external={run.Outcome.ExternalResult?.Status}; "
+                + $"code={run.Outcome.ExternalResult?.ErrorCode}; elapsedMs={run.Outcome.ExternalResult?.DurationMilliseconds}; "
+                + $"reason={run.Outcome.ReasonCode}; trace={string.Join(',', run.Outcome.ExternalResult?.Trace.Select(t => t.Kind) ?? [])}; "
+                + $"Create/Prompt/GET/Abort={string.Join('/', Counts(f))}");
         Assert.Equal(ExternalExecutionStatus.Completed, run.Outcome.ExternalResult!.Status); Assert.Empty(run.Outcome.ExternalResult.SourceCandidates);
         Assert.Equal(0, reader.ReadAttempts); Assert.Equal(0, chat.Calls); Assert.Equal(EvidenceAssessmentStatus.InsufficientEvidence, run.Outcome.Review!.Status);
         Assert.Equal(HumanGateStatus.NeedsHumanReview, run.Outcome.HumanGate); Assert.Equal(new[] { 1, 1, 9, 0 }, Counts(f));

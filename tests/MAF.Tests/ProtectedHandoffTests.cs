@@ -226,18 +226,41 @@ public sealed class ProtectedHandoffTests(ITestOutputHelper output) : IDisposabl
         var store = f.F.Store(); var runtime = new ProtectedExternalRuntime(f.F.Runtime.Inputs, new ImmutablePolicySource(f.F.Policy), f.F,
             spy, store, store, store, f.Http, f.F.Runtime.Options, f.F.Clock);
         var pending = f.Flow(runtime).RunAsync(f.Task, cancel.Token);
-        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5)); Assert.NotNull(spy.Owner);
-        Assert.Null(await f.F.Executions.TryAcquireAsync(f.Task.TaskId));
-        if (variant == "cancel-wait") cancel.Cancel();
-        if (variant == "dispose-owner") await spy.Owner!.DisposeAsync();
-        if (variant == "cancel-control") await f.F.Application().RequestAsync(f.F.Command, f.F.Canceller);
-        if (variant == "policy") { f.F.Policy = f.F.Policy with { Epoch = new(2), Version = new(2), Rules = [] }; await store.ActivatePolicyAsync(); }
-        if (variant is not ("timeout" or "cancel-wait")) release.TrySetResult();
-        var run = await pending.WaitAsync(TimeSpan.FromSeconds(10)); Graph(run);
-        Assert.NotEqual(HumanGateStatus.ReadyForHumanReview, run.Outcome.HumanGate); Assert.Equal(0, f.ReviewCalls);
-        Assert.Equal(1, Counts(f.Fake.Requests)[0]); Assert.Equal(1, Counts(f.Fake.Requests)[1]); Assert.Equal(0, Counts(f.Fake.Requests)[3]);
-        await using var releasedOwner = await f.F.Executions.TryAcquireAsync(f.Task.TaskId); Assert.NotNull(releasedOwner);
-        output.WriteLine($"{variant}: Create/Prompt/GET/Abort={string.Join('/', Counts(f.Fake.Requests))}; owner released before outer completion; gate={run.Outcome.HumanGate}");
+        try
+        {
+            // Observe early Workflow termination as well as the gate; a missing callback must
+            // not hide the completed child's status behind an unrelated gate timeout.
+            await Task.WhenAny(entered.Task, pending).WaitAsync(TimeSpan.FromSeconds(5));
+            if (!entered.Task.IsCompletedSuccessfully)
+            {
+                var early = await pending;
+                output.WriteLine($"Observation gate not reached: external={early.Outcome.ExternalResult?.Status}; "
+                    + $"code={early.Outcome.ExternalResult?.ErrorCode}; reason={early.Outcome.ReasonCode}; "
+                    + $"trace={string.Join(',', early.Outcome.ExternalResult?.Trace.Select(t => t.Kind) ?? [])}; "
+                    + $"Create/Prompt/GET/Abort={string.Join('/', Counts(f.Fake.Requests))}");
+            }
+            Assert.True(entered.Task.IsCompletedSuccessfully, "Original child must reach the observation gate.");
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5)); Assert.NotNull(spy.Owner);
+            Assert.Null(await f.F.Executions.TryAcquireAsync(f.Task.TaskId));
+            if (variant == "cancel-wait") cancel.Cancel();
+            if (variant == "dispose-owner") await spy.Owner!.DisposeAsync();
+            if (variant == "cancel-control") await f.F.Application().RequestAsync(f.F.Command, f.F.Canceller);
+            if (variant == "policy") { f.F.Policy = f.F.Policy with { Epoch = new(2), Version = new(2), Rules = [] }; await store.ActivatePolicyAsync(); }
+            if (variant is not ("timeout" or "cancel-wait")) release.TrySetResult();
+            var run = await pending.WaitAsync(TimeSpan.FromSeconds(10)); Graph(run);
+            Assert.NotEqual(HumanGateStatus.ReadyForHumanReview, run.Outcome.HumanGate); Assert.Equal(0, f.ReviewCalls);
+            Assert.Equal(1, Counts(f.Fake.Requests)[0]); Assert.Equal(1, Counts(f.Fake.Requests)[1]); Assert.Equal(0, Counts(f.Fake.Requests)[3]);
+            await using var releasedOwner = await f.F.Executions.TryAcquireAsync(f.Task.TaskId); Assert.NotNull(releasedOwner);
+            output.WriteLine($"{variant}: Create/Prompt/GET/Abort={string.Join('/', Counts(f.Fake.Requests))}; owner released before outer completion; gate={run.Outcome.HumanGate}");
+        }
+        finally
+        {
+            // Assertion failure must not dispose HTTP/SQLite while the original child
+            // still runs. Cancellation is local observation cancellation, never Abort.
+            cancel.Cancel();
+            release.TrySetResult();
+            await pending.WaitAsync(TimeSpan.FromSeconds(10));
+        }
     }
 
     sealed class OwnershipSpy(IExecutionStore inner) : IExecutionStore

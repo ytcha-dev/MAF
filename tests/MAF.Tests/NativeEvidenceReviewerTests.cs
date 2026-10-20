@@ -31,6 +31,7 @@ public sealed class NativeEvidenceReviewerTests(ITestOutputHelper output) : IDis
         if (run.Outcome.Review is null)
             output.WriteLine($"Review prerequisite unavailable: PCA={run.Outcome.Comprehension}; external={run.Outcome.ExternalResult?.Status}; "
                 + $"code={run.Outcome.ExternalResult?.ErrorCode}; reason={run.Outcome.ReasonCode}; "
+                + $"elapsedMs={run.Outcome.ExternalResult?.DurationMilliseconds}; "
                 + $"trace={string.Join(',', run.Outcome.ExternalResult?.Trace.Select(t => t.Kind) ?? [])}");
     }
 
@@ -140,6 +141,7 @@ public sealed class NativeEvidenceReviewerTests(ITestOutputHelper output) : IDis
             };
             return await reviewer.ReviewAsync(e, t);
         }).RunAsync(f.Task);
+        MissingReviewDiagnostics(run);
         Assert.Equal(variant == "missing" ? 0 : 1, invoked); Assert.Equal(variant == "missing" ? 0 : 2, client.Calls);
         Assert.Equal(EvidenceAssessmentStatus.InsufficientEvidence, run.Outcome.Review!.Status); Assert.Empty(run.Outcome.Review.Sources!.Admitted);
         Assert.Equal(ExternalExecutionStatus.Completed, run.Outcome.ExternalResult!.Status); Assert.Equal(new[] { 1, 1, 9, 0 }, Counts(f));

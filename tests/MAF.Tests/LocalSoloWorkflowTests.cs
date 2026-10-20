@@ -100,6 +100,10 @@ public sealed class LocalSoloWorkflowTests(ITestOutputHelper output) : IDisposab
         var run = await f.Flow(sources: new VerifiedSourceMode(new(f.F.Runtime.Root, f.F.Clock)), reviewer: review,
             handoff: variant == "changed" ? () => { var path = Path.Combine(f.F.Runtime.Root, "Example.cs"); File.WriteAllText(path, File.ReadAllText(path).Replace("return 42;", "return 77;")); } : null).RunAsync(f.Task);
         Graph(run); var view = LocalSoloOutcomeMapper.FromControlledWorkflow(run.Outcome); NonExecutable(view);
+        if (view.Status != ExternalExecutionStatus.Completed)
+            output.WriteLine($"Completion prerequisite unavailable: external={view.Status}; "
+                + $"code={run.Outcome.ExternalResult?.ErrorCode}; elapsedMs={run.Outcome.ExternalResult?.DurationMilliseconds}; "
+                + $"reason={run.Outcome.ReasonCode}; trace={string.Join(',', run.Outcome.ExternalResult?.Trace.Select(t => t.Kind) ?? [])}");
         Assert.Equal(ExternalExecutionStatus.Completed, view.Status);
         Assert.Equal(variant == "reviewer-unavailable" ? EvidenceAssessmentStatus.ReviewUnavailable : EvidenceAssessmentStatus.InsufficientEvidence, view.ReviewStatus);
         Assert.Equal(HumanGateStatus.NeedsHumanReview, view.Readiness); Assert.Equal(new[] { 1, 1, 9, 0 }, Counts(f));
