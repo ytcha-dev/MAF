@@ -43,6 +43,18 @@ the current design gate above governs the next action.
 Production Host activation, M3-C/identity, real multi-agent provider integration, durable
 parent resume and Human Approval UI remain incomplete. Phase 2B-3, Phase 2C/Registry and
 Hybrid are also unfinished. Historical milestone next-actions at the end are dated evidence.
+## Project-wide test fixture rules — mandatory for S2D and future increments
+
+**Default: do not create temporary folders for tests that do not need a real filesystem.** This is a persistent requirement for new code, tests, agent prompts and acceptance reviews, not a one-time S1 fix.
+
+- **Pure tests must be filesystem-free:** parsing, configuration and recipient validation, DTO/binding comparisons, presentation/redaction, readiness, blocked submission and negative permission cases must not call `Directory.CreateDirectory`, `Directory.CreateTempSubdirectory` or other filesystem creation APIs. Avoid any implicit workspace allocation.
+- **No eager test-fixture directories:** never create a folder in an xUnit test-class field initializer, constructor or automatic shared setup merely because some test cases require one. Use explicit per-test allocation, or lazy ownership accessed only by filesystem-dependent cases; assert non-filesystem tests do not initialize the workspace.
+- **Rare allowed exception:** a test that truly requires existing directory metadata, file content or SQLite may create one isolated, test-owned, disposable fixture in an explicitly permitted personal environment. Limit creation to the necessary test, do not share uncontrolled paths, and remove only the exact owned fixture (prefer non-recursive deletion where its contents are known empty). Never delete arbitrary parent, project or user directories.
+- **Acceptance gate:** each new increment must identify tests that create directories, justify why they need them, and verify that pure cases create none. Do not confuse "no test-owned directory allocation" with proof of zero system-wide side effects.
+- **Endpoint security:** do not change folder names, locations, executable names, extensions, controls or security settings to evade a detection. Corporate execution hold and data restrictions remain; a home pass is not corporate clearance.
+
+**Known follow-up:** S2C `LocalExecutionPreparationTests` currently uses eager `Directory.CreateDirectory(root)` in its constructor. Correct this test-fixture isolation at the beginning of S2D without changing production Host behavior. Do not start any live execution to validate this fix.
+
 ## 1. Vision and operating principles
 
 MAF is a **local-first, extensible orchestration platform** coordinating native agents, existing independent harnesses, and optional knowledge/tools/services. It must **not** recreate OpenCode's coding loop or a general-purpose RAG engine.
