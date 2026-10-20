@@ -9,7 +9,8 @@
 
 ## Current development increment and next action
 
-**Current increment: Local Solo MVP-S2B — offline readiness and bounded critical limitations validated; ready for owner acceptance. External Host activation remains BLOCKED; corporate execution hold is unchanged.**
+**Current increment: Local Solo MVP-S2C — immutable execution preparation and independent native-role adapter binding; operational execution remains disabled. External Host activation remains BLOCKED; corporate execution hold is unchanged.**
+See [S2C results](acceptance/LOCAL_SOLO_MVP_S2C_PERSONAL_EXECUTION_BOUNDARY_RESULTS.md): exact task/workspace/Harness/profile/budget/three-recipient binding, real native-adapter metadata validation without model calls, and separate disabled PersonalLab/ProductionProtected profiles. Metadata is not egress authorization; Harness downstream recipient verification remains unavailable. No executable research route, synthetic authority or production fallback was added. Next decision: Owner acceptance of the explicit limited PersonalLab risk boundary and separate S2D authorization for one privately configured foreground ReadOnly personal fixture run. Stop after S2C.
 See [S2B results](acceptance/LOCAL_SOLO_MVP_S2B_READINESS_RESULTS.md): strict `--local readiness` reuses the existing candidate application boundary; trust/custody/three data flows remain NotEstablished and overall Blocked. 23 focused + 301 scoped regression cases pass; no operational facade, authority source or provider activation added. Stop after S2B.
 See [S2A results](acceptance/LOCAL_SOLO_MVP_S2A_WORKFLOW_COMPOSITION_RESULTS.md): reuse existing internal composition (no new public facade/factory), explicit ControlledOfflineFixture / NotLiveProvider presentation, 12 focused + 88 Host + 201 protected/source/Reviewer passing cases. No production clients, trust registration or CLI routing added. Historical S2A controlled evidence retained.
 The [S1 results and verification limits](acceptance/LOCAL_SOLO_MVP_S1_HOST_FOUNDATION_RESULTS.md)
@@ -19,9 +20,10 @@ The [Harness extensibility review](acceptance/LOCAL_SOLO_MVP_HARNESS_EXTENSIBILI
 finds reusable Core/Workflow/evidence seams but concrete OpenCode protected-composition,
 source-origin and cancellation/receipt constraints. The provider-neutral Host application/view
 boundary is validated for the bounded offline journey (56 focused / 32 narrow regression passed; Host/test builds 0 warnings/errors), not accepted operational execution. Historical S1 NotRun evidence is preserved in the report.
-Next: separately authorize safe protected OpenCode composition only after defining genuine trust,
-activation/storage custody, role-specific native egress and Harness/model data-flow prerequisites;
-missing evidence keeps activation blocked. Real-provider evaluation requires its own authorization.
+Next: review the S2C PersonalLab risk boundary and separately authorize the smallest foreground
+personal ReadOnly increment with privately selected recipients. ProductionProtected still requires
+genuine trust, activation/storage custody and native/Harness data-flow prerequisites; missing
+evidence keeps that profile blocked. Real-provider evaluation requires its own authorization.
 OpenCode is the first adapter, not the permanent architecture. Codex CLI, Claude Code and
 other CLI/API/A2A Harnesses are future candidates, not implemented integrations. No Registry,
 multi-provider UI, generalized approval/IAM platform or Hybrid planner is needed first.
@@ -31,7 +33,7 @@ The [M3-C-W0 report](plans/M3C_CORPORATE_WORKSTATION_TRUST_FEASIBILITY.md) is re
 deferred enterprise-trust planning evidence; its corporate-first sequencing is superseded
 by this Local Solo priority, without waiving security holds, genuine authorization,
 native-model outbound controls or fail-closed guards. S1 is the offline foundation; S2A adds controlled outcome integration and S2B adds advisory readiness.
-These do not establish production trust or authorize S2C/provider activation.
+These do not establish production trust or authorize S2D/provider activation.
 Pinned official-source-derived fixtures calibrate bounded excerpts, known unrelated tools
 and exact duplicate reads. Independent 4C verification and R1 native tool observation remain
 mandatory. 357 focused / 1307 offline tests pass; these are not live-provider success rates.
