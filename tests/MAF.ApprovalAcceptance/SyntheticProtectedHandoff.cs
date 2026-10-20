@@ -12,6 +12,7 @@ namespace MAF.ApprovalAcceptance;
 // Test-owned only. Initialization creates schema/authority but NEVER pre-admits the task.
 public sealed class SyntheticProtectedHandoff : IDisposable
 {
+    readonly OfflineCheckpointTiming? timing = OfflineCheckpointTiming.Current;
     public SyntheticCancellation F { get; }
     public RuntimeHttpFixture Fake { get; }
     public HttpClient Http { get; }
@@ -30,7 +31,7 @@ public sealed class SyntheticProtectedHandoff : IDisposable
         F = new(db, v4: true);
         Fake = new(F.Runtime.Root) { StatePath = db + ".provider", LedgerPath = db + ".http" };
         Http = ReceiptTransport.ForTests(new ResponseGate(Fake, gate, (request, response) => ResponseTransform?.Invoke(request, response) ?? response,
-            (request, token) => OfflineEffectObserver?.Invoke(request, token)));
+            (request, token) => OfflineEffectObserver?.Invoke(request, token), timing));
     }
     public async Task Initialize()
     {
@@ -38,7 +39,11 @@ public sealed class SyntheticProtectedHandoff : IDisposable
         await ApprovalSchema.MigrateV2ToV3Async(F.Runtime.Database, SyntheticApproval.Maintenance, F);
         await ApprovalSchema.MigrateV3ToV4Async(F.Runtime.Database, SyntheticApproval.Maintenance, F);
         await F.Store().ActivatePolicyAsync();
+        timing?.Mark("FixtureReady");
     }
+    internal SqliteApprovalStore TimingStore() => timing is null ? F.Store()
+        : new(F.Runtime.Database, F.Authority(), F.Clock, 10000, p => timing.Mark("Sql." + p),
+            ApprovalStoreProfile.ExplicitV4, p => timing.Mark("Sql." + p));
     internal ControlledHandoffWorkflow Flow(ProtectedExternalRuntime? runtime = null, ITrustedCallerContext? caller = null,
         ExternalAdmissionMode mode = ExternalAdmissionMode.Submit, Action? handoff = null, ExternalExecutionHandle? expected = null,
         VerifiedSourceMode? sources = null, Func<TaskEvidence, CancellationToken, Task<ReviewAssessment>>? reviewer = null,
@@ -46,10 +51,13 @@ public sealed class SyntheticProtectedHandoff : IDisposable
     {
         var original = F.Runtime.Request; var input = F.Runtime.Inputs;
         expected ??= input.PreparedHandle;
-        Adapter = new(runtime ?? F.Protected(Http), caller ?? F.Runtime.Caller, original, input.NewWorkflowRunId, expected, mode)
+        runtime ??= F.Protected(Http, TimingStore());
+        if (timing is not null) runtime.TimingCheckpoint = timing.Mark;
+        Adapter = new(runtime, caller ?? F.Runtime.Caller, original, input.NewWorkflowRunId, expected, mode)
         { BeforeHandoff = handoff };
         return new(briefing ?? new TaskBriefingAdapter(new Chat(this), new ProjectTools(F.Runtime.Root)),
-            _ => PolicyOutcome.Allow, Adapter, reviewer ?? Review, expected, TimeProvider.System, sources);
+            _ => PolicyOutcome.Allow, Adapter, timing is null ? reviewer ?? Review : (e, t) =>
+            { timing.Reviewer(); return (reviewer ?? Review)(e, t); }, expected, TimeProvider.System, sources);
     }
     Task<ReviewAssessment> Review(TaskEvidence evidence, CancellationToken token)
     {
@@ -89,10 +97,13 @@ public sealed class SyntheticProtectedHandoff : IDisposable
     }
     sealed class ResponseGate(HttpMessageHandler inner, Action<string>? gate,
         Func<HttpRequestMessage, HttpResponseMessage, HttpResponseMessage> transform,
-        Func<HttpRequestMessage, CancellationToken, Action<bool>?> observer) : DelegatingHandler(inner)
+        Func<HttpRequestMessage, CancellationToken, Action<bool>?> observer, OfflineCheckpointTiming? timing) : DelegatingHandler(inner)
     {
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         {
+            var point = request.Method + " " + request.RequestUri!.AbsolutePath;
+            timing?.Request(request);
+            timing?.Mark("Http.Begin " + point);
             var observed = observer(request, token); // BEFORE fake HTTP, never an operational transport.
             try
             {
@@ -101,9 +112,10 @@ public sealed class SyntheticProtectedHandoff : IDisposable
                     gate?.Invoke("PromptHttpReturned");
                 response = transform(request, response);
                 observed?.Invoke(true);
+                timing?.Mark("Http.End " + point);
                 return response;
             }
-            catch { observed?.Invoke(false); throw; }
+            catch { timing?.Mark("Http.Failed " + point); observed?.Invoke(false); throw; }
         }
     }
     public void Dispose() => Http.Dispose();

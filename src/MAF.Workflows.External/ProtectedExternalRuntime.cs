@@ -11,6 +11,8 @@ public sealed class ProtectedExternalRuntime(ExternalAdmissionInputs inputs, IPo
     IExecutionAdmissionCoordinator admission, IRuntimeEnforcementCoordinator enforcement,
     HttpClient http, OpenCodeOptions options, TimeProvider clock)
 {
+    // Opt-in friend-test diagnostics only. No authority, payload or decision is exposed.
+    internal Action<string>? TimingCheckpoint { get; set; }
     public Task<IReadOnlyList<DurableExecution>> ListAsync(CancellationToken token = default)
         => throw new ExternalHarnessException("MetadataListNotSupported");
 
@@ -37,6 +39,10 @@ public sealed class ProtectedExternalRuntime(ExternalAdmissionInputs inputs, IPo
         using var budget = CancellationTokenSource.CreateLinkedTokenSource(token);
         budget.CancelAfter(intent.Timeout);
         token = budget.Token; // One protected budget across admission, reattach and Workflow observation.
+        var timing = TimingCheckpoint;
+        void Mark(string point) { try { timing?.Invoke(point); } catch { /* Diagnostics cannot deny or grant. */ } }
+        Mark("BudgetStart");
+        using var timingCancellation = timing is null ? default : token.Register(() => Mark("BudgetCancelled"));
         // Authenticate before acquiring/reading TaskId metadata; reads are internal, never disclosed on denial.
         var identity = identities.Resolve(caller);
         var now = clock.GetUtcNow();
@@ -48,8 +54,10 @@ public sealed class ProtectedExternalRuntime(ExternalAdmissionInputs inputs, IPo
         if (DurableExecution.NormalizeRoot(new ProjectTools(inputs.Scope.ResourceId).Root) != inputs.Scope.ResourceId
             || DurableExecution.NormalizeRoot(options.ApprovedProjectRoot) != inputs.Scope.ResourceId)
             throw new ExternalHarnessException("RuntimeScopeMismatch");
+        Mark("IdentityAndScopeChecked");
         await using var owner = await executions.TryAcquireAsync(intent.TaskId, token)
             ?? throw new ExternalHarnessException("TaskAlreadyOwned");
+        Mark("OwnershipAcquired");
         var existing = await executions.GetAsync(intent.TaskId, token);
         if (resume is not null && existing is not null)
             throw new ExternalHarnessException("ExistingExecutionRecoveryOnly"); // Explicit Inspect is a separate authorization.
@@ -70,6 +78,7 @@ public sealed class ProtectedExternalRuntime(ExternalAdmissionInputs inputs, IPo
         if (result.Decision.Outcome != (approvedResume ? PolicyOutcome.RequireApproval : PolicyOutcome.Allow) || result.Operation is null)
             throw new ExternalHarnessException(result.Decision.Reason.ToString());
         var control = await controls.GetControlAsync(intent.TaskId, token);
+        Mark("PolicyAndControlChecked");
         // Provider configuration validation is local and precedes any approval consumption.
         var projection = new OpenCodeClient(http, options);
         if (projection.Scope != inputs.Scope.ProviderScopeDigest || projection.Provider != inputs.ProviderId)
@@ -78,6 +87,7 @@ public sealed class ProtectedExternalRuntime(ExternalAdmissionInputs inputs, IPo
         ConsumedApprovalAuthorization? evidence = null;
         if (existing is null)
         {
+            Mark("AdmissionBegin");
             if (approvedResume)
             {
                 if (enforcement is not IApprovalResumeCoordinator coordinator) throw new ExternalHarnessException("ResumeNotSupported");
@@ -94,6 +104,7 @@ public sealed class ProtectedExternalRuntime(ExternalAdmissionInputs inputs, IPo
                 created = await continuation.ConsumeAsync(owner, token);
             }
         }
+        Mark("AdmissionConsumed");
         using var access = new ProtectedAccess(trusted, policy, identities, executions, enforcement,
             owner, caller, control?.Version ?? 0, intent, existing is not null, clock, options, evidence);
         var client = new OpenCodeClient(access, http, options);
@@ -106,7 +117,9 @@ public sealed class ProtectedExternalRuntime(ExternalAdmissionInputs inputs, IPo
             await access.VerifyAsync(ProviderEffect.Metadata, existing, null, token);
             return await service.InspectOwnedAsync(existing, inputs.Scope.ResourceId, intent.Timeout, owner, observeOnce, token);
         }
-        return await service.LaunchOwnedAsync(intent.Submission!, created!, owner, token);
+        Mark("ChildWorkflowBegin");
+        try { return await service.LaunchOwnedAsync(intent.Submission!, created!, owner, token); }
+        finally { Mark("ChildWorkflowReturned"); }
     }
 
     sealed class IntentStore(IExecutionStore inner, ProtectedAccess access) : IExecutionStore, IOriginalCreateStore

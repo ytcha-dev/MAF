@@ -215,6 +215,7 @@ public sealed class ProtectedHandoffTests(ITestOutputHelper output) : IDisposabl
     [InlineData("cancel-control")] [InlineData("policy")]
     public async Task InFlightObservationPreservesChildOwnershipAndNeverAborts(string variant)
     {
+        using var timing = new OfflineCheckpointTiming(output.WriteLine);
         using var f = await Fixture(); var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var cancel = new CancellationTokenSource(); var spy = new OwnershipSpy(f.F.Executions);
@@ -223,7 +224,7 @@ public sealed class ProtectedHandoffTests(ITestOutputHelper output) : IDisposabl
             if (request.RequestUri!.AbsolutePath != "/session/status") return;
             entered.TrySetResult(); await release.Task.WaitAsync(token);
         };
-        var store = f.F.Store(); var runtime = new ProtectedExternalRuntime(f.F.Runtime.Inputs, new ImmutablePolicySource(f.F.Policy), f.F,
+        var store = f.TimingStore(); var runtime = new ProtectedExternalRuntime(f.F.Runtime.Inputs, new ImmutablePolicySource(f.F.Policy), f.F,
             spy, store, store, store, f.Http, f.F.Runtime.Options, f.F.Clock);
         var pending = f.Flow(runtime).RunAsync(f.Task, cancel.Token);
         try
@@ -234,6 +235,7 @@ public sealed class ProtectedHandoffTests(ITestOutputHelper output) : IDisposabl
             if (!entered.Task.IsCompletedSuccessfully)
             {
                 var early = await pending;
+                timing.Observe(early.Outcome);
                 output.WriteLine($"Observation gate not reached: external={early.Outcome.ExternalResult?.Status}; "
                     + $"code={early.Outcome.ExternalResult?.ErrorCode}; reason={early.Outcome.ReasonCode}; "
                     + $"trace={string.Join(',', early.Outcome.ExternalResult?.Trace.Select(t => t.Kind) ?? [])}; "
@@ -248,6 +250,7 @@ public sealed class ProtectedHandoffTests(ITestOutputHelper output) : IDisposabl
             if (variant == "policy") { f.F.Policy = f.F.Policy with { Epoch = new(2), Version = new(2), Rules = [] }; await store.ActivatePolicyAsync(); }
             if (variant is not ("timeout" or "cancel-wait")) release.TrySetResult();
             var run = await pending.WaitAsync(TimeSpan.FromSeconds(10)); Graph(run);
+            timing.Observe(run.Outcome);
             Assert.NotEqual(HumanGateStatus.ReadyForHumanReview, run.Outcome.HumanGate); Assert.Equal(0, f.ReviewCalls);
             Assert.Equal(1, Counts(f.Fake.Requests)[0]); Assert.Equal(1, Counts(f.Fake.Requests)[1]); Assert.Equal(0, Counts(f.Fake.Requests)[3]);
             await using var releasedOwner = await f.F.Executions.TryAcquireAsync(f.Task.TaskId); Assert.NotNull(releasedOwner);

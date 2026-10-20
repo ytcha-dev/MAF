@@ -77,8 +77,10 @@ public sealed class NativeEvidenceReviewerTests(ITestOutputHelper output) : IDis
     [InlineData("case-property")] [InlineData("case-duplicate")]
     public async Task InvalidAgentBehaviorCannotChangeCompletedFactsOrGrantApproval(string variant)
     {
+        using var timing = new OfflineCheckpointTiming(output.WriteLine);
         using var f = await Fixture(); using var client = new Script { Variant = variant }; var reviewer = new NativeEvidenceReviewer(client);
         var run = await f.Flow(sources: Mode(f), reviewer: reviewer.ReviewAsync).RunAsync(f.Task);
+        timing.Observe(run.Outcome);
         MissingReviewDiagnostics(run);
         Assert.Equal(EvidenceAssessmentStatus.ReviewUnavailable, run.Outcome.Review!.Status);
         Assert.Equal(HumanGateStatus.NeedsHumanReview, run.Outcome.HumanGate);
@@ -117,9 +119,11 @@ public sealed class NativeEvidenceReviewerTests(ITestOutputHelper output) : IDis
     [InlineData("unavailable", EvidenceAssessmentStatus.ReviewUnavailable)]
     public async Task AdvisoryNegativeResultsRemainNonExecutable(string variant, EvidenceAssessmentStatus expected)
     {
+        using var timing = new OfflineCheckpointTiming(output.WriteLine);
         using var f = await Fixture(); using var client = new Script { Variant = variant };
         var run = await f.Flow(sources: Mode(f), reviewer: new NativeEvidenceReviewer(client).ReviewAsync).RunAsync(f.Task);
         MissingReviewDiagnostics(run);
+        timing.Observe(run.Outcome);
         Assert.Equal(expected, run.Outcome.Review!.Status); Assert.Equal(HumanGateStatus.NeedsHumanReview, run.Outcome.HumanGate);
         Assert.Equal(new[] { 1, 1, 9, 0 }, Counts(f));
     }
@@ -128,6 +132,7 @@ public sealed class NativeEvidenceReviewerTests(ITestOutputHelper output) : IDis
     [InlineData("changed")] [InlineData("timestamp")] [InlineData("digest")] [InlineData("missing")]
     public async Task IndependentSourceValidationSurroundsNativeAgent(string variant)
     {
+        using var timing = new OfflineCheckpointTiming(output.WriteLine);
         using var f = await Fixture(); using var client = new Script();
         var reviewer = new NativeEvidenceReviewer(client); var invoked = 0;
         var run = await f.Flow(sources: Mode(f, variant == "missing" ? "Missing.cs" : "Example.cs"), reviewer: async (e, t) =>
@@ -142,6 +147,7 @@ public sealed class NativeEvidenceReviewerTests(ITestOutputHelper output) : IDis
             return await reviewer.ReviewAsync(e, t);
         }).RunAsync(f.Task);
         MissingReviewDiagnostics(run);
+        timing.Observe(run.Outcome);
         Assert.Equal(variant == "missing" ? 0 : 1, invoked); Assert.Equal(variant == "missing" ? 0 : 2, client.Calls);
         Assert.Equal(EvidenceAssessmentStatus.InsufficientEvidence, run.Outcome.Review!.Status); Assert.Empty(run.Outcome.Review.Sources!.Admitted);
         Assert.Equal(ExternalExecutionStatus.Completed, run.Outcome.ExternalResult!.Status); Assert.Equal(new[] { 1, 1, 9, 0 }, Counts(f));

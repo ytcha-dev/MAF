@@ -191,6 +191,7 @@ public sealed class SourceCandidateIntegrationTests(ITestOutputHelper output) : 
     [InlineData("changed")] [InlineData("unavailable")]
     public async Task IndependentReaderAndPostReviewValidationRemainAuthoritative(string variant)
     {
+        using var timing = new OfflineCheckpointTiming(output.WriteLine);
         using var f = await Fixture(variant: variant); using var chat = new Reviewer(); FileStream? locked = null;
         try
         {
@@ -199,6 +200,7 @@ public sealed class SourceCandidateIntegrationTests(ITestOutputHelper output) : 
             if (variant == "unavailable") locked = new FileStream(Path.Combine(f.F.Runtime.Root, "Example.cs"), FileMode.Open, FileAccess.Read, FileShare.None);
             var reader = new BoundedSourceReader(f.F.Runtime.Root, f.F.Clock);
             var run = await f.Flow(sources: new VerifiedSourceMode(reader), reviewer: new NativeEvidenceReviewer(chat).ReviewAsync).RunAsync(f.Task);
+            timing.Observe(run.Outcome);
             if (run.Outcome.ExternalResult is not { Status: ExternalExecutionStatus.Completed, SourceCandidates.Length: 1 })
                 output.WriteLine($"Source prerequisite unavailable: external={run.Outcome.ExternalResult?.Status}; "
                     + $"code={run.Outcome.ExternalResult?.ErrorCode}; elapsedMs={run.Outcome.ExternalResult?.DurationMilliseconds}; "

@@ -92,6 +92,7 @@ public sealed class LocalSoloWorkflowTests(ITestOutputHelper output) : IDisposab
     [InlineData("missing")] [InlineData("changed")] [InlineData("partial-observation")] [InlineData("reviewer-unavailable")]
     public async Task CompletedDoesNotImplySuccessfulReview(string variant)
     {
+        using var timing = new OfflineCheckpointTiming(output.WriteLine);
         using var f = await fixtures.Fixture(variant: variant == "missing" ? "none" : "valid", sources: variant == "partial-observation" ? 2 : 1);
         using var model = new SourceCandidateIntegrationTests.Reviewer { Partial = variant == "partial-observation" };
         var native = new NativeEvidenceReviewer(model);
@@ -99,6 +100,7 @@ public sealed class LocalSoloWorkflowTests(ITestOutputHelper output) : IDisposab
             ? (_, _) => throw new InvalidOperationException("SyntheticReviewerUnavailable") : native.ReviewAsync;
         var run = await f.Flow(sources: new VerifiedSourceMode(new(f.F.Runtime.Root, f.F.Clock)), reviewer: review,
             handoff: variant == "changed" ? () => { var path = Path.Combine(f.F.Runtime.Root, "Example.cs"); File.WriteAllText(path, File.ReadAllText(path).Replace("return 42;", "return 77;")); } : null).RunAsync(f.Task);
+        timing.Observe(run.Outcome);
         Graph(run); var view = LocalSoloOutcomeMapper.FromControlledWorkflow(run.Outcome); NonExecutable(view);
         if (view.Status != ExternalExecutionStatus.Completed)
             output.WriteLine($"Completion prerequisite unavailable: external={view.Status}; "
