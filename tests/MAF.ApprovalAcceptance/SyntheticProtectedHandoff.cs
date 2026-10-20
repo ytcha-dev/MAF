@@ -15,7 +15,24 @@ public sealed class SyntheticProtectedHandoff : IDisposable
     readonly OfflineCheckpointTiming? timing = OfflineCheckpointTiming.Current;
     public SyntheticCancellation F { get; }
     public RuntimeHttpFixture Fake { get; }
-    public HttpClient Http { get; }
+    HttpClient? http;
+    readonly object httpGate = new();
+    internal DelegatingHandler? OfflineBoundary;
+    public HttpClient Http
+    {
+        get
+        {
+            lock (httpGate)
+            {
+            if (http is not null) return http;
+            HttpMessageHandler handler = new ResponseGate(Fake, gate, (request, response) => ResponseTransform?.Invoke(request, response) ?? response,
+                (request, token) => OfflineEffectObserver?.Invoke(request, token), timing);
+            if (OfflineBoundary is not null) { OfflineBoundary.InnerHandler = handler; handler = OfflineBoundary; }
+            return http = ReceiptTransport.ForTests(handler);
+            }
+        }
+    }
+    readonly Action<string>? gate;
     public int PcaCalls, ReviewCalls;
     public bool BadBrief, ReviewFails;
     internal Action<TaskEvidence>? OnReview;
@@ -27,11 +44,10 @@ public sealed class SyntheticProtectedHandoff : IDisposable
     internal ProtectedHandoffDelegation? Adapter { get; private set; }
     public SyntheticProtectedHandoff(string db, Action<string>? gate = null, TimeSpan? operationTimeout = null)
     {
+        this.gate = gate;
         Directory.CreateDirectory(Path.GetDirectoryName(db)!);
         F = new(db, v4: true, operationTimeout: operationTimeout);
         Fake = new(F.Runtime.Root) { StatePath = db + ".provider", LedgerPath = db + ".http" };
-        Http = ReceiptTransport.ForTests(new ResponseGate(Fake, gate, (request, response) => ResponseTransform?.Invoke(request, response) ?? response,
-            (request, token) => OfflineEffectObserver?.Invoke(request, token), timing));
     }
     public async Task Initialize()
     {
@@ -111,6 +127,7 @@ public sealed class SyntheticProtectedHandoff : IDisposable
                 if (request.Method == HttpMethod.Post && request.RequestUri!.AbsolutePath.EndsWith("/prompt_async", StringComparison.Ordinal))
                     gate?.Invoke("PromptHttpReturned");
                 response = transform(request, response);
+                response.RequestMessage ??= request; // Explicit fake exchange; Lab checks before outer v4 transport.
                 observed?.Invoke(true);
                 timing?.Mark("Http.End " + point);
                 return response;
@@ -118,5 +135,5 @@ public sealed class SyntheticProtectedHandoff : IDisposable
             catch { timing?.Mark("Http.Failed " + point); observed?.Invoke(false); throw; }
         }
     }
-    public void Dispose() => Http.Dispose();
+    public void Dispose() => http?.Dispose();
 }

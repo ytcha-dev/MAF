@@ -11,11 +11,12 @@ internal sealed record LabProvenanceIdentity(string OperationId, HandoffTask Tas
     ExternalExecutionHandle Handle, LocalExecutionInput Binding, LocalEvidenceBudgets Budgets);
 internal sealed record LabJournalHeader(int Version, LabProvenanceIdentity Identity, string Fingerprint, DateTimeOffset ExpiresAt);
 internal sealed record LabJournalEvent(int Sequence, string Kind, int Attempt = 0, LabEffect? Effect = null,
-    string? Session = null, ExternalExecutionStatus? Status = null, EvidenceAssessmentStatus? Review = null, HumanGateStatus? Gate = null);
+    string? Session = null, ExternalExecutionStatus? Status = null, EvidenceAssessmentStatus? Review = null, HumanGateStatus? Gate = null,
+    LabOpenCodeProtocol? Protocol = null);
 internal sealed record LabProvenanceInspection(LabJournalHeader Header, LabJournalEvent[] Events)
 {
     public bool CanResume => false; // Inspection never reconstructs admission or an execution capability.
-    public string Receipt => "NotEstablished";
+    public string Receipt => Events.Any(e => e.Kind == "LabReceiptVerified") ? "FixtureVerifiedOriginalResponse / NotProductionAuthenticity" : "NotEstablished";
     public string Recovery => "Blocked / UnknownUntilOriginalEvidenceVerified";
     public string HumanAcceptance => "NotEstablished";
     public string Provenance => "PersonalLab / ControlledOfflineFixture / NotLiveProvider";
@@ -42,6 +43,32 @@ internal sealed class PersonalLabOfflineOperation : IDisposable
     bool disposed, faulted, outcomeRecorded;
     string? session;
     internal LocalExecutionPreparation Preparation => preparation;
+    internal ExternalExecutionHandle OriginalHandle => identity.Handle;
+    bool protocolBound;
+    int receiptStep;
+    internal void BindLabProtocol(LabOpenCodeProtocol protocol)
+    {
+        lock (sync)
+        {
+            if (protocolBound || attempt != 0 || protocol.Recipient != preparation.Binding.HarnessRecipient)
+                throw new ExternalHarnessException("LabProtocolBindingMismatch");
+            admission.DemandRunning(preparation);
+            Write(new LabJournalEvent(++sequence, "LabProtocolBound", Protocol: protocol));
+            protocolBound = true;
+        }
+    }
+    internal void RecordSessionEvidence(string kind, string originalSession)
+    {
+        lock (sync)
+        {
+            var expected = receiptStep switch { 0 => "LabSessionCandidate", 1 => "LabResponseCorrelated", 2 => "LabReceiptVerified", _ => "" };
+            if (!protocolBound || kind != expected || originalSession != session || session is null)
+                throw new ExternalHarnessException("LabReceiptSequenceMismatch");
+            admission.DemandRunning(preparation);
+            Write(new LabJournalEvent(++sequence, kind, Session: session));
+            receiptStep++;
+        }
+    }
     PersonalLabOfflineOperation(LocalExecutionPreparation p, PersonalLabAdmission admission, ExternalExecutionHandle handle, FileStream journal)
     { preparation = p; this.admission = admission; identity = new(p.OperationId, p.Task, handle, p.Binding, p.EvidenceBudgets); this.journal = journal; }
 
@@ -96,6 +123,8 @@ internal sealed class PersonalLabOfflineOperation : IDisposable
         {
             ObjectDisposedException.ThrowIf(disposed, this);
             if (faulted) throw new IOException("LabJournalUnavailable");
+            if (protocolBound && effect is LabEffect.SubmitPrompt or LabEffect.Observe && receiptStep != 3)
+                throw new ExternalHarnessException("LabReceiptRequired");
             var request = new LabEffectRequest(preparation.OperationId, preparation.Task, identity.Handle.ExecutionId,
                 preparation.Binding, preparation.EvidenceBudgets, effect, target);
             var reserved = PersonalLabAdmission.Reserve(admission, request, token);
@@ -157,7 +186,9 @@ internal sealed class PersonalLabOfflineOperation : IDisposable
         var events = lines.Skip(1).Select(line => JsonSerializer.Deserialize<LabJournalEvent>(line, Json) ?? throw new IOException("LabJournalInvalid")).ToArray();
         var pending = new Dictionary<int, LabEffect>();
         bool create = false, prompt = false, createReturned = false, terminalAdmission = false;
-        int nextAttempt = 0;
+        int nextAttempt = 0, receipt = 0;
+        string? originalSession = null;
+        bool labProtocol = false;
         for (var i = 0; i < events.Length; i++)
         {
             var e = events[i];
@@ -166,15 +197,30 @@ internal sealed class PersonalLabOfflineOperation : IDisposable
             {
                 if (terminalAdmission || e.Attempt != ++nextAttempt || e.Effect is not { } effect || !Enum.IsDefined(effect) || !pending.TryAdd(e.Attempt, effect)) throw new IOException("LabJournalInvalid");
                 if (effect == LabEffect.CreateSession) { if (create) throw new IOException("LabJournalDuplicatePost"); create = true; }
-                if (effect == LabEffect.SubmitPrompt) { if (prompt || !createReturned) throw new IOException("LabJournalDuplicatePost"); prompt = true; }
+                if (effect == LabEffect.SubmitPrompt) { if (prompt || !createReturned || labProtocol && receipt != 3) throw new IOException("LabJournalDuplicatePost"); prompt = true; }
             }
             else if (e.Kind is "Returned" or "Uncertain")
             {
                 if (!pending.Remove(e.Attempt, out var effect) || e.Effect != effect) throw new IOException("LabJournalInvalid");
                 if (e.Kind == "Returned" && effect == LabEffect.CreateSession) createReturned = true;
+                if (e.Kind == "Returned" && effect == LabEffect.CreateSession) originalSession = e.Session;
                 if (e.Session is not null && (e.Kind != "Returned" || effect != LabEffect.CreateSession || !Regex.IsMatch(e.Session, "\\Ases_[A-Za-z0-9_-]{1,100}\\z"))) throw new IOException("LabJournalInvalid");
             }
+            else if (e.Kind == "LabProtocolBound")
+            {
+                if (labProtocol || nextAttempt != 0 || e.Protocol is not { } protocol || protocol.Recipient != header.Identity.Binding.HarnessRecipient)
+                    throw new IOException("LabJournalInvalid");
+                LabOpenCodeBoundary.ValidateProtocol(protocol); labProtocol = true;
+            }
+            else if (e.Kind is "LabSessionCandidate" or "LabResponseCorrelated" or "LabReceiptVerified")
+            {
+                var expected = receipt switch { 0 => "LabSessionCandidate", 1 => "LabResponseCorrelated", 2 => "LabReceiptVerified", _ => "" };
+                if (!labProtocol || terminalAdmission || !createReturned || originalSession is null || e.Session != originalSession || e.Kind != expected)
+                    throw new IOException("LabJournalInvalid");
+                receipt++;
+            }
             else if (e.Kind is not ("ProviderObservation" or "Consumed" or "Revoked")) throw new IOException("LabJournalInvalid");
+            if (e.Protocol is not null && e.Kind != "LabProtocolBound") throw new IOException("LabJournalInvalid");
             if (e.Status is { } status && (e.Kind != "ProviderObservation" || !Enum.IsDefined(status))) throw new IOException("LabJournalInvalid");
             if (e.Review is { } review && (e.Kind != "ProviderObservation" || !Enum.IsDefined(review))
                 || e.Gate is { } gate && (e.Kind != "ProviderObservation" || !Enum.IsDefined(gate))) throw new IOException("LabJournalInvalid");

@@ -9,7 +9,8 @@
 
 ## Current development increment and next action
 
-**Current increment: Local Solo MVP-S2D-B — offline durable Lab provenance and owned native recipient transport boundaries; ready for scoped Owner review. S2D-A is conditionally accepted as an offline foundation. Operational execution remains disabled; corporate execution hold is unchanged.**
+**Current increment: Local Solo MVP-S2D-C — HOLD after Owner-reported antivirus event and final test-host termination. Implementation handed off for static GPT/Owner review; final validation incomplete. Affected execution must not resume without clearance. S2D-A remains conditionally accepted. Operational execution remains disabled; corporate execution hold is unchanged.**
+See [S2D-C results](acceptance/LOCAL_SOLO_MVP_S2D_C_FIRST_REAL_RUN_BOUNDARY_RESULTS.md): original controlled exchange, durable candidate/correlation/fixture-verification, exact structured OpenCode model selection and owned native clients through the existing Workflow. Network, public CLI and production trust remain blocked. Downstream attestation and a Lab-owned live child/transport are still missing; no operational readiness claim. Historical failed runs remain recorded. Stop after S2D-C.
 See [S2D-B results](acceptance/LOCAL_SOLO_MVP_S2D_B_OFFLINE_PROVENANCE_RECIPIENT_RESULTS.md): app-owned journal outside the ReadOnly workspace, flushed intent and post-IO lifetime checks, inspection-only reopen, and owned native role/HTTP/model/redirect checks. Final 34 new cases, 234 Lab/Host and 94 protected/source/Reviewer cases pass (overlap/sequence in report), including historical traversal. No production authority, verified Lab receipt, OpenCode downstream attestation, public CLI activation or full-suite clearance. Next: separately authorize the disabled Lab receipt/model-pin integration and resolve exact recipient/data-flow approval before any live task. Stop after S2D-B.
 See [S2D-A results](acceptance/LOCAL_SOLO_MVP_S2D_A_PERSONAL_LAB_ADMISSION_RESULTS.md): S2C eager-directory correction, one admission/start per prepared operation, exact offline effect binding, bounded lifetime/cancellation/revocation/budgets, and no refunded Create/Prompt attempts. Existing protected v4 fixtures and native evidence Workflow remain independent; Lab admission cannot authorize production or network effects. Next: separately review/authorize the smallest S2D-B Lab storage/provenance and three-recipient enforcement increment. No live execution or public PersonalLab route. Stop after S2D-A.
 Validation: final 82 Lab/preparation, 120 Host, 66 Reviewer and 42 coverage cases pass. Full source/protected classes each had one failure; targeted diagnostic reruns pass but causes remain unconfirmed. The combined regression run also hit its session bound. This is not a clean full-regression result; unconditional acceptance remains pending investigation.
@@ -24,8 +25,8 @@ The [Harness extensibility review](acceptance/LOCAL_SOLO_MVP_HARNESS_EXTENSIBILI
 finds reusable Core/Workflow/evidence seams but concrete OpenCode protected-composition,
 source-origin and cancellation/receipt constraints. The provider-neutral Host application/view
 boundary is validated for the bounded offline journey (56 focused / 32 narrow regression passed; Host/test builds 0 warnings/errors), not accepted operational execution. Historical S1 NotRun evidence is preserved in the report.
-Next: review S2D-B offline evidence and separately authorize the missing Lab receipt/model-pin
-composition before considering a live personal task. ProductionProtected still requires
+Next: static GPT/Owner review of S2D-C and security-event review before any affected build/test
+execution resumes. Final snapshot is not test-cleared. ProductionProtected still requires
 genuine trust, activation/storage custody and native/Harness data-flow prerequisites; missing
 evidence keeps that profile blocked. Real-provider evaluation requires its own authorization.
 OpenCode is the first adapter, not the permanent architecture. Codex CLI, Claude Code and
