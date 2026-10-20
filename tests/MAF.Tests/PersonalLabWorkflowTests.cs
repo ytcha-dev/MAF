@@ -170,14 +170,21 @@ public sealed class PersonalLabWorkflowTests(ITestOutputHelper output) : IDispos
         output.WriteLine($"Variant={variant}; lab={lab.State}; reserved={lab.ReservedEffects}; observed={lab.Observations.Length}; fake HTTP={calls}; real HTTP/model calls=0");
     }
 
-    sealed class GuardedScript(IChatClient script, NativeRecipientBinding binding, PersonalLabAdmission admission,
-        LocalExecutionPreparation prepared, LabEffect effect) : DelegatingChatClient(script)
+    internal sealed class GuardedScript(IChatClient script, NativeRecipientBinding binding, PersonalLabAdmission admission,
+        LocalExecutionPreparation prepared, LabEffect effect, PersonalLabOfflineOperation? durable = null) : DelegatingChatClient(script)
     {
         public bool Unavailable { get; init; }
         public override object? GetService(Type type, object? key = null) => type == typeof(ChatClientMetadata)
             ? new ChatClientMetadata(binding.Provider, binding.Endpoint, binding.Model) : base.GetService(type, key);
         public override async Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
         {
+            if (durable is not null)
+            {
+                using var durableAttempt = durable.Reserve(effect, token: cancellationToken);
+                if (Unavailable) throw new InvalidOperationException("ScriptedReviewerUnavailable");
+                var result = await base.GetResponseAsync(messages, options, cancellationToken);
+                durableAttempt.RecordReturned(); return result;
+            }
             using var attempt = PersonalLabAdmission.Reserve(admission, PersonalLabAdmissionTests.Request(prepared, effect), cancellationToken);
             if (Unavailable) throw new InvalidOperationException("ScriptedReviewerUnavailable");
             var response = await base.GetResponseAsync(messages, options, cancellationToken);

@@ -9,7 +9,8 @@
 
 ## Current development increment and next action
 
-**Current increment: Local Solo MVP-S2D-A — internal PersonalLab admission/offline effect boundary and existing official Workflow fixture integration; ready for scoped Owner review. Operational execution remains disabled; corporate execution hold is unchanged.**
+**Current increment: Local Solo MVP-S2D-B — offline durable Lab provenance and owned native recipient transport boundaries; ready for scoped Owner review. S2D-A is conditionally accepted as an offline foundation. Operational execution remains disabled; corporate execution hold is unchanged.**
+See [S2D-B results](acceptance/LOCAL_SOLO_MVP_S2D_B_OFFLINE_PROVENANCE_RECIPIENT_RESULTS.md): app-owned journal outside the ReadOnly workspace, flushed intent and post-IO lifetime checks, inspection-only reopen, and owned native role/HTTP/model/redirect checks. Final 34 new cases, 234 Lab/Host and 94 protected/source/Reviewer cases pass (overlap/sequence in report), including historical traversal. No production authority, verified Lab receipt, OpenCode downstream attestation, public CLI activation or full-suite clearance. Next: separately authorize the disabled Lab receipt/model-pin integration and resolve exact recipient/data-flow approval before any live task. Stop after S2D-B.
 See [S2D-A results](acceptance/LOCAL_SOLO_MVP_S2D_A_PERSONAL_LAB_ADMISSION_RESULTS.md): S2C eager-directory correction, one admission/start per prepared operation, exact offline effect binding, bounded lifetime/cancellation/revocation/budgets, and no refunded Create/Prompt attempts. Existing protected v4 fixtures and native evidence Workflow remain independent; Lab admission cannot authorize production or network effects. Next: separately review/authorize the smallest S2D-B Lab storage/provenance and three-recipient enforcement increment. No live execution or public PersonalLab route. Stop after S2D-A.
 Validation: final 82 Lab/preparation, 120 Host, 66 Reviewer and 42 coverage cases pass. Full source/protected classes each had one failure; targeted diagnostic reruns pass but causes remain unconfirmed. The combined regression run also hit its session bound. This is not a clean full-regression result; unconditional acceptance remains pending investigation.
 R3 scoped stabilization: [fixture budget results](acceptance/LOCAL_SOLO_MVP_S2D_A_R3_FIXTURE_BUDGET_RESULTS.md) records 55/55 serial, 55/55 with two threads and 202/202 Lab/preparation/Host regressions. Selected ordinary fixtures explicitly use 5s before policy binding; in-flight operation and independent Reviewer deadlines retain 2s. No production change or full 403-case rerun; historical failures remain recorded. Ready for conditional Owner review, not Owner-accepted or operationally enabled.
@@ -23,8 +24,8 @@ The [Harness extensibility review](acceptance/LOCAL_SOLO_MVP_HARNESS_EXTENSIBILI
 finds reusable Core/Workflow/evidence seams but concrete OpenCode protected-composition,
 source-origin and cancellation/receipt constraints. The provider-neutral Host application/view
 boundary is validated for the bounded offline journey (56 focused / 32 narrow regression passed; Host/test builds 0 warnings/errors), not accepted operational execution. Historical S1 NotRun evidence is preserved in the report.
-Next: review S2D-A offline evidence and separately authorize a narrow S2D-B storage/provenance
-and recipient restriction increment before considering a live personal task. ProductionProtected still requires
+Next: review S2D-B offline evidence and separately authorize the missing Lab receipt/model-pin
+composition before considering a live personal task. ProductionProtected still requires
 genuine trust, activation/storage custody and native/Harness data-flow prerequisites; missing
 evidence keeps that profile blocked. Real-provider evaluation requires its own authorization.
 OpenCode is the first adapter, not the permanent architecture. Codex CLI, Claude Code and
@@ -36,7 +37,7 @@ The [M3-C-W0 report](plans/M3C_CORPORATE_WORKSTATION_TRUST_FEASIBILITY.md) is re
 deferred enterprise-trust planning evidence; its corporate-first sequencing is superseded
 by this Local Solo priority, without waiving security holds, genuine authorization,
 native-model outbound controls or fail-closed guards. S1 is the offline foundation; S2A adds controlled outcome integration and S2B adds advisory readiness.
-These do not establish production trust or authorize S2D-B/provider activation.
+These do not establish production trust or authorize provider activation.
 Pinned official-source-derived fixtures calibrate bounded excerpts, known unrelated tools
 and exact duplicate reads. Independent 4C verification and R1 native tool observation remain
 mandatory. 357 focused / 1307 offline tests pass; these are not live-provider success rates.

@@ -34,6 +34,23 @@ internal sealed class PersonalLabAdmission
     public ImmutableArray<LabEffectObservation> Observations { get { lock (sync) return [..observations]; } }
     public int ReservedEffects { get { lock (sync) return attempts; } }
 
+    internal void DemandPreparation(LocalExecutionPreparation expected)
+    {
+        lock (sync)
+        {
+            if (!ReferenceEquals(preparation, expected)) throw new ExternalHarnessException("LabEffectBindingMismatch");
+            Demand(PersonalLabState.Admitted);
+        }
+    }
+    internal void DemandRunning(LocalExecutionPreparation expected)
+    {
+        lock (sync)
+        {
+            if (!ReferenceEquals(preparation, expected)) throw new ExternalHarnessException("LabEffectBindingMismatch");
+            Demand(PersonalLabState.Running);
+        }
+    }
+
     private PersonalLabAdmission(LocalExecutionPreparation preparation, string executionId,
         TimeProvider clock, CancellationToken cancellation)
     {
