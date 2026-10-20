@@ -11,9 +11,10 @@ using MAF.Workflows.External.OpenCode;
 namespace MAF.ApprovalAcceptance;
 
 // Controlled agent trust and in-memory HTTP only. Never installed in Host.
-public sealed class SyntheticRuntime(string database) : ITrustedIdentityResolver, ITrustedPolicyAcquisition,
+public sealed class SyntheticRuntime(string database, TimeSpan? operationTimeout = null) : ITrustedIdentityResolver, ITrustedPolicyAcquisition,
     IApprovalAuthorization, IExecutionBindingVerifier
 {
+    readonly TimeSpan taskTimeout = operationTimeout ?? TimeSpan.FromSeconds(2);
     public string Database { get; } = database;
     public SyntheticActor Caller { get; } = new("runtime-agent");
     public SyntheticClock Clock { get; } = new();
@@ -28,7 +29,7 @@ public sealed class SyntheticRuntime(string database) : ITrustedIdentityResolver
     public ExternalTaskRequest Request => PreparedTask is { } task
         ? task.Workspace == Root ? new(task.TaskId, Root, task.Objective, task.StageTimeout)
             : throw new InvalidOperationException("SyntheticPreparedWorkspaceMismatch")
-        : new("runtime-task", Root, "SYNTHETIC_RUNTIME_PROMPT", TimeSpan.FromSeconds(2));
+        : new("runtime-task", Root, "SYNTHETIC_RUNTIME_PROMPT", taskTimeout);
     public ExternalAdmissionRequest Intent => new(ExternalAdmissionMode.Submit, Request.TaskId, Request.Timeout, Request);
     public CapabilityDescriptor Submit => new("runtime-connector", "1", PolicyCapability.ReadOnlyTask, EnforcementBoundary.TaskAdmission, [PolicyOperation.SubmitNewReadOnlyTask], true, true);
     public CapabilityDescriptor Inspect => Submit with { Capability = PolicyCapability.ExecutionInspection, SupportedOperations = [PolicyOperation.InspectExistingExecution] };

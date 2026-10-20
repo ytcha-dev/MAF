@@ -217,6 +217,8 @@ public sealed class ProtectedHandoffTests(ITestOutputHelper output) : IDisposabl
     {
         using var timing = new OfflineCheckpointTiming(output.WriteLine);
         using var f = await Fixture(); var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Assert.Equal(TimeSpan.FromSeconds(2), f.Task.StageTimeout);
+        Assert.Equal(f.Task.StageTimeout.Ticks, f.F.Runtime.Inputs.Scope.BudgetTicks);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var cancel = new CancellationTokenSource(); var spy = new OwnershipSpy(f.F.Executions);
         f.Fake.OnRequest = async (request, token) =>

@@ -21,11 +21,11 @@ public sealed class SyntheticCancellation : ITrustedIdentityResolver, ITrustedPo
     public CapabilityDescriptor Capability => Runtime.Submit with { Capability = PolicyCapability.ExecutionCancellation, SupportedOperations = [PolicyOperation.RequestCancelExecution] };
     public CancellationAdmissionInputs Inputs => new(Policy.AuthorityId, Policy.Epoch, Policy.Version, Runtime.Scope, Capability, "cancel-operation");
     public CancellationCommand Command => new("cancel-one", Runtime.Request.TaskId, "runtime-execution", 0);
-    public SyntheticCancellation(string database, bool approved = false, bool v4 = false)
+    public SyntheticCancellation(string database, bool approved = false, bool v4 = false, TimeSpan? operationTimeout = null)
     {
         V4 = v4;
         Directory.CreateDirectory(Path.GetDirectoryName(database)!);
-        Approval = new(database);
+        Approval = new(database, operationTimeout);
         var original = approved ? Approval.Policy : Runtime.Policy;
         Policy = original with { Capabilities = [..original.Capabilities, Capability], Rules = [..original.Rules,
             new(Canceller.SubjectId, Capability.ConnectorId, Capability.Capability, PolicyOperation.RequestCancelExecution, Runtime.Scope, PolicyOutcome.Allow)] };

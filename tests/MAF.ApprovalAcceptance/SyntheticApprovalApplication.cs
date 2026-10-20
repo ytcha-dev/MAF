@@ -16,9 +16,9 @@ public sealed class SyntheticApprovalApplication : ITrustedIdentityResolver, ITr
     public PolicySnapshot Policy { get; set; }
     public AuthenticatedIdentity OperatorIdentity { get; set; }
     public bool OperatorEnabled { get; set; } = true;
-    public SyntheticApprovalApplication(string database)
+    public SyntheticApprovalApplication(string database, TimeSpan? operationTimeout = null)
     {
-        Runtime = new(database);
+        Runtime = new(database, operationTimeout);
         Policy = Runtime.Policy with { Rules = [Runtime.Policy.Rules[0] with { Outcome = PolicyOutcome.RequireApproval, RequiredOperatorScope = "operator:readonly" }, Runtime.Policy.Rules[1]] };
         OperatorIdentity = new(Operator.SubjectId, Operator.AuthenticationContextId, IdentityKind.HumanOperator, Clock.Now.AddMinutes(-1), Clock.Now.AddMinutes(10), true);
     }

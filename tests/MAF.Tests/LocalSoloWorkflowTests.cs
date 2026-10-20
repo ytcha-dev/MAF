@@ -93,7 +93,8 @@ public sealed class LocalSoloWorkflowTests(ITestOutputHelper output) : IDisposab
     public async Task CompletedDoesNotImplySuccessfulReview(string variant)
     {
         using var timing = new OfflineCheckpointTiming(output.WriteLine);
-        using var f = await fixtures.Fixture(variant: variant == "missing" ? "none" : "valid", sources: variant == "partial-observation" ? 2 : 1);
+        using var f = await fixtures.Fixture(variant: variant == "missing" ? "none" : "valid", sources: variant == "partial-observation" ? 2 : 1,
+            operationTimeout: TimeSpan.FromSeconds(5));
         using var model = new SourceCandidateIntegrationTests.Reviewer { Partial = variant == "partial-observation" };
         var native = new NativeEvidenceReviewer(model);
         Func<TaskEvidence, CancellationToken, Task<ReviewAssessment>> review = variant == "reviewer-unavailable"

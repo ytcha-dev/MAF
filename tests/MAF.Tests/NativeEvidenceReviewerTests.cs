@@ -15,9 +15,14 @@ namespace MAF.Tests;
 public sealed class NativeEvidenceReviewerTests(ITestOutputHelper output) : IDisposable
 {
     readonly string root = Path.Combine(Path.GetTempPath(), "maf-native-evidence-" + Guid.NewGuid().ToString("N"));
-    async Task<SyntheticProtectedHandoff> Fixture(string suffix = "")
+    async Task<SyntheticProtectedHandoff> Fixture(string suffix = "", TimeSpan? operationTimeout = null)
     {
-        var f = new SyntheticProtectedHandoff(Path.Combine(root, suffix, "synthetic.db")); await f.Initialize();
+        var f = new SyntheticProtectedHandoff(Path.Combine(root, suffix, "synthetic.db"), operationTimeout: operationTimeout);
+        var budget = operationTimeout ?? TimeSpan.FromSeconds(2);
+        Assert.Equal(budget, f.Task.StageTimeout); Assert.Equal(budget, f.F.Runtime.Request.Timeout);
+        Assert.Equal(budget.Ticks, f.F.Runtime.Inputs.Scope.BudgetTicks);
+        Assert.All(f.F.Policy.Rules, r => Assert.Equal(budget.Ticks, r.Scope.BudgetTicks));
+        await f.Initialize();
         Source(f); return f;
     }
     static void Source(SyntheticProtectedHandoff f, string text = "return 42;") => File.WriteAllText(Path.Combine(f.F.Runtime.Root, "Example.cs"),
@@ -78,8 +83,18 @@ public sealed class NativeEvidenceReviewerTests(ITestOutputHelper output) : IDis
     public async Task InvalidAgentBehaviorCannotChangeCompletedFactsOrGrantApproval(string variant)
     {
         using var timing = new OfflineCheckpointTiming(output.WriteLine);
-        using var f = await Fixture(); using var client = new Script { Variant = variant }; var reviewer = new NativeEvidenceReviewer(client);
-        var run = await f.Flow(sources: Mode(f), reviewer: reviewer.ReviewAsync).RunAsync(f.Task);
+        using var f = await Fixture(operationTimeout: TimeSpan.FromSeconds(5)); using var client = new Script { Variant = variant }; var reviewer = new NativeEvidenceReviewer(client);
+        bool shortDeadlineCancelled = false, parentCancelled = false;
+        var run = await f.Flow(sources: Mode(f), reviewer: async (e, t) =>
+        {
+            if (variant != "timeout") return await reviewer.ReviewAsync(e, t);
+            // External admission/observation needs 5s; native Review still gets only 2s.
+            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(t);
+            deadline.CancelAfter(TimeSpan.FromSeconds(2));
+            var result = await reviewer.ReviewAsync(e, deadline.Token);
+            shortDeadlineCancelled = deadline.IsCancellationRequested; parentCancelled = t.IsCancellationRequested;
+            return result;
+        }).RunAsync(f.Task);
         timing.Observe(run.Outcome);
         MissingReviewDiagnostics(run);
         Assert.Equal(EvidenceAssessmentStatus.ReviewUnavailable, run.Outcome.Review!.Status);
@@ -88,6 +103,8 @@ public sealed class NativeEvidenceReviewerTests(ITestOutputHelper output) : IDis
         Assert.Equal(DurableExecutionState.Completed, (await f.F.Executions.GetAsync(f.Task.TaskId))!.State);
         Assert.Equal(new[] { 1, 1, 9, 0 }, Counts(f)); Assert.Equal(0, f.ReviewCalls);
         if (variant == "construction") Assert.Equal(0, client.Calls);
+        if (variant == "timeout")
+        { Assert.True(shortDeadlineCancelled); Assert.False(parentCancelled); Assert.Equal(1, client.Calls); }
     }
 
     [Theory]
@@ -120,7 +137,7 @@ public sealed class NativeEvidenceReviewerTests(ITestOutputHelper output) : IDis
     public async Task AdvisoryNegativeResultsRemainNonExecutable(string variant, EvidenceAssessmentStatus expected)
     {
         using var timing = new OfflineCheckpointTiming(output.WriteLine);
-        using var f = await Fixture(); using var client = new Script { Variant = variant };
+        using var f = await Fixture(operationTimeout: TimeSpan.FromSeconds(5)); using var client = new Script { Variant = variant };
         var run = await f.Flow(sources: Mode(f), reviewer: new NativeEvidenceReviewer(client).ReviewAsync).RunAsync(f.Task);
         MissingReviewDiagnostics(run);
         timing.Observe(run.Outcome);
@@ -133,7 +150,7 @@ public sealed class NativeEvidenceReviewerTests(ITestOutputHelper output) : IDis
     public async Task IndependentSourceValidationSurroundsNativeAgent(string variant)
     {
         using var timing = new OfflineCheckpointTiming(output.WriteLine);
-        using var f = await Fixture(); using var client = new Script();
+        using var f = await Fixture(operationTimeout: TimeSpan.FromSeconds(5)); using var client = new Script();
         var reviewer = new NativeEvidenceReviewer(client); var invoked = 0;
         var run = await f.Flow(sources: Mode(f, variant == "missing" ? "Missing.cs" : "Example.cs"), reviewer: async (e, t) =>
         {

@@ -25,10 +25,10 @@ public sealed class SyntheticProtectedHandoff : IDisposable
     public HandoffTask Task => new(F.Runtime.Request.TaskId, F.Runtime.Inputs.NewWorkflowRunId, F.Runtime.Root,
         F.Runtime.Request.TaskText, F.Runtime.Request.Timeout);
     internal ProtectedHandoffDelegation? Adapter { get; private set; }
-    public SyntheticProtectedHandoff(string db, Action<string>? gate = null)
+    public SyntheticProtectedHandoff(string db, Action<string>? gate = null, TimeSpan? operationTimeout = null)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(db)!);
-        F = new(db, v4: true);
+        F = new(db, v4: true, operationTimeout: operationTimeout);
         Fake = new(F.Runtime.Root) { StatePath = db + ".provider", LedgerPath = db + ".http" };
         Http = ReceiptTransport.ForTests(new ResponseGate(Fake, gate, (request, response) => ResponseTransform?.Invoke(request, response) ?? response,
             (request, token) => OfflineEffectObserver?.Invoke(request, token), timing));
