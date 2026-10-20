@@ -20,6 +20,7 @@ public sealed class SyntheticProtectedHandoff : IDisposable
     internal Action<TaskEvidence>? OnReview;
     internal EvidenceAssessmentStatus SourceReviewStatus = EvidenceAssessmentStatus.SufficientEvidence;
     internal Func<HttpRequestMessage, HttpResponseMessage, HttpResponseMessage>? ResponseTransform;
+    internal Func<HttpRequestMessage, CancellationToken, Action<bool>>? OfflineEffectObserver;
     public HandoffTask Task => new(F.Runtime.Request.TaskId, F.Runtime.Inputs.NewWorkflowRunId, F.Runtime.Root,
         F.Runtime.Request.TaskText, F.Runtime.Request.Timeout);
     internal ProtectedHandoffDelegation? Adapter { get; private set; }
@@ -28,7 +29,8 @@ public sealed class SyntheticProtectedHandoff : IDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(db)!);
         F = new(db, v4: true);
         Fake = new(F.Runtime.Root) { StatePath = db + ".provider", LedgerPath = db + ".http" };
-        Http = ReceiptTransport.ForTests(new ResponseGate(Fake, gate, (request, response) => ResponseTransform?.Invoke(request, response) ?? response));
+        Http = ReceiptTransport.ForTests(new ResponseGate(Fake, gate, (request, response) => ResponseTransform?.Invoke(request, response) ?? response,
+            (request, token) => OfflineEffectObserver?.Invoke(request, token)));
     }
     public async Task Initialize()
     {
@@ -39,13 +41,14 @@ public sealed class SyntheticProtectedHandoff : IDisposable
     }
     internal ControlledHandoffWorkflow Flow(ProtectedExternalRuntime? runtime = null, ITrustedCallerContext? caller = null,
         ExternalAdmissionMode mode = ExternalAdmissionMode.Submit, Action? handoff = null, ExternalExecutionHandle? expected = null,
-        VerifiedSourceMode? sources = null, Func<TaskEvidence, CancellationToken, Task<ReviewAssessment>>? reviewer = null)
+        VerifiedSourceMode? sources = null, Func<TaskEvidence, CancellationToken, Task<ReviewAssessment>>? reviewer = null,
+        ITaskBriefing? briefing = null)
     {
         var original = F.Runtime.Request; var input = F.Runtime.Inputs;
         expected ??= input.PreparedHandle;
         Adapter = new(runtime ?? F.Protected(Http), caller ?? F.Runtime.Caller, original, input.NewWorkflowRunId, expected, mode)
         { BeforeHandoff = handoff };
-        return new(new TaskBriefingAdapter(new Chat(this), new ProjectTools(F.Runtime.Root)),
+        return new(briefing ?? new TaskBriefingAdapter(new Chat(this), new ProjectTools(F.Runtime.Root)),
             _ => PolicyOutcome.Allow, Adapter, reviewer ?? Review, expected, TimeProvider.System, sources);
     }
     Task<ReviewAssessment> Review(TaskEvidence evidence, CancellationToken token)
@@ -67,7 +70,7 @@ public sealed class SyntheticProtectedHandoff : IDisposable
                 if (record?.SubmissionPhase == SubmissionPhase.PromptIntended) gate("PromptIntentCommitted");
             }
         }, ApprovalStoreProfile.ExplicitV4, gate);
-    sealed class Chat(SyntheticProtectedHandoff owner) : IChatClient
+    internal sealed class Chat(SyntheticProtectedHandoff owner) : IChatClient
     {
         public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
         {
@@ -85,14 +88,22 @@ public sealed class SyntheticProtectedHandoff : IDisposable
         public void Dispose() { }
     }
     sealed class ResponseGate(HttpMessageHandler inner, Action<string>? gate,
-        Func<HttpRequestMessage, HttpResponseMessage, HttpResponseMessage> transform) : DelegatingHandler(inner)
+        Func<HttpRequestMessage, HttpResponseMessage, HttpResponseMessage> transform,
+        Func<HttpRequestMessage, CancellationToken, Action<bool>?> observer) : DelegatingHandler(inner)
     {
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         {
-            var response = await base.SendAsync(request, token);
-            if (request.Method == HttpMethod.Post && request.RequestUri!.AbsolutePath.EndsWith("/prompt_async", StringComparison.Ordinal))
-                gate?.Invoke("PromptHttpReturned");
-            return transform(request, response);
+            var observed = observer(request, token); // BEFORE fake HTTP, never an operational transport.
+            try
+            {
+                var response = await base.SendAsync(request, token);
+                if (request.Method == HttpMethod.Post && request.RequestUri!.AbsolutePath.EndsWith("/prompt_async", StringComparison.Ordinal))
+                    gate?.Invoke("PromptHttpReturned");
+                response = transform(request, response);
+                observed?.Invoke(true);
+                return response;
+            }
+            catch { observed?.Invoke(false); throw; }
         }
     }
     public void Dispose() => Http.Dispose();

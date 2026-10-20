@@ -26,6 +26,7 @@ internal sealed record LocalExecutionInput(string Objective, string Workspace,
 // An operation identity is correlation only; this object cannot dispatch anything.
 internal sealed class LocalExecutionPreparation
 {
+    int offlineLabAdmissionClaimed;
     public string OperationId { get; }
     public HandoffTask Task { get; }
     public LocalExecutionInput Binding { get; }
@@ -111,4 +112,10 @@ internal sealed class LocalExecutionPreparation
     // No callback/client/store/runtime accepted. Both profiles are disabled, independently.
     public void DemandExecution() => throw new ExternalHarnessException(
         Binding.Profile == LocalExecutionProfile.PersonalLab ? "PersonalLabNotApproved" : LocalSoloApplication.Blocker);
+
+    internal void ClaimOfflineLabAdmission()
+    {
+        if (Interlocked.CompareExchange(ref offlineLabAdmissionClaimed, 1, 0) != 0)
+            throw new ExternalHarnessException("LabAdmissionAlreadyIssued");
+    }
 }

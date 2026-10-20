@@ -23,13 +23,18 @@ public sealed class SyntheticRuntime(string database) : ITrustedIdentityResolver
     {
         get { using var http = new HttpClient(); return new OpenCodeClient(http, Options).Scope; }
     }
-    public ExternalTaskRequest Request => new("runtime-task", Root, "SYNTHETIC_RUNTIME_PROMPT", TimeSpan.FromSeconds(2));
+    // Optional test-owned original identity, supplied before any task admission/effect.
+    public HandoffTask? PreparedTask { get; set; }
+    public ExternalTaskRequest Request => PreparedTask is { } task
+        ? task.Workspace == Root ? new(task.TaskId, Root, task.Objective, task.StageTimeout)
+            : throw new InvalidOperationException("SyntheticPreparedWorkspaceMismatch")
+        : new("runtime-task", Root, "SYNTHETIC_RUNTIME_PROMPT", TimeSpan.FromSeconds(2));
     public ExternalAdmissionRequest Intent => new(ExternalAdmissionMode.Submit, Request.TaskId, Request.Timeout, Request);
     public CapabilityDescriptor Submit => new("runtime-connector", "1", PolicyCapability.ReadOnlyTask, EnforcementBoundary.TaskAdmission, [PolicyOperation.SubmitNewReadOnlyTask], true, true);
     public CapabilityDescriptor Inspect => Submit with { Capability = PolicyCapability.ExecutionInspection, SupportedOperations = [PolicyOperation.InspectExistingExecution] };
     public AuthorizationScope Scope => new(Root, ProviderScope, new('A', 64), 1, 1, ResourceAccess.ReadOnly, Request.Timeout.Ticks);
     public ExternalAdmissionInputs Inputs => new("runtime-authority", new(1), new(1), "OpenCode", Scope, Submit, Inspect,
-        "runtime-operation", "runtime-run", new("runtime-execution", "OpenCode", ExternalRequestId: "msg_runtime"), []);
+        "runtime-operation", PreparedTask?.WorkflowRunId ?? "runtime-run", new("runtime-execution", "OpenCode", ExternalRequestId: "msg_runtime"), []);
     PolicySnapshot? configured;
     public PolicySnapshot Policy
     {

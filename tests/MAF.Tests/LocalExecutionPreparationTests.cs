@@ -7,8 +7,20 @@ namespace MAF.Tests;
 public sealed class LocalExecutionPreparationTests : IDisposable
 {
     readonly string root = Path.Combine(Path.GetTempPath(), "maf-s2c-" + Guid.NewGuid().ToString("N"));
-    public LocalExecutionPreparationTests() => Directory.CreateDirectory(root);
-    LocalExecutionInput Input() => new("Explain the personal fixture", root, LocalExecutionProfile.PersonalLab,
+    bool ownsWorkspace;
+    void AllocateWorkspace()
+    {
+        Assert.False(Directory.Exists(root));
+        Directory.CreateDirectory(root);
+        ownsWorkspace = true;
+    }
+    void NoWorkspaceAllocated()
+    {
+        Assert.False(ownsWorkspace);
+        Assert.False(Directory.Exists(root));
+    }
+    // Existing test-output directory supplies metadata for valid preparation; no fixture allocated.
+    LocalExecutionInput Input() => new("Explain the personal fixture", Path.TrimEndingDirectorySeparator(AppContext.BaseDirectory), LocalExecutionProfile.PersonalLab,
         new(NativeModelRole.Pca, "pca-v1", new("https://pca.example.invalid/v1"), "pca-provider", "pca-model"),
         new(NativeModelRole.Reviewer, "review-v1", new("https://review.example.invalid/v1"), "review-provider", "review-model"),
         new("harness-v1", "harness-provider", "harness-model"), TimeSpan.FromSeconds(60));
@@ -16,7 +28,8 @@ public sealed class LocalExecutionPreparationTests : IDisposable
     [Fact]
     public void ExactImmutableBindingReusesTaskAndCreatesNoFiles()
     {
-        var input = Input(); var prepared = LocalExecutionPreparation.Prepare(input);
+        AllocateWorkspace();
+        var input = Input() with { Workspace = root }; var prepared = LocalExecutionPreparation.Prepare(input);
         prepared.DemandExact(input);
         Assert.Equal(input, prepared.Binding); Assert.Equal(input.Workspace, prepared.Task.Workspace);
         Assert.Equal(input.Objective, prepared.Task.Objective); Assert.Equal(input.StageTimeout, prepared.Task.StageTimeout);
@@ -45,6 +58,7 @@ public sealed class LocalExecutionPreparationTests : IDisposable
             _ => input with { HarnessRecipient = input.HarnessRecipient! with { ConfigurationId = "v2" } }
         };
         Assert.Equal("PreparedIntentMismatch", Assert.Throws<ArgumentException>(() => prepared.DemandExact(changed)).Message);
+        NoWorkspaceAllocated();
     }
     [Theory]
     [InlineData("pca", "PcaBindingMissing")] [InlineData("reviewer", "ReviewerBindingMissing")]
@@ -73,7 +87,7 @@ public sealed class LocalExecutionPreparationTests : IDisposable
             _ => input with { HarnessRecipient = input.HarnessRecipient! with { Model = "bad\nmodel" } }
         };
         Assert.Equal(error, Assert.Throws<ArgumentException>(() => LocalExecutionPreparation.Prepare(input)).Message);
-        Assert.Empty(Directory.EnumerateFileSystemEntries(root));
+        NoWorkspaceAllocated();
     }
     [Theory]
     [InlineData(0, "PersonalLabNotApproved")]
@@ -83,7 +97,7 @@ public sealed class LocalExecutionPreparationTests : IDisposable
         var prepared = LocalExecutionPreparation.Prepare(Input() with { Profile = (LocalExecutionProfile)profile });
         Assert.Equal(code, Assert.Throws<ExternalHarnessException>(prepared.DemandExecution).Code);
         Assert.Equal("ProductionTrustUnavailable", Assert.Throws<ExternalHarnessException>(LocalSoloApplication.Submit).Code);
-        Assert.Empty(Directory.EnumerateFileSystemEntries(root));
+        NoWorkspaceAllocated();
     }
     [Theory]
     [InlineData(false)] [InlineData(true)]
@@ -94,18 +108,22 @@ public sealed class LocalExecutionPreparationTests : IDisposable
             Assert.Throws<ExternalHarnessException>(() => prepared.DemandHarnessRecipient(input.HarnessRecipient)).Code);
         else Assert.Throws<ArgumentException>(() => prepared.DemandHarnessRecipient(null));
         Assert.Throws<ArgumentException>(() => prepared.DemandHarnessRecipient(input.HarnessRecipient! with { Model = "other" }));
+        NoWorkspaceAllocated();
     }
     [Fact]
     public void ConcreteNativeAdaptersBindIndependentRecipientsWithoutModelCalls()
     {
         var input = Input(); var prepared = LocalExecutionPreparation.Prepare(input);
+        var before = Directory.GetFileSystemEntries(input.Workspace).Order().ToArray();
         using var pca = new MetadataClient(input.Pca!); using var reviewer = new MetadataClient(input.Reviewer!);
         var adapters = prepared.BindNativeAdapters(pca, reviewer);
         Assert.IsType<MAF.Agents.Comprehension.TaskBriefingAdapter>(adapters.Pca);
         Assert.IsType<MAF.Agents.Review.NativeEvidenceReviewer>(adapters.Reviewer);
         Assert.Throws<ArgumentException>(() => prepared.BindNativeAdapters(reviewer, pca));
         Assert.Throws<ArgumentException>(() => prepared.BindNativeAdapters(pca, pca));
-        Assert.Equal(0, pca.Calls + reviewer.Calls); Assert.Empty(Directory.EnumerateFileSystemEntries(root));
+        Assert.Equal(0, pca.Calls + reviewer.Calls);
+        Assert.Equal(before, Directory.GetFileSystemEntries(input.Workspace).Order().ToArray());
+        NoWorkspaceAllocated();
     }
     [Theory]
     [InlineData("endpoint")] [InlineData("provider")] [InlineData("model")] [InlineData("missing")]
@@ -122,6 +140,7 @@ public sealed class LocalExecutionPreparationTests : IDisposable
         using var reviewer = new MetadataClient(input.Reviewer!);
         Assert.Equal("NativeRecipientMismatch", Assert.Throws<ArgumentException>(() => prepared.BindNativeAdapters(pca, reviewer)).Message);
         Assert.Equal(0, pca.Calls + reviewer.Calls);
+        NoWorkspaceAllocated();
     }
     [Theory]
     [InlineData("personal-run")] [InlineData("--profile")] [InlineData("--factory")]
@@ -132,6 +151,7 @@ public sealed class LocalExecutionPreparationTests : IDisposable
             : new[] { "--local", "submit", option, "synthetic" };
         Assert.Equal(2, LocalSoloConsole.Run(args, output, error, _ => throw new InvalidOperationException("UnexpectedConfigurationRead")));
         Assert.Empty(output.ToString()); Assert.Contains("InvalidLocalInput", error.ToString());
+        NoWorkspaceAllocated();
     }
     sealed class MetadataClient(NativeRecipientBinding binding) : IChatClient
     {
@@ -145,5 +165,8 @@ public sealed class LocalExecutionPreparationTests : IDisposable
         { Calls++; throw new InvalidOperationException("NoModelRequestPermitted"); }
         public void Dispose() { }
     }
-    public void Dispose() => Directory.Delete(root); // Owned empty fixture only; deliberately non-recursive.
+    public void Dispose()
+    {
+        if (ownsWorkspace) Directory.Delete(root); // Exact owned empty fixture only; non-recursive.
+    }
 }

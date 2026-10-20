@@ -194,6 +194,10 @@ public sealed class SourceCandidateIntegrationTests(ITestOutputHelper output) : 
             if (variant == "unavailable") locked = new FileStream(Path.Combine(f.F.Runtime.Root, "Example.cs"), FileMode.Open, FileAccess.Read, FileShare.None);
             var reader = new BoundedSourceReader(f.F.Runtime.Root, f.F.Clock);
             var run = await f.Flow(sources: new VerifiedSourceMode(reader), reviewer: new NativeEvidenceReviewer(chat).ReviewAsync).RunAsync(f.Task);
+            if (run.Outcome.ExternalResult is not { Status: ExternalExecutionStatus.Completed, SourceCandidates.Length: 1 })
+                output.WriteLine($"Source prerequisite unavailable: external={run.Outcome.ExternalResult?.Status}; "
+                    + $"code={run.Outcome.ExternalResult?.ErrorCode}; elapsedMs={run.Outcome.ExternalResult?.DurationMilliseconds}; "
+                    + $"reason={run.Outcome.ReasonCode}; trace={string.Join(',', run.Outcome.ExternalResult?.Trace.Select(t => t.Kind) ?? [])}");
             Assert.Single(run.Outcome.ExternalResult!.SourceCandidates); Assert.Equal(ExternalExecutionStatus.Completed, run.Outcome.ExternalResult.Status);
             Assert.NotEqual(HumanGateStatus.ReadyForHumanReview, run.Outcome.HumanGate); Assert.Empty(run.Outcome.Review!.Sources!.Admitted);
             Assert.Equal(variant == "unavailable" ? EvidenceAssessmentStatus.ReviewUnavailable : EvidenceAssessmentStatus.InsufficientEvidence, run.Outcome.Review.Status);

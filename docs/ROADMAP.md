@@ -9,7 +9,9 @@
 
 ## Current development increment and next action
 
-**Current increment: Local Solo MVP-S2C — immutable execution preparation and independent native-role adapter binding; operational execution remains disabled. External Host activation remains BLOCKED; corporate execution hold is unchanged.**
+**Current increment: Local Solo MVP-S2D-A — internal PersonalLab admission/offline effect boundary and existing official Workflow fixture integration; ready for scoped Owner review. Operational execution remains disabled; corporate execution hold is unchanged.**
+See [S2D-A results](acceptance/LOCAL_SOLO_MVP_S2D_A_PERSONAL_LAB_ADMISSION_RESULTS.md): S2C eager-directory correction, one admission/start per prepared operation, exact offline effect binding, bounded lifetime/cancellation/revocation/budgets, and no refunded Create/Prompt attempts. Existing protected v4 fixtures and native evidence Workflow remain independent; Lab admission cannot authorize production or network effects. Next: separately review/authorize the smallest S2D-B Lab storage/provenance and three-recipient enforcement increment. No live execution or public PersonalLab route. Stop after S2D-A.
+Validation: final 82 Lab/preparation, 120 Host, 66 Reviewer and 42 coverage cases pass. Full source/protected classes each had one failure; targeted diagnostic reruns pass but causes remain unconfirmed. The combined regression run also hit its session bound. This is not a clean full-regression result; unconditional acceptance remains pending investigation.
 See [S2C results](acceptance/LOCAL_SOLO_MVP_S2C_PERSONAL_EXECUTION_BOUNDARY_RESULTS.md): exact task/workspace/Harness/profile/budget/three-recipient binding, real native-adapter metadata validation without model calls, and separate disabled PersonalLab/ProductionProtected profiles. Metadata is not egress authorization; Harness downstream recipient verification remains unavailable. No executable research route, synthetic authority or production fallback was added. Next decision: Owner acceptance of the explicit limited PersonalLab risk boundary and separate S2D authorization for one privately configured foreground ReadOnly personal fixture run. Stop after S2C.
 See [S2B results](acceptance/LOCAL_SOLO_MVP_S2B_READINESS_RESULTS.md): strict `--local readiness` reuses the existing candidate application boundary; trust/custody/three data flows remain NotEstablished and overall Blocked. 23 focused + 301 scoped regression cases pass; no operational facade, authority source or provider activation added. Stop after S2B.
 See [S2A results](acceptance/LOCAL_SOLO_MVP_S2A_WORKFLOW_COMPOSITION_RESULTS.md): reuse existing internal composition (no new public facade/factory), explicit ControlledOfflineFixture / NotLiveProvider presentation, 12 focused + 88 Host + 201 protected/source/Reviewer passing cases. No production clients, trust registration or CLI routing added. Historical S2A controlled evidence retained.
@@ -20,8 +22,8 @@ The [Harness extensibility review](acceptance/LOCAL_SOLO_MVP_HARNESS_EXTENSIBILI
 finds reusable Core/Workflow/evidence seams but concrete OpenCode protected-composition,
 source-origin and cancellation/receipt constraints. The provider-neutral Host application/view
 boundary is validated for the bounded offline journey (56 focused / 32 narrow regression passed; Host/test builds 0 warnings/errors), not accepted operational execution. Historical S1 NotRun evidence is preserved in the report.
-Next: review the S2C PersonalLab risk boundary and separately authorize the smallest foreground
-personal ReadOnly increment with privately selected recipients. ProductionProtected still requires
+Next: review S2D-A offline evidence and separately authorize a narrow S2D-B storage/provenance
+and recipient restriction increment before considering a live personal task. ProductionProtected still requires
 genuine trust, activation/storage custody and native/Harness data-flow prerequisites; missing
 evidence keeps that profile blocked. Real-provider evaluation requires its own authorization.
 OpenCode is the first adapter, not the permanent architecture. Codex CLI, Claude Code and
@@ -33,7 +35,7 @@ The [M3-C-W0 report](plans/M3C_CORPORATE_WORKSTATION_TRUST_FEASIBILITY.md) is re
 deferred enterprise-trust planning evidence; its corporate-first sequencing is superseded
 by this Local Solo priority, without waiving security holds, genuine authorization,
 native-model outbound controls or fail-closed guards. S1 is the offline foundation; S2A adds controlled outcome integration and S2B adds advisory readiness.
-These do not establish production trust or authorize S2D/provider activation.
+These do not establish production trust or authorize S2D-B/provider activation.
 Pinned official-source-derived fixtures calibrate bounded excerpts, known unrelated tools
 and exact duplicate reads. Independent 4C verification and R1 native tool observation remain
 mandatory. 357 focused / 1307 offline tests pass; these are not live-provider success rates.
@@ -53,7 +55,7 @@ Hybrid are also unfinished. Historical milestone next-actions at the end are dat
 - **Acceptance gate:** each new increment must identify tests that create directories, justify why they need them, and verify that pure cases create none. Do not confuse "no test-owned directory allocation" with proof of zero system-wide side effects.
 - **Endpoint security:** do not change folder names, locations, executable names, extensions, controls or security settings to evade a detection. Corporate execution hold and data restrictions remain; a home pass is not corporate clearance.
 
-**Known follow-up:** S2C `LocalExecutionPreparationTests` currently uses eager `Directory.CreateDirectory(root)` in its constructor. Correct this test-fixture isolation at the beginning of S2D without changing production Host behavior. Do not start any live execution to validate this fix.
+**S2D-A correction:** S2C `LocalExecutionPreparationTests` no longer creates directories in its constructor. Only its explicit canonical-directory/no-file-effects case allocates an empty owned workspace; metadata/binding/denial cases assert no workspace allocation. See the S2D-A results for selected-fixture coverage and the excluded legacy eager `RuntimeEnforcementTests` class. No live execution was used for this fix.
 
 ## 1. Vision and operating principles
 

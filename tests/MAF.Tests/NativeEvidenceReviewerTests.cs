@@ -26,6 +26,13 @@ public sealed class NativeEvidenceReviewerTests(ITestOutputHelper output) : IDis
         (e, _) => Task.FromResult<ImmutableArray<SourceCandidate>>([new(BoundedSourceReader.Binding(e), path, 120, 121, "// end", SourceCandidateOrigin.SyntheticTest)]));
     static int[] Counts(SyntheticProtectedHandoff f) => [f.Fake.Requests.Count(x => x == "POST /session"),
         f.Fake.Requests.Count(x => x.EndsWith("/prompt_async")), f.Fake.Requests.Count(x => x.StartsWith("GET ")), f.Fake.Requests.Count(x => x.EndsWith("/abort"))];
+    void MissingReviewDiagnostics(HandoffRun run)
+    {
+        if (run.Outcome.Review is null)
+            output.WriteLine($"Review prerequisite unavailable: PCA={run.Outcome.Comprehension}; external={run.Outcome.ExternalResult?.Status}; "
+                + $"code={run.Outcome.ExternalResult?.ErrorCode}; reason={run.Outcome.ReasonCode}; "
+                + $"trace={string.Join(',', run.Outcome.ExternalResult?.Trace.Select(t => t.Kind) ?? [])}");
+    }
 
     [Fact]
     public async Task OfficialNativeReviewerReadsRealLine120InsideProtectedTypedGraph()
@@ -71,6 +78,7 @@ public sealed class NativeEvidenceReviewerTests(ITestOutputHelper output) : IDis
     {
         using var f = await Fixture(); using var client = new Script { Variant = variant }; var reviewer = new NativeEvidenceReviewer(client);
         var run = await f.Flow(sources: Mode(f), reviewer: reviewer.ReviewAsync).RunAsync(f.Task);
+        MissingReviewDiagnostics(run);
         Assert.Equal(EvidenceAssessmentStatus.ReviewUnavailable, run.Outcome.Review!.Status);
         Assert.Equal(HumanGateStatus.NeedsHumanReview, run.Outcome.HumanGate);
         Assert.Equal(ExternalExecutionStatus.Completed, run.Outcome.ExternalResult!.Status);
@@ -110,6 +118,7 @@ public sealed class NativeEvidenceReviewerTests(ITestOutputHelper output) : IDis
     {
         using var f = await Fixture(); using var client = new Script { Variant = variant };
         var run = await f.Flow(sources: Mode(f), reviewer: new NativeEvidenceReviewer(client).ReviewAsync).RunAsync(f.Task);
+        MissingReviewDiagnostics(run);
         Assert.Equal(expected, run.Outcome.Review!.Status); Assert.Equal(HumanGateStatus.NeedsHumanReview, run.Outcome.HumanGate);
         Assert.Equal(new[] { 1, 1, 9, 0 }, Counts(f));
     }
