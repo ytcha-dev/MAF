@@ -21,7 +21,7 @@ public sealed class IndependentLabRuntimeTests(Xunit.Abstractions.ITestOutputHel
         public readonly ExternalExecutionHandle Handle = new("lab-execution", "OpenCode", ExternalRequestId: "msg_lab");
         public readonly PersonalLabOfflineOperation Operation;
         public readonly Wire Transport;
-        public Owned(string variant, TimeProvider? clock = null)
+        public Owned(string variant, TimeProvider? clock = null, string? wireVariant = null)
         {
             Root = Path.Combine(Path.GetTempPath(), "maf-independent-lab", variant, Guid.NewGuid().ToString("N"));
             Workspace = Directory.CreateDirectory(Path.Combine(Root, "workspace")).FullName;
@@ -32,7 +32,7 @@ public sealed class IndependentLabRuntimeTests(Xunit.Abstractions.ITestOutputHel
                 Pca = input.Pca! with { Provider = "openai" }, Reviewer = input.Reviewer! with { Provider = "openai" } });
             Admission = PersonalLabAdmission.AdmitOffline(Preparation, Preparation.Binding, Handle.ExecutionId, clock ?? TimeProvider.System);
             Operation = PersonalLabOfflineOperation.Begin(Preparation, Admission, Handle, Storage);
-            Transport = new(Preparation, variant);
+            Transport = new(Preparation, wireVariant ?? variant);
         }
         public void Dispose()
         {
@@ -108,8 +108,9 @@ public sealed class IndependentLabRuntimeTests(Xunit.Abstractions.ITestOutputHel
             if (variant == "reviewer-unavailable") Assert.Equal(EvidenceAssessmentStatus.ReviewUnavailable, run.Outcome.Review!.Status);
             output.WriteLine($"{variant}: status={result.Status}; error={result.ErrorCode}; review={run.Outcome.Review?.Status}; requests={string.Join(',', f.Transport.Fake.Requests)}");
             if (variant != "lost-create") Assert.ThrowsAny<Exception>(() => f.Operation.Reserve(LabEffect.CreateSession));
-            if (variant == "invalid-receipt") Assert.Throws<ExternalHarnessException>(() => f.Operation.RecordOutcome(run.Outcome));
-            var view = variant == "invalid-receipt" ? LocalSoloOutcomeMapper.FromControlledWorkflow(run.Outcome) : f.Operation.RecordOutcome(run.Outcome);
+            var view = f.Operation.RecordOutcome(run.Outcome);
+            Assert.Throws<ExternalHarnessException>(() => f.Operation.RecordOutcome(run.Outcome));
+            Assert.ThrowsAny<Exception>(() => f.Operation.Reserve(LabEffect.SubmitPrompt));
             Assert.Equal(LocalViewKind.ControlledOfflineFixture, view.Kind); Assert.Equal(LocalHumanChoice.NotEstablished, view.HumanChoice);
             var counts = f.Transport.Fake.Requests;
             Assert.Equal(1, counts.Count(x => x == "POST /session"));
@@ -120,6 +121,19 @@ public sealed class IndependentLabRuntimeTests(Xunit.Abstractions.ITestOutputHel
             var journal = PersonalLabOfflineOperation.Inspect(f.Storage, p.OperationId); journal.DemandExact(p, f.Handle);
             Assert.False(journal.CanResume); Assert.Equal("NotEstablished", journal.HumanAcceptance);
             Assert.Single(journal.Events, e => e.Kind == "Intent" && e.Effect == LabEffect.CreateSession);
+            var recorded = Assert.Single(journal.Events, e => e.Kind is "ProviderObservation" or "InterruptedObservation");
+            Assert.Equal(result.Status, recorded.Status); Assert.Equal(result.ErrorCode, recorded.ErrorCode);
+            Assert.Equal(result.Handle.ExternalSessionId, recorded.OutcomeSession);
+            if (variant == "invalid-receipt")
+            {
+                Assert.Equal("InterruptedObservation", recorded.Kind);
+                Assert.Equal("ses_runtime", journal.CandidateSession); Assert.Null(journal.VerifiedSession);
+                Assert.Null(recorded.OutcomeSession); Assert.Equal("NotEstablished", journal.Receipt);
+                Assert.Contains(journal.Events, e => e.Kind == "Revoked");
+                Assert.DoesNotContain(journal.Events, e => e.Kind == "Intent" && e.Effect == LabEffect.SubmitPrompt);
+            }
+            if (variant == "lost-create")
+            { Assert.Null(journal.CandidateSession); Assert.Null(journal.VerifiedSession); Assert.Equal(ExternalExecutionStatus.Unknown, recorded.Status); }
             if (success)
             {
                 Assert.Equal("FixtureVerifiedOriginalResponse / NotProductionAuthenticity", journal.Receipt);
@@ -132,6 +146,99 @@ public sealed class IndependentLabRuntimeTests(Xunit.Abstractions.ITestOutputHel
             Assert.DoesNotContain(Directory.EnumerateFiles(f.Storage), x => x.EndsWith(".db"));
         }
         Assert.Equal(1, f.Transport.Disposals);
+    }
+    [Theory]
+    [InlineData("invalid-receipt", "other")]
+    [InlineData("invalid-receipt", "completed")]
+    [InlineData("invalid-receipt", "accepted")]
+    [InlineData("valid", "other")]
+    [InlineData("valid", "missing")]
+    public async Task OutcomeCannotReplaceCandidateOrVerifiedIdentity(string variant, string mutation)
+    {
+        using var f = new Owned("outcome-identity-" + variant + "-" + mutation, wireVariant: variant);
+        var transport = f.Transport;
+        using var pca = BoundNativeRecipient.ForTests(f.Operation, NativeModelRole.Pca,
+            new PersonalLabFirstRunBoundaryTests.NativeHttp(f.Preparation, false, false));
+        using var reviewer = BoundNativeRecipient.ForTests(f.Operation, NativeModelRole.Reviewer,
+            new PersonalLabFirstRunBoundaryTests.NativeHttp(f.Preparation, true, false));
+        using var runtime = PersonalLabOfflineRuntime.ForTests(f.Operation, transport, LabOpenCodeBoundaryTests.Origin);
+        var run = await runtime.RunAsync(pca, reviewer);
+        var result = run.Outcome.ExternalResult!;
+        var changed = mutation switch
+        {
+            "completed" => run.Outcome with { ExternalResult = result with { Status = ExternalExecutionStatus.Completed } },
+            "accepted" => run.Outcome with { HumanGate = HumanGateStatus.ReadyForHumanReview },
+            _ => run.Outcome with { ExternalResult = result with { Handle = result.Handle with
+                { ExternalSessionId = mutation == "other" ? "ses_other" : null } } }
+        };
+        Assert.Throws<ExternalHarnessException>(() => f.Operation.RecordOutcome(changed));
+        var count = transport.Fake.Requests.Count;
+        f.Operation.RecordOutcome(run.Outcome); // A rejected substitute must not consume the diagnostic write.
+        Assert.Equal(count, transport.Fake.Requests.Count);
+        Assert.ThrowsAny<Exception>(() => f.Operation.Reserve(LabEffect.CreateSession));
+        Assert.ThrowsAny<Exception>(() => f.Operation.Reserve(LabEffect.SubmitPrompt));
+        f.Operation.Dispose();
+        var journal = PersonalLabOfflineOperation.Inspect(f.Storage, f.Preparation.OperationId);
+        Assert.Equal("ses_runtime", journal.CandidateSession);
+        Assert.Equal(variant == "valid" ? "ses_runtime" : null, journal.VerifiedSession);
+        Assert.False(journal.CanResume); Assert.Equal("NotEstablished", journal.HumanAcceptance);
+        Assert.Single(journal.Events, e => e.Kind is "ProviderObservation" or "InterruptedObservation");
+        // Reopening must reject a forged diagnostic that claims a different outcome identity or success.
+        var path = Path.Combine(f.Storage, f.Preparation.OperationId + ".lab-journal");
+        var original = File.ReadAllText(path);
+        foreach (var field in new[] { "outcomeSession", "status", "gate" })
+        {
+            if (variant == "valid" && field != "outcomeSession") continue;
+            var lines = original.Split('\n');
+            for (var i = 1; i < lines.Length - 1; i++)
+            {
+                var row = JsonNode.Parse(lines[i])!;
+                if (row["kind"]!.GetValue<string>() is not ("ProviderObservation" or "InterruptedObservation")) continue;
+                row[field] = field == "outcomeSession" ? JsonValue.Create("ses_other")
+                    : JsonValue.Create(field == "status" ? (int)ExternalExecutionStatus.Completed : (int)HumanGateStatus.ReadyForHumanReview);
+                lines[i] = row.ToJsonString();
+            }
+            File.WriteAllText(path, string.Join('\n', lines));
+            Assert.Throws<IOException>(() => PersonalLabOfflineOperation.Inspect(f.Storage, f.Preparation.OperationId));
+        }
+        File.WriteAllText(path, original);
+        Assert.False(PersonalLabOfflineOperation.Inspect(f.Storage, f.Preparation.OperationId).CanResume);
+    }
+    [Theory]
+    [InlineData(ExternalExecutionStatus.Unknown, false)]
+    [InlineData(ExternalExecutionStatus.Failed, false)]
+    [InlineData(ExternalExecutionStatus.Cancelled, false)]
+    [InlineData(ExternalExecutionStatus.Unknown, true)]
+    public void InterruptedCandidateOutcomeSurvivesInspectionWithoutVerification(ExternalExecutionStatus status, bool echoCandidate)
+    {
+        using var f = new Owned("interrupted-" + status + "-" + echoCandidate);
+        using var boundary = LabOpenCodeBoundary.ForTests(f.Operation, LabOpenCodeBoundaryTests.Origin);
+        using (var create = f.Operation.Reserve(LabEffect.CreateSession)) create.RecordReturned("ses_candidate");
+        f.Operation.RecordSessionEvidence("LabSessionCandidate", "ses_candidate");
+        f.Operation.RecordSessionEvidence("LabResponseCorrelated", "ses_candidate");
+        Assert.Equal("LabReceiptRequired", Assert.Throws<ExternalHarnessException>(() => f.Operation.Reserve(LabEffect.SubmitPrompt)).Code);
+        Assert.Equal("LabReceiptRequired", Assert.Throws<ExternalHarnessException>(() => f.Operation.Reserve(LabEffect.Observe)).Code);
+        f.Operation.Revoke(); // Diagnostics must remain recordable after authorization is revoked.
+        var task = f.Preparation.Task;
+        var result = new ExternalTaskResult(task.TaskId, task.WorkflowRunId, status,
+            f.Handle with { ExternalSessionId = echoCandidate ? "ses_candidate" : null },
+            "Interrupted before receipt verification.", [], [], ErrorCode: "LabReceiptRequired");
+        var outcome = new WorkflowOutcome(task.TaskId, task.WorkflowRunId, ComprehensionStatus.Proposed,
+            result, null, HumanGateStatus.NeedsHumanReview, [], [], [], "LabReceiptRequired");
+        f.Operation.RecordOutcome(outcome);
+        Assert.Throws<ExternalHarnessException>(() => f.Operation.RecordOutcome(outcome));
+        Assert.ThrowsAny<Exception>(() => f.Operation.Reserve(LabEffect.SubmitPrompt));
+        Assert.Throws<ExternalHarnessException>(f.Preparation.DemandExecution);
+        f.Operation.Dispose();
+        var journal = PersonalLabOfflineOperation.Inspect(f.Storage, f.Preparation.OperationId);
+        Assert.Equal("ses_candidate", journal.CandidateSession); Assert.Null(journal.VerifiedSession);
+        Assert.Equal("NotEstablished", journal.Receipt); Assert.False(journal.CanResume);
+        var recorded = Assert.Single(journal.Events, e => e.Kind is "ProviderObservation" or "InterruptedObservation");
+        Assert.Equal(status, recorded.Status); Assert.Equal(result.Handle.ExternalSessionId, recorded.OutcomeSession);
+        Assert.Equal("LabReceiptRequired", recorded.ErrorCode);
+        Assert.Single(journal.Events, e => e.Kind == "Consumed");
+        Assert.DoesNotContain(journal.Events, e => e.Kind == "Intent" && e.Effect == LabEffect.SubmitPrompt);
+        Assert.Empty(f.Transport.Fake.Requests); f.Transport.Dispose();
     }
     [Fact]
     public void WrongExecutionCannotOpenLabJournalOrAuthorizeProduction()
