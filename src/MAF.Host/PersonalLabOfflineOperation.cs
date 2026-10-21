@@ -12,9 +12,11 @@ internal sealed record LabProvenanceIdentity(string OperationId, HandoffTask Tas
 internal sealed record LabJournalHeader(int Version, LabProvenanceIdentity Identity, string Fingerprint, DateTimeOffset ExpiresAt);
 internal sealed record LabJournalEvent(int Sequence, string Kind, int Attempt = 0, LabEffect? Effect = null,
     string? Session = null, ExternalExecutionStatus? Status = null, EvidenceAssessmentStatus? Review = null, HumanGateStatus? Gate = null,
-    LabOpenCodeProtocol? Protocol = null);
+    LabOpenCodeProtocol? Protocol = null, string? OutcomeSession = null, string? ErrorCode = null);
 internal sealed record LabProvenanceInspection(LabJournalHeader Header, LabJournalEvent[] Events)
 {
+    public string? CandidateSession => Events.LastOrDefault(e => e.Kind == "Returned" && e.Effect == LabEffect.CreateSession)?.Session;
+    public string? VerifiedSession => Events.LastOrDefault(e => e.Kind == "LabReceiptVerified")?.Session;
     public bool CanResume => false; // Inspection never reconstructs admission or an execution capability.
     public string Receipt => Events.Any(e => e.Kind == "LabReceiptVerified") ? "FixtureVerifiedOriginalResponse / NotProductionAuthenticity" : "NotEstablished";
     public string Recovery => "Blocked / UnknownUntilOriginalEvidenceVerified";
@@ -159,14 +161,27 @@ internal sealed class PersonalLabOfflineOperation : IDisposable
             if (outcome.ExternalResult is { } result && (result.Handle.ExecutionId != identity.Handle.ExecutionId
                 || result.TaskId != identity.Task.TaskId || result.WorkflowRunId != identity.Task.WorkflowRunId
                 || result.Handle.Provider != identity.Handle.Provider || result.Handle.ExternalRequestId != identity.Handle.ExternalRequestId
-                || result.Handle.ExternalSessionId != session)) throw new ExternalHarnessException("LabProvenanceMismatch");
-            Write(new LabJournalEvent(++sequence, "ProviderObservation", Status: outcome.ExternalResult?.Status,
-                Review: outcome.Review?.Status, Gate: outcome.HumanGate));
+                || !ValidOutcomeSession(session, protocolBound && receiptStep != 3, result.Handle.ExternalSessionId, result.Status)))
+                throw new ExternalHarnessException("LabProvenanceMismatch");
+            var interrupted = outcome.ExternalResult is { } observation && observation.Handle.ExternalSessionId != session;
+            if (protocolBound && receiptStep != 3 && (outcome.HumanGate == HumanGateStatus.ReadyForHumanReview
+                || outcome.Review?.Status == EvidenceAssessmentStatus.SufficientEvidence))
+                throw new ExternalHarnessException("LabReceiptRequired");
+            if (outcome.ExternalResult?.ErrorCode is { } code && !HandoffValidation.Text(code, 100))
+                throw new ExternalHarnessException("LabProvenanceMismatch");
+            Write(new LabJournalEvent(++sequence, interrupted ? "InterruptedObservation" : "ProviderObservation", Status: outcome.ExternalResult?.Status,
+                Review: outcome.Review?.Status, Gate: outcome.HumanGate,
+                OutcomeSession: outcome.ExternalResult?.Handle.ExternalSessionId, ErrorCode: outcome.ExternalResult?.ErrorCode));
             Write(new LabJournalEvent(++sequence, "Consumed")); admission.Consume();
             outcomeRecorded = true;
             return LocalSoloOutcomeMapper.FromControlledWorkflow(outcome);
         }
     }
+    // A missing handle may describe interruption before a candidate was verified. It never replaces that candidate.
+    static bool ValidOutcomeSession(string? candidate, bool unverified, string? observed, ExternalExecutionStatus status)
+        => Enum.IsDefined(status) && (!unverified || status is ExternalExecutionStatus.Unknown or ExternalExecutionStatus.Failed or ExternalExecutionStatus.Cancelled)
+            && (observed == candidate || unverified && observed is null);
+
     public void Revoke()
     { lock (sync) { admission.Revoke(); Write(new LabJournalEvent(++sequence, "Revoked")); } }
     public void Dispose()
@@ -229,11 +244,22 @@ internal sealed class PersonalLabOfflineOperation : IDisposable
                     throw new IOException("LabJournalInvalid");
                 receipt++;
             }
-            else if (e.Kind is not ("ProviderObservation" or "Consumed" or "Revoked")) throw new IOException("LabJournalInvalid");
+            else if (e.Kind is not ("ProviderObservation" or "InterruptedObservation" or "Consumed" or "Revoked")) throw new IOException("LabJournalInvalid");
+            var observation = e.Kind is "ProviderObservation" or "InterruptedObservation";
+            if (e.Kind == "InterruptedObservation" && (!labProtocol || receipt == 3 || originalSession is null
+                || e.OutcomeSession is not null || e.Status is not (ExternalExecutionStatus.Unknown or ExternalExecutionStatus.Failed or ExternalExecutionStatus.Cancelled)))
+                throw new IOException("LabJournalInvalid");
+            if (e.OutcomeSession is not null && (!observation || e.OutcomeSession != originalSession)
+                || e.ErrorCode is not null && (!observation || !HandoffValidation.Text(e.ErrorCode, 100)))
+                throw new IOException("LabJournalInvalid");
+            if (observation && labProtocol && receipt != 3 && (e.Status is not null
+                && e.Status is not (ExternalExecutionStatus.Unknown or ExternalExecutionStatus.Failed or ExternalExecutionStatus.Cancelled)
+                || e.Gate == HumanGateStatus.ReadyForHumanReview || e.Review == EvidenceAssessmentStatus.SufficientEvidence))
+                throw new IOException("LabJournalInvalid");
             if (e.Protocol is not null && e.Kind != "LabProtocolBound") throw new IOException("LabJournalInvalid");
-            if (e.Status is { } status && (e.Kind != "ProviderObservation" || !Enum.IsDefined(status))) throw new IOException("LabJournalInvalid");
-            if (e.Review is { } review && (e.Kind != "ProviderObservation" || !Enum.IsDefined(review))
-                || e.Gate is { } gate && (e.Kind != "ProviderObservation" || !Enum.IsDefined(gate))) throw new IOException("LabJournalInvalid");
+            if (e.Status is { } status && (!observation || !Enum.IsDefined(status))) throw new IOException("LabJournalInvalid");
+            if (e.Review is { } review && (!observation || !Enum.IsDefined(review))
+                || e.Gate is { } gate && (!observation || !Enum.IsDefined(gate))) throw new IOException("LabJournalInvalid");
             if (e.Kind is "Consumed" or "Revoked") terminalAdmission = true;
         }
         return new(header, events); // Pending intents are preserved, never converted to returned/verified.

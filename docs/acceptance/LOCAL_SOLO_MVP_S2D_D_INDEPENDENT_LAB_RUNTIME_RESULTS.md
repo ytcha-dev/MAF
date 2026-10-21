@@ -196,6 +196,15 @@ Wrong-execution preparation test allocates no directory. Lazy-client quality cas
 only the existing fixture's necessary empty owned root, not a Lab journal/source/SQLite.
 Legacy regression fixture naming remains unchanged; no antivirus workaround or global cleanup.
 
+## Reliability closure follow-up — 2026-10-21
+
+The historical invalid-receipt rejection and focused results above describe the original
+S2D-D snapshot. The separately authorized reliability closure now records an interrupted
+outcome without replacing the candidate session or manufacturing a verified receipt.
+See [closure evidence](LOCAL_SOLO_MVP_S2D_D_RELIABILITY_CLOSURE_RESULTS.md).
+Quiescent disposal, inspection-only reopen, all live/production blockers and conditional
+Owner acceptance remain unchanged. This follow-up is not S2D-E authorization.
+
 ## Acceptance conditions and remaining live blockers
 
 Independent offline Lab ownership is delivered; no synthetic ProductionProtected authority
