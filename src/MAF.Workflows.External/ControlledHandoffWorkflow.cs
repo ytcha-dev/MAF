@@ -22,7 +22,7 @@ internal sealed record HandoffRun(WorkflowOutcome Outcome, ImmutableArray<Workfl
 internal sealed class ControlledHandoffWorkflow(ITaskBriefing briefingSource,
     Func<ExternalTaskRequest, PolicyOutcome> assessmentSource, IControlledDelegation delegationSource,
     Func<TaskEvidence, CancellationToken, Task<ReviewAssessment>> reviewSource, ExternalExecutionHandle originalHandle,
-    TimeProvider clock, VerifiedSourceMode? verifiedSources = null)
+    TimeProvider clock, VerifiedSourceMode? verifiedSources = null, Action<Task>? ownedWork = null)
 {
     readonly ITaskBriefing briefing = briefingSource;
     readonly Func<ExternalTaskRequest, PolicyOutcome> assess = assessmentSource;
@@ -68,7 +68,9 @@ internal sealed class ControlledHandoffWorkflow(ITaskBriefing briefingSource,
         token.ThrowIfCancellationRequested();
         using var deadline = new CancellationTokenSource(timeout, clock);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, deadline.Token);
-        return await action(linked.Token).WaitAsync(linked.Token);
+        var work = action(linked.Token);
+        ownedWork?.Invoke(work); // Optional owned composition must drain work after a bounded wait stops observing it.
+        return await work.WaitAsync(linked.Token);
     }
 
     sealed record BriefHandoff(HandoffTask Task, TaskBrief? Brief, HandoffStageState State, string? Reason);

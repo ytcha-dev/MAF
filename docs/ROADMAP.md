@@ -9,6 +9,13 @@
 
 ## Current development increment and next action
 
+**Runtime Lifecycle Closure follow-up:** bounded local cancellation/drain and tracked
+underlying native work are implemented for the internal offline Lab runtime. Build has
+0 warnings/errors; 171 focused and 1584 full offline tests pass (3 live cases skipped),
+recorded in [results](acceptance/RUNTIME_LIFECYCLE_CLOSURE_RESULTS.md) and the
+[lifecycle contract](architecture/PERSONAL_LAB_RUNTIME_LIFECYCLE.md). Active Dispose remains
+rejected; caller-owned journal/native clients must outlive drain. No live/public activation.
+
 **Current increment: S2D-D independent PersonalLab offline ownership delivered; Conditional Owner acceptance recommended. Lab path uses no protected synthetic authority; no live/network/public activation. Corporate hold remains.**
 Reliability closure follow-up: [scope and validation evidence](acceptance/LOCAL_SOLO_MVP_S2D_D_RELIABILITY_CLOSURE_RESULTS.md)
 addresses Linux process diagnostic portability and interrupted invalid-receipt outcome

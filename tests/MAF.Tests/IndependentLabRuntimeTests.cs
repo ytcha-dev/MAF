@@ -13,7 +13,7 @@ namespace MAF.Tests;
 public sealed class IndependentLabRuntimeTests(Xunit.Abstractions.ITestOutputHelper output)
 {
     // Explicitly allocated by file-backed cases only; no SQLite or protected authority fixture.
-    sealed class Owned : IDisposable
+    internal sealed class Owned : IDisposable
     {
         public readonly string Root, Workspace, Storage;
         public readonly LocalExecutionPreparation Preparation;
@@ -42,7 +42,7 @@ public sealed class IndependentLabRuntimeTests(Xunit.Abstractions.ITestOutputHel
             Directory.Delete(Root); // only this explicit run; no parent/global/recursive cleanup
         }
     }
-    sealed class Wire(LocalExecutionPreparation p, string variant) : DelegatingHandler(new RuntimeHttpFixture(p.Task.Workspace)
+    internal sealed class Wire(LocalExecutionPreparation p, string variant) : DelegatingHandler(new RuntimeHttpFixture(p.Task.Workspace)
         { LoseCreateResponse = variant == "lost-create", LoseSubmitResponse = variant == "lost-prompt" })
     {
         public RuntimeHttpFixture Fake => (RuntimeHttpFixture)InnerHandler!;
