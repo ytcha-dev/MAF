@@ -194,18 +194,31 @@ public sealed class AbortDeliveryTests(ITestOutputHelper output) : IDisposable
         {
             Assert.Equal("ExecutionOwned", await CancellationSchemaTests.Line(execution));
             Assert.Equal("DeliveryIntentCommitted", await CancellationSchemaTests.Line(first));
+            var executionStart = execution.StartTime;
+            var firstStart = first.StartTime; // Capture while checkpoint ownership keeps both children alive.
             using var second = CancellationSchemaTests.Child("abort-run", Db);
-            var result = await second.StandardOutput.ReadToEndAsync().WaitAsync(TimeSpan.FromSeconds(20));
-            await second.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10)); Assert.Equal(0, second.ExitCode); Assert.Contains("DeliveryBusy", result);
+            try
+            {
+                var result = await second.StandardOutput.ReadToEndAsync().WaitAsync(TimeSpan.FromSeconds(20));
+                await second.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10)); Assert.Equal(0, second.ExitCode); Assert.Contains("DeliveryBusy", result);
+            }
+            finally { await CancellationSchemaTests.Kill(second); }
             await first.StandardInput.WriteLineAsync("continue"); await first.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10)); Assert.Equal(0, first.ExitCode);
             Assert.Single(File.ReadAllLines(Db + ".abort-http")); Assert.Equal(1L, await Sql("SELECT count(*) FROM cancellation_deliveries"));
-            output.WriteLine($"ExecutionOwnerPID={execution.Id} startUTC={execution.StartTime.ToUniversalTime():O}; winnerPID={first.Id} startUTC={first.StartTime.ToUniversalTime():O}; competitorPID={second.Id}; original/target=runtime-task/runtime-execution/ses_runtime; reservations=1; GET/Create/Prompt/Abort=0/0/0/1");
+            output.WriteLine($"ExecutionOwnerPID={execution.Id} startUTC={executionStart.ToUniversalTime():O}; winnerPID={first.Id} startUTC={firstStart.ToUniversalTime():O}; competitorPID={second.Id}; original/target=runtime-task/runtime-execution/ses_runtime; reservations=1; GET/Create/Prompt/Abort=0/0/0/1");
         }
         finally
         {
-            await CancellationSchemaTests.Kill(first);
-            if (!execution.HasExited)
-            { await execution.StandardInput.WriteLineAsync("release"); await execution.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10)); }
+            try { await CancellationSchemaTests.Kill(first); }
+            finally
+            {
+                try
+                {
+                    if (!execution.HasExited)
+                    { await execution.StandardInput.WriteLineAsync("release"); await execution.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10)); }
+                }
+                finally { await CancellationSchemaTests.Kill(execution); }
+            }
         }
     }
     [Theory] [InlineData("missing-cancel")] [InlineData("empty-session")] [InlineData("terminal")]
