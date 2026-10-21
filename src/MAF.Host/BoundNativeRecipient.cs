@@ -37,12 +37,12 @@ internal sealed class BoundNativeRecipient : IDisposable
     public static BoundNativeRecipient CreateDisabled(PersonalLabOfflineOperation operation, NativeModelRole role, ApiKeyCredential credential)
         => new(operation, role, credential, new HttpClientHandler { AllowAutoRedirect = false, UseProxy = false, UseCookies = false }, LabEffectTarget.Network);
     internal static (ITaskBriefing Pca, NativeEvidenceReviewer Reviewer) BindAdapters(PersonalLabOfflineOperation operation,
-        BoundNativeRecipient pca, BoundNativeRecipient reviewer)
+        BoundNativeRecipient pca, BoundNativeRecipient reviewer, Action<Task>? ownedWork = null)
     {
         if (!ReferenceEquals(pca.operation, operation) || !ReferenceEquals(reviewer.operation, operation)
             || pca.binding != operation.Preparation.Binding.Pca || reviewer.binding != operation.Preparation.Binding.Reviewer)
             throw new ExternalHarnessException("OwnedNativeRoleMismatch");
-        return operation.Preparation.BindNativeAdapters(pca.Client, reviewer.Client);
+        return operation.Preparation.BindNativeAdapters(pca.Client, reviewer.Client, ownedWork);
     }
     // Friend-test seam only, analogous to ReceiptTransport.ForTests; never operational DI/input.
     internal static BoundNativeRecipient ForTests(PersonalLabOfflineOperation operation, NativeModelRole role, HttpMessageHandler fake,

@@ -85,12 +85,12 @@ internal sealed class LocalExecutionPreparation
     // Useful adapter wiring without client construction or requests. Metadata matching is only
     // compatibility, not proof of transport/redirect/tool egress or independent data approval.
     public (ITaskBriefing Pca, NativeEvidenceReviewer Reviewer) BindNativeAdapters(
-        IChatClient pca, IChatClient reviewer)
+        IChatClient pca, IChatClient reviewer, Action<Task>? ownedWork = null)
     {
         DemandExact(Binding);
         if (ReferenceEquals(pca, reviewer)) throw new ArgumentException("IndependentRoleClientsRequired");
         Match(pca, Binding.Pca!); Match(reviewer, Binding.Reviewer!);
-        return (new TaskBriefingAdapter(pca, new ProjectTools(Task.Workspace)), new NativeEvidenceReviewer(reviewer));
+        return (new TaskBriefingAdapter(pca, new ProjectTools(Task.Workspace)), new NativeEvidenceReviewer(reviewer, ownedWork));
     }
     static void Match(IChatClient client, NativeRecipientBinding binding)
     {
