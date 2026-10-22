@@ -9,6 +9,17 @@
 
 ## Current development increment and next action
 
+**Offline downstream configuration binding:** internal `LabOpenCodeExecutionPlan` references
+the existing preparation without creating another execution identity/admission. It binds the
+expected recipient, canonical HTTPS endpoint and configuration SHA-256 digest, with explicit
+None-only override/fallback/auxiliary descriptions and deterministic versioned binding digest.
+Matching descriptions are not runtime custody/egress evidence. Network, public execution and
+all production/Lab blockers remain unchanged. See the [boundary contract](architecture/PERSONAL_LAB_OPENCODE_LIVE_BOUNDARY.md).
+Validation: build 0 warnings/errors; 263 scoped and 1624 full offline cases passed, with
+only the 3 existing live cases skipped. All 40 new plan cases passed in both final runs.
+Next: separately review live intention/recipient scope and owned child/operational transport;
+no live or Process/Transport implementation is authorized by this offline increment.
+
 **Runtime Lifecycle Closure follow-up:** bounded local cancellation/drain and tracked
 underlying native work are implemented for the internal offline Lab runtime. Build has
 0 warnings/errors; 171 focused and 1584 full offline tests pass (3 live cases skipped),
