@@ -4,6 +4,8 @@ MAF 以 C# / .NET 10 與官方 Microsoft Agent Framework，逐步建立 local-fi
 
 4D／R1 已由 Owner Review 作為受控技術里程碑；S2D-A 已條件接受為離線基礎。目前增量是 **S2D-D 獨立 PersonalLab offline runtime（受控驗證完成，建議 Conditional Owner acceptance；無 live activation）**。現有能力與驗收邊界：
 
+後續 offline downstream binding：新增 internal immutable OpenCode configuration plan，引用原 preparation，精確比較 provider／model／configuration ID、canonical HTTPS endpoint 與設定 digest；未知 override／fallback／auxiliary flow 一律拒絕。這只是預期描述比較，不是有效設定 custody、egress attestation 或 live 授權；所有執行 blocker 不變。見 [live boundary 契約](docs/architecture/PERSONAL_LAB_OPENCODE_LIVE_BOUNDARY.md)。
+
 - **Phase 2A**：[受控 live、唯讀 OpenCode PoC](docs/acceptance/PHASE2A_RESULTS.md)；另有 [2B-1 家用持久化／恢復驗收](docs/acceptance/PHASE2B1_HOME_RESULTS.md)，不代表公司端安全相容性 clearance。
 - **M3／M4**：受控 protected execution、durable recovery、synthetic Approval/Resume 與取消／對帳技術證明，見 [M4-C](docs/acceptance/PHASE2B2_M4_C_RESULTS.md)。
 - **4A／4B／4C**：官方 deterministic typed Workflow、protected child runtime + fake HTTP，以及獨立有界來源 provenance，見 [4A](docs/acceptance/PHASE2B4_A_TYPED_HANDOFF_RESULTS.md)、[4B](docs/acceptance/PHASE2B4_B_PROTECTED_HANDOFF_RESULTS.md)、[4C](docs/acceptance/PHASE2B4_C_REVIEWER_EVIDENCE_RESULTS.md)。
