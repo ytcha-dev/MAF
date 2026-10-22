@@ -2,6 +2,33 @@ using System.Text.Json;
 using MAF.ApprovalAcceptance;
 using MAF.Persistence.Sqlite;
 
+// Test-only, bounded child protocol for OwnedHarnessProcess tests. No Host/provider/network composition.
+if (args.Length == 2 && args[0] == "owned-process-fixture")
+{
+    switch (args[1])
+    {
+        case "exit": Environment.ExitCode = 23; break;
+        case "eof":
+            await Console.In.ReadToEndAsync().WaitAsync(TimeSpan.FromSeconds(15));
+            break;
+        case "output":
+            var block = new string('x', 4096);
+            async Task Emit()
+            {
+                for (var i = 0; i < 512; i++)
+                {
+                    await Console.Out.WriteAsync(block);
+                    await Console.Error.WriteAsync(block);
+                }
+            }
+            await Emit().WaitAsync(TimeSpan.FromSeconds(15));
+            break;
+        case "linger": await Task.Delay(TimeSpan.FromSeconds(5)); break;
+        default: throw new ArgumentException("Unknown owned-process fixture mode");
+    }
+    return;
+}
+
 if (args.Length < 2) throw new ArgumentException("Test-only: seed <db> | read <db> | migrate-crash <db> <checkpoint>");
 var path = Path.GetFullPath(args[1]);
 if (args[0].StartsWith("handoff-", StringComparison.Ordinal))

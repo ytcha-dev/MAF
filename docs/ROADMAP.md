@@ -9,6 +9,16 @@
 
 ## Current development increment and next action
 
+**Owned Harness Process Lifecycle (2026-10-22):** small internal independently testable
+`OwnedHarnessProcess` implements explicit executable/environment selection, original-child
+observation, opt-in EOF shutdown, bounded stop and ownership-preserving unresolved outcomes.
+No runtime/public/live startup is connected. Windows original-handle termination is authored;
+Linux forced termination is deliberately unresolved pending a safe identity mechanism.
+Build, new fake/OS tests and full offline regression are **NotRun** under the corporate hold;
+implementation is not accepted as fully validated. See the [ownership contract and validation
+inventory](architecture/OWNED_HARNESS_PROCESS_LIFECYCLE.md). Next: independent validation and
+review; controlled OpenCode startup/preflight remains a separate milestone.
+
 **Offline downstream configuration binding:** internal `LabOpenCodeExecutionPlan` references
 the existing preparation without creating another execution identity/admission. It binds the
 expected recipient, canonical HTTPS endpoint and configuration SHA-256 digest, with explicit
