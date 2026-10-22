@@ -119,6 +119,7 @@ public sealed class OwnedHarnessProcessTests
         var owner = Own(child, eof: true);
         Assert.Equal(OwnedProcessStop.GracefulExit, await owner.StopAsync());
         Assert.True(owner.Observe().ShutdownRequested);
+        Assert.False(owner.InputCloseFailed);
         Assert.Equal(1, child.Eofs); Assert.Equal(0, child.Kills);
         Assert.Equal(0, unrelated.Kills); Assert.False(unrelated.Exit.IsCompleted);
         owner.Dispose();
@@ -173,16 +174,185 @@ public sealed class OwnedHarnessProcessTests
         Assert.Throws<InvalidOperationException>(() => owner.Dispose());
     }
 
+    [Fact]
+    public async Task EofFailureRacingExitRetainsExitCodeWithoutTermination()
+    {
+        var child = new FakeChild { ThrowOnEof = true };
+        child.OnEof = () => child.Complete(17);
+        var owner = Own(child, eof: true);
+        Assert.Equal(OwnedProcessStop.GracefulExit, await owner.StopAsync());
+        Assert.True(owner.InputCloseFailed);
+        Assert.Equal(17, owner.Observe().ExitCode);
+        Assert.Equal(0, child.Kills);
+        await owner.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task EofFailureStillWaitsForOriginalChildDuringGrace()
+    {
+        var child = new FakeChild { ThrowOnEof = true };
+        // No timer race: EOF fails synchronously before the test releases the original child.
+        var owner = OwnedHarnessProcess.ForTests(child, TimeSpan.FromSeconds(10), Deadline, closeInputOnStop: true);
+        var stop = owner.StopAsync();
+        Assert.True(owner.InputCloseFailed);
+        Assert.False(stop.IsCompleted);
+        child.Complete(0);
+        Assert.Equal(OwnedProcessStop.GracefulExit, await stop);
+        Assert.Equal(0, child.Kills);
+        await owner.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task EofFailureAllowsOneBackendPermittedTermination()
+    {
+        var child = new FakeChild { ThrowOnEof = true, ExitOnKill = true };
+        var owner = Own(child, eof: true);
+        var stop = owner.StopAsync();
+        Assert.Same(stop, owner.StopAsync());
+        Assert.Equal(OwnedProcessStop.Terminated, await stop);
+        Assert.True(owner.InputCloseFailed);
+        Assert.Equal(1, child.Eofs); Assert.Equal(1, child.Kills);
+        await owner.DisposeAsync();
+        Assert.Same(stop, owner.StopAsync());
+        Assert.Equal(1, child.Kills);
+    }
+
+    [Fact]
+    public async Task EofFailureCannotOverrideConservativeTerminationPolicy()
+    {
+        var child = new FakeChild { ThrowOnEof = true };
+        child.OnTerminate = () => throw new PlatformNotSupportedException("synthetic conservative backend");
+        var owner = Own(child, eof: true);
+        var stop = owner.StopAsync();
+        Assert.Equal(OwnedProcessStop.Unresolved, await stop);
+        Assert.True(owner.InputCloseFailed);
+        Assert.Equal(OwnedProcessState.Running, owner.Observe().State);
+        Assert.Throws<InvalidOperationException>(() => owner.Dispose());
+        Assert.False(owner.ResourceCleanup.IsCompleted);
+        Assert.Same(stop, owner.StopAsync());
+        Assert.Equal(1, child.Kills); Assert.Equal(0, child.Disposals);
+        child.Complete(0); await owner.DisposeAsync();
+        Assert.Equal(OwnedProcessStop.Unresolved, await stop);
+        Assert.Equal(1, child.Kills);
+    }
+
+    [Fact]
+    public async Task EofFailureWithUnknownExitNeverAttemptsTermination()
+    {
+        var child = new FakeChild { ThrowOnEof = true };
+        child.OnEof = () => child.Completion.SetException(new IOException("synthetic exit observation failure"));
+        var owner = Own(child, eof: true);
+        Assert.Equal(OwnedProcessStop.Unresolved, await owner.StopAsync());
+        Assert.True(owner.InputCloseFailed);
+        Assert.Equal(OwnedProcessState.Unresolved, owner.Observe().State);
+        Assert.Equal(0, child.Kills);
+        Assert.Throws<InvalidOperationException>(() => owner.Dispose());
+    }
+
+    [Fact]
+    public async Task TerminationFailureRacingExitReobservesOriginalChild()
+    {
+        var child = new FakeChild { ThrowOnEof = true, ThrowOnKill = true };
+        child.OnTerminate = () => child.Complete(19);
+        var owner = Own(child, eof: true);
+        Assert.Equal(OwnedProcessStop.AlreadyExited, await owner.StopAsync());
+        Assert.Equal(19, owner.Observe().ExitCode);
+        Assert.True(owner.InputCloseFailed);
+        Assert.Equal(1, child.Kills);
+        await owner.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task ChildDisposeFailureRemainsFailureEvenWhenBackendCleanupSucceeds()
+    {
+        var child = new FakeChild { ThrowOnDispose = true }; child.Complete(0);
+        var owner = Own(child);
+        Assert.Throws<IOException>(() => owner.Dispose());
+        Assert.True(child.Cleanup.IsCompletedSuccessfully);
+        await Assert.ThrowsAsync<IOException>(() => owner.ResourceCleanup);
+        Assert.Throws<IOException>(() => owner.Dispose());
+        await Assert.ThrowsAsync<IOException>(() => owner.DisposeAsync().AsTask());
+        await Assert.ThrowsAsync<IOException>(() => owner.DisposeAsync().AsTask());
+        Assert.Equal(1, child.Disposals);
+        Assert.False(owner.ResourceCleanup.IsCompletedSuccessfully);
+        Assert.Equal(0, owner.Observe().ExitCode); // Process exit is separate from resource release.
+    }
+
+    [Fact]
+    public async Task ResourceCleanupFaultSurvivesRepeatedSyncAndAsyncDisposal()
+    {
+        var child = new FakeChild { CleanupTask = Task.FromException(new IOException("synthetic cleanup failure")) };
+        child.Complete(0); var owner = Own(child);
+        Assert.Throws<IOException>(() => owner.Dispose());
+        await Assert.ThrowsAsync<IOException>(() => owner.DisposeAsync().AsTask());
+        var evidence = owner.ResourceCleanup;
+        Assert.Throws<IOException>(() => owner.Dispose());
+        await Assert.ThrowsAsync<IOException>(() => owner.DisposeAsync().AsTask());
+        Assert.Same(evidence, owner.ResourceCleanup);
+        Assert.True(evidence.IsFaulted); Assert.Equal(1, child.Disposals);
+    }
+
+    [Fact]
+    public async Task ResourceCleanupTimeoutRetainsPendingEvidenceWithoutDisposalRetry()
+    {
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var child = new FakeChild { CleanupTask = release.Task }; child.Complete(0);
+        var owner = Own(child);
+        try
+        {
+            await Assert.ThrowsAsync<TimeoutException>(() => owner.DisposeAsync().AsTask());
+            var evidence = owner.ResourceCleanup;
+            Assert.False(evidence.IsCompleted);
+            owner.Dispose(); // Idempotent release attempt; this does not prove async cleanup completion.
+            await Assert.ThrowsAsync<TimeoutException>(() => owner.DisposeAsync().AsTask());
+            Assert.Same(evidence, owner.ResourceCleanup);
+            Assert.False(evidence.IsCompletedSuccessfully); Assert.Equal(1, child.Disposals);
+        }
+        finally { release.TrySetResult(); await owner.ResourceCleanup; }
+        await owner.DisposeAsync(); // May join eventual completion, never repeat resource release.
+        Assert.Equal(1, child.Disposals);
+    }
+
+    [Fact]
+    public async Task CleanupFaultAfterTimeoutCannotBecomeSuccessfulRepeatedDisposal()
+    {
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var child = new FakeChild { CleanupTask = release.Task }; child.Complete(0);
+        var owner = Own(child);
+        try { await Assert.ThrowsAsync<TimeoutException>(() => owner.DisposeAsync().AsTask()); }
+        finally { release.TrySetException(new IOException("synthetic delayed cleanup failure")); }
+        await Assert.ThrowsAsync<IOException>(() => owner.ResourceCleanup);
+        Assert.Throws<IOException>(() => owner.Dispose());
+        await Assert.ThrowsAsync<IOException>(() => owner.DisposeAsync().AsTask());
+        Assert.Equal(1, child.Disposals);
+    }
+
     sealed class FakeChild : OwnedHarnessProcess.IOwnedProcessChild
     {
         internal readonly TaskCompletionSource<int> Completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public Task<int> Exit => Completion.Task;
-        public Task Cleanup => Task.CompletedTask;
-        internal bool ExitOnEof, ExitOnKill, ThrowOnKill;
+        public Task Cleanup => CleanupTask;
+        internal Task CleanupTask = Task.CompletedTask;
+        internal bool ExitOnEof, ExitOnKill, ThrowOnKill, ThrowOnEof, ThrowOnDispose;
+        internal Action? OnEof, OnTerminate;
         internal int Kills, Eofs, Disposals;
         internal void Complete(int code) => Completion.TrySetResult(code);
-        public void CloseInput() { Eofs++; if (ExitOnEof) Complete(0); }
-        public void Terminate() { Kills++; if (ThrowOnKill) throw new IOException("synthetic termination failure"); if (ExitOnKill) Complete(137); }
-        public void Dispose() => Interlocked.Increment(ref Disposals);
+        public void CloseInput()
+        {
+            Eofs++; OnEof?.Invoke();
+            if (ThrowOnEof) throw new IOException("synthetic EOF failure");
+            if (ExitOnEof) Complete(0);
+        }
+        public void Terminate()
+        {
+            Kills++; OnTerminate?.Invoke();
+            if (ThrowOnKill) throw new IOException("synthetic termination failure");
+            if (ExitOnKill) Complete(137);
+        }
+        public void Dispose()
+        {
+            Interlocked.Increment(ref Disposals);
+            if (ThrowOnDispose) throw new IOException("synthetic dispose failure");
+        }
     }
 }

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.ExceptionServices;
 
 namespace MAF.Host;
 
@@ -14,6 +15,9 @@ internal sealed class OwnedHarnessProcess : IDisposable, IAsyncDisposable
     readonly TimeSpan grace, terminationWait;
     readonly bool closeInput;
     Task<OwnedProcessStop>? stop;
+    readonly TaskCompletionSource cleanup = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    ExceptionDispatchInfo? disposalFailure;
+    bool inputCloseFailed;
     bool disposed;
 
     private OwnedHarnessProcess(IOwnedProcessChild child, TimeSpan grace, TimeSpan terminationWait, bool closeInput)
@@ -96,7 +100,8 @@ internal sealed class OwnedHarnessProcess : IDisposable, IAsyncDisposable
     internal Task<int> WaitForExitAsync(TimeSpan timeout, CancellationToken token = default)
     { ValidateDeadline(timeout); return child.Exit.WaitAsync(timeout, token); }
 
-    internal Task ResourceCleanup => child.Cleanup;
+    internal Task ResourceCleanup => cleanup.Task;
+    internal bool InputCloseFailed { get { lock (sync) return inputCloseFailed; } }
 
     internal Task<OwnedProcessStop> StopAsync()
     {
@@ -114,13 +119,23 @@ internal sealed class OwnedHarnessProcess : IDisposable, IAsyncDisposable
     async Task CompleteStop(TaskCompletionSource<OwnedProcessStop> completion)
     {
         try { completion.SetResult(await StopCore().ConfigureAwait(false)); }
-        catch { completion.SetResult(OwnedProcessStop.Unresolved); }
+        catch
+        {
+            // EOF/termination can race an observed exit; failure of that operation is not lost ownership.
+            completion.SetResult(child.Exit.IsCompletedSuccessfully ? OwnedProcessStop.AlreadyExited : OwnedProcessStop.Unresolved);
+        }
     }
     async Task<OwnedProcessStop> StopCore()
     {
         if (child.Exit.IsCompleted) return child.Exit.IsCompletedSuccessfully ? OwnedProcessStop.AlreadyExited : OwnedProcessStop.Unresolved;
         // EOF is opt-in and only useful for a child with an explicitly reviewed EOF protocol.
-        if (closeInput) child.CloseInput();
+        if (closeInput)
+        {
+            try { child.CloseInput(); }
+            catch { lock (sync) inputCloseFailed = true; }
+            // Reobserve the original exit task below, including a close/exit race. Pipe failure alone
+            // neither loses ownership nor permits termination outside the backend's platform policy.
+        }
         try { await child.Exit.WaitAsync(grace).ConfigureAwait(false); return OwnedProcessStop.GracefulExit; }
         catch (TimeoutException) { }
         if (child.Exit.IsCompletedSuccessfully) return OwnedProcessStop.GracefulExit;
@@ -134,12 +149,32 @@ internal sealed class OwnedHarnessProcess : IDisposable, IAsyncDisposable
     {
         lock (sync)
         {
-            if (disposed) return;
+            if (disposed)
+            {
+                disposalFailure?.Throw();
+                if (cleanup.Task.IsFaulted) cleanup.Task.GetAwaiter().GetResult();
+                return;
+            }
             if (stop is { IsCompleted: false } || !child.Exit.IsCompletedSuccessfully)
                 throw new InvalidOperationException("OwnedProcessNotResolved: retain owner and await exit before disposal");
             disposed = true;
-            child.Dispose(); // No implicit kill; repeated disposal never touches a reused PID.
+            try { child.Dispose(); } // No implicit kill; repeated disposal never touches a reused PID.
+            catch (Exception error)
+            {
+                disposalFailure = ExceptionDispatchInfo.Capture(error);
+                cleanup.TrySetException(error); // Even a backend's successful Cleanup cannot erase Dispose failure.
+                _ = ObserveCleanup();
+                throw;
+            }
+            _ = ObserveCleanup();
+            if (cleanup.Task.IsFaulted) cleanup.Task.GetAwaiter().GetResult();
         }
+    }
+    async Task ObserveCleanup()
+    {
+        try { await child.Cleanup.ConfigureAwait(false); cleanup.TrySetResult(); }
+        catch (Exception error) { cleanup.TrySetException(error); }
+        // TrySetResult cannot overwrite a previously recorded synchronous Dispose failure.
     }
     public async ValueTask DisposeAsync()
     {

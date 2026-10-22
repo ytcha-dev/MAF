@@ -20,6 +20,11 @@ installation, fallback, PID attachment or process-name lookup. Explicit environm
 are trusted caller input, not a general environment-security policy; approval must consider
 credentials, loader hooks, HOME/config locations and any executable's downstream tools.
 
+Windows OpenCode launcher limitation: npm's `opencode.cmd` is a command script and cannot
+be launched through this primitive. Future OpenCode integration requires an explicitly
+approved executable strategy, including its arguments, environment and ownership model.
+This PR adds no cmd.exe/PowerShell fallback, PATH lookup or automatic launcher replacement.
+
 Start is synchronous. Native start failure is propagated; cancelled input is checked before
 the process-creation commit point. Cancellation racing after that check can still result in
 a successfully returned owner. There is no cancellable OS process-creation API here.
@@ -43,6 +48,14 @@ There is no universal graceful console-process shutdown API. Explicit opt-in clo
 without writing a command, for reviewed EOF-aware children only. Otherwise the grace interval
 allows normal completion. No control signals, CloseMainWindow, Ctrl+C or protocol Abort is sent.
 
+EOF/pipe-close failure is recorded as `InputCloseFailed`, separately from ownership/exit
+evidence. Stop still observes the original child through the bounded grace interval: an
+observed exit preserves its exit code, observation failure remains Unresolved, and a still
+running child reaches only the existing backend-permitted termination path. A failure racing
+an already-observed exit can return AlreadyExited. No EOF or termination retry is introduced;
+concurrent callers continue to share the original stop task and its cached outcome. Linux's
+conservative forced-termination policy remains unchanged.
+
 After the grace interval, Windows uses Kill(false) on the retained original Process; after
 a further bounded wait, absence of observed exit is TerminationTimedOut (ownership remains
 unresolved and disposal is rejected). Linux/other Unix systems
@@ -59,6 +72,16 @@ disposal does not re-run it. DisposeAsync joins stop, requires resolved exit, di
 and bounds its wait on ResourceCleanup. Cleanup failure/timeout is observable and does not
 prove full release; retain the owner and inspect ResourceCleanup. A cached timeout/Unresolved stop
 result is not rewritten after eventual exit; WaitForExitAsync/Observe can still show that exit.
+
+ResourceCleanup is the owner's stable completion task and is pending until disposal starts
+and backend cleanup completes. A synchronous child Dispose failure faults it even if the
+backend reports successful cleanup. That failure is retained and rethrown on repeated
+Dispose/DisposeAsync, without repeating child disposal. Backend cleanup faults also remain
+observable on ResourceCleanup and repeated disposal. A cleanup wait timeout leaves the task
+pending, never successfully completed: a later DisposeAsync may wait again, without repeating
+resource release. Eventual cleanup can complete or fault the same task. An idempotent sync
+Dispose while cleanup is pending only means no repeated release attempt; callers must await
+ResourceCleanup to claim completed resource release.
 
 Both output streams are drained immediately with independent fixed 4096-byte buffers and
 discarded, retaining no output text or credentials. No line or ReadToEnd accumulation exists
@@ -86,11 +109,17 @@ Network denial, admission, journal, receipt, recovery, Unknown/no-retry or exist
 
 ## Authored validation (all NotRun)
 
-- `OwnedHarnessProcessTests`: 13 Facts plus 3 Theories / 8 rows (21 intended cases).
+- `OwnedHarnessProcessTests`: 23 Facts plus 3 Theories / 8 rows (31 intended cases).
   In-memory fakes and existing file/directory metadata only: explicit paths/environment,
   invalid/missing inputs, finite deadlines, pre-launch cancellation, normal and early exit,
   startup survival/wait timeout, cancelled observation preserving ownership, EOF, termination
   timeout/failure, repeated disposal, concurrent stop/dispose and unrelated-child isolation.
+  PR #4 review follow-up adds 10 fake-only Facts: EOF failure racing exit; EOF failure with
+  exit during grace; one permitted termination after EOF failure; conservative termination
+  rejection without retry; EOF failure with unknown exit; termination failure racing exit;
+  child Dispose failure despite backend cleanup success; persistent ResourceCleanup fault;
+  cleanup timeout with eventual completion; and cleanup timeout followed by a persistent fault.
+  These assert repeated Dispose/DisposeAsync never retry child disposal or erase failure.
 - `OwnedHarnessProcessOsTests`: one metadata-only shell rejection Fact, plus five opt-in
   OS process Facts for launch/exit/early exit, EOF shutdown and pipe cleanup, 2 MiB on each
   output stream, original-child-only timeout/termination and existing non-executable failure.
@@ -115,3 +144,8 @@ provide isolation. No pre-existing directory cleanup or broad fixture refactor i
 Known PR #3 baseline remains 1624 passed / 0 failed / 3 skipped, build 0 warnings/errors;
 this milestone has no executed result to compare with it. Future totals will include five
 additional default-skipped OS cases unless independently enabled.
+
+PR #4 follow-up: all 37 intended cases (31 pure/fake, one metadata, five opt-in OS), build
+and existing regression remain **NotRun** on the affected company device. The 10 newly
+authored cases are not passing evidence. No new filesystem fixtures or process modes are
+added by this follow-up. Stop for external Architect Review; no merge or live execution.
