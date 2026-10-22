@@ -1,5 +1,9 @@
 # PersonalLab offline runtime lifecycle
 
+Separate follow-up: [Owned Harness Process Lifecycle](OWNED_HARNESS_PROCESS_LIFECYCLE.md)
+is authored for independent static review, with all execution validation NotRun. It is not
+wired into this runtime and does not change the ownership or authorization described below.
+
 Status: bounded Runtime Lifecycle Closure implementation; verification is recorded in
 [acceptance evidence](../acceptance/RUNTIME_LIFECYCLE_CLOSURE_RESULTS.md). No live activation.
 
