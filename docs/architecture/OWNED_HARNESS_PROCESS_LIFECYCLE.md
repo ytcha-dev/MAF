@@ -1,5 +1,23 @@
 # Owned Harness Process Lifecycle — 2026-10-22
 
+## R1 closure follow-up — 2026-10-27
+
+The owner/backend are now allocated before OS Start. After a successful launch, setup runs
+through one guarded initialization path. A setup failure throws the sanitized internal
+OwnedProcessInitializationException carrying the exact Owner, marked InitializationFailed.
+The caller MUST retain exception.Owner, explicitly stop/observe the original child and
+dispose only after confirmed exit. No automatic kill, retry, detach or handle-only cleanup.
+SurvivedStartupAsync cannot return true for a failed initialization. Exit observation starts
+before accessing redirected streams; partially started drains remain owned until disposal.
+Stream getters are evaluated inside individual release guards, so a failed getter cannot
+skip the other resource release attempts. Existing unresolved/cleanup failure rules apply.
+
+Five new in-memory Fake Facts cover ownership retention, pending partial cleanup, repeated
+disposal, unresolved termination, unknown exit and persistent disposal failure. All are
+**NotRun**; total intended coverage is now 42 (36 fake/metadata, 1 platform metadata, 5 OS).
+Build, regression and OS validation remain **NotRun** under the corporate execution hold.
+This closes the authored ownership handoff design gap, not executed acceptance.
+
 Status: implemented for static review only. Build, all new tests and existing regression
 are **NotRun** under the corporate execution hold. This is not validated acceptance.
 No live Harness, public Host execution, socket or provider/model calls are enabled.

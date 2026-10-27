@@ -327,6 +327,83 @@ public sealed class OwnedHarnessProcessTests
         Assert.Equal(1, child.Disposals);
     }
 
+    static OwnedHarnessProcess FailedSetup(FakeChild child)
+    {
+        var error = Assert.Throws<OwnedProcessInitializationException>(() =>
+            OwnedHarnessProcess.InitializeStartedForTests(child,
+                () => throw new IOException("sensitive setup detail"), Deadline, Deadline, closeInputOnStop: true));
+        Assert.DoesNotContain("sensitive setup detail", error.ToString());
+        Assert.True(error.Owner.InitializationFailed);
+        return error.Owner;
+    }
+
+    [Fact]
+    public async Task SetupFailureReturnsOriginalOwnerWithoutDetachOrImplicitShutdown()
+    {
+        var child = new FakeChild(); var owner = FailedSetup(child);
+        Assert.Equal(OwnedProcessState.Running, owner.Observe().State);
+        Assert.False(await owner.SurvivedStartupAsync(Deadline));
+        Assert.Equal(0, child.Kills); Assert.Equal(0, child.Eofs); Assert.Equal(0, child.Disposals);
+        Assert.Throws<InvalidOperationException>(() => owner.Dispose());
+        child.Complete(29);
+        Assert.Equal(29, await owner.WaitForExitAsync(Deadline));
+        await owner.DisposeAsync(); owner.Dispose(); await owner.DisposeAsync();
+        Assert.Equal(1, child.Disposals); Assert.True(owner.ResourceCleanup.IsCompletedSuccessfully);
+    }
+
+    [Fact]
+    public async Task SetupFailureRetainsPartialCleanupUntilOriginalExitAndRelease()
+    {
+        var partial = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var child = new FakeChild { ExitOnEof = true, CleanupTask = partial.Task };
+        var owner = FailedSetup(child);
+        Assert.Equal(OwnedProcessStop.GracefulExit, await owner.StopAsync());
+        owner.Dispose(); owner.Dispose();
+        Assert.False(owner.ResourceCleanup.IsCompleted);
+        Assert.Equal(1, child.Disposals); Assert.Equal(1, child.Eofs); Assert.Equal(0, child.Kills);
+        partial.SetResult(); await owner.ResourceCleanup; await owner.DisposeAsync();
+        Assert.Equal(1, child.Disposals);
+    }
+
+    [Fact]
+    public async Task SetupFailureWithUnresolvedStopRetainsOwnerWithoutRetry()
+    {
+        var child = new FakeChild { ThrowOnKill = true }; var owner = FailedSetup(child);
+        var stop = owner.StopAsync();
+        Assert.Equal(OwnedProcessStop.Unresolved, await stop);
+        Assert.Same(stop, owner.StopAsync());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => owner.DisposeAsync().AsTask());
+        Assert.Equal(1, child.Kills); Assert.Equal(0, child.Disposals);
+        Assert.False(owner.ResourceCleanup.IsCompleted);
+        child.Complete(31); await owner.DisposeAsync();
+        Assert.Equal(31, owner.Observe().ExitCode); Assert.Equal(1, child.Disposals);
+        Assert.Equal(OwnedProcessStop.Unresolved, await stop);
+    }
+
+    [Fact]
+    public async Task SetupFailureDoesNotEraseCleanupFailureAcrossRepeatedDisposal()
+    {
+        var child = new FakeChild { ThrowOnDispose = true }; var owner = FailedSetup(child);
+        child.Complete(0);
+        Assert.Throws<IOException>(() => owner.Dispose());
+        await Assert.ThrowsAsync<IOException>(() => owner.ResourceCleanup);
+        Assert.Throws<IOException>(() => owner.Dispose());
+        await Assert.ThrowsAsync<IOException>(() => owner.DisposeAsync().AsTask());
+        Assert.Equal(1, child.Disposals);
+    }
+
+    [Fact]
+    public async Task SetupFailureWithUnknownExitCannotDisposeOrInventTermination()
+    {
+        var child = new FakeChild(); var owner = FailedSetup(child);
+        child.Completion.SetException(new IOException("synthetic observation failure"));
+        Assert.Equal(OwnedProcessStop.Unresolved, await owner.StopAsync());
+        Assert.Equal(OwnedProcessState.Unresolved, owner.Observe().State);
+        Assert.Throws<InvalidOperationException>(() => owner.Dispose());
+        Assert.Equal(0, child.Kills); Assert.Equal(0, child.Disposals);
+        Assert.False(owner.ResourceCleanup.IsCompleted);
+    }
+
     sealed class FakeChild : OwnedHarnessProcess.IOwnedProcessChild
     {
         internal readonly TaskCompletionSource<int> Completion = new(TaskCreationOptions.RunContinuationsAsynchronously);

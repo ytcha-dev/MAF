@@ -7,6 +7,14 @@ internal enum OwnedProcessState { Running, Exited, Unresolved }
 internal enum OwnedProcessStop { AlreadyExited, GracefulExit, Terminated, TerminationTimedOut, Unresolved }
 internal sealed record OwnedProcessObservation(OwnedProcessState State, int? ExitCode, bool ShutdownRequested);
 
+// A successful launch must never disappear behind a setup exception. The caller must retain Owner.
+// Do not expose the original exception: it may contain executable paths or environment values.
+internal sealed class OwnedProcessInitializationException(OwnedHarnessProcess owner)
+    : Exception("OwnedProcessInitializationFailed: retain Owner; stop and observe the original child before disposal")
+{
+    internal OwnedHarnessProcess Owner { get; } = owner;
+}
+
 // An ownership primitive, NEVER an authorization grant. No runtime/CLI registration.
 internal sealed class OwnedHarnessProcess : IDisposable, IAsyncDisposable
 {
@@ -19,6 +27,7 @@ internal sealed class OwnedHarnessProcess : IDisposable, IAsyncDisposable
     ExceptionDispatchInfo? disposalFailure;
     bool inputCloseFailed;
     bool disposed;
+    internal bool InitializationFailed { get; private set; }
 
     private OwnedHarnessProcess(IOwnedProcessChild child, TimeSpan grace, TimeSpan terminationWait, bool closeInput)
     { this.child = child; this.grace = grace; this.terminationWait = terminationWait; this.closeInput = closeInput; }
@@ -30,8 +39,26 @@ internal sealed class OwnedHarnessProcess : IDisposable, IAsyncDisposable
         var start = CreateStartInfo(executable, workingDirectory, arguments, environment);
         ValidateDeadline(grace); ValidateDeadline(terminationWait);
         token.ThrowIfCancellationRequested(); // Synchronous launch commits ownership here; later cancellation uses StopAsync.
-        return new(new SystemChild(start), grace, terminationWait, closeInputOnStop);
+        var child = new SystemChild(start);
+        var owner = new OwnedHarnessProcess(child, grace, terminationWait, closeInputOnStop);
+        child.Start(); // Owner and backend already exist before the OS launch commit point.
+        return InitializeStartedOwner(owner, child.Initialize);
     }
+
+    static OwnedHarnessProcess InitializeStartedOwner(OwnedHarnessProcess owner, Action initialize)
+    {
+        try { initialize(); return owner; }
+        catch
+        {
+            owner.InitializationFailed = true;
+            // No detach, implicit kill, retry or disposal. Partial setup resources stay with Owner.
+            throw new OwnedProcessInitializationException(owner);
+        }
+    }
+
+    internal static OwnedHarnessProcess InitializeStartedForTests(IOwnedProcessChild child, Action initialize,
+        TimeSpan grace, TimeSpan terminationWait, bool closeInputOnStop = false)
+        => InitializeStartedOwner(ForTests(child, grace, terminationWait, closeInputOnStop), initialize);
 
     internal static System.Diagnostics.ProcessStartInfo CreateStartInfo(string executable, string workingDirectory,
         IReadOnlyList<string> arguments, IReadOnlyDictionary<string, string> environment)
@@ -93,6 +120,7 @@ internal sealed class OwnedHarnessProcess : IDisposable, IAsyncDisposable
     internal async Task<bool> SurvivedStartupAsync(TimeSpan interval, CancellationToken token = default)
     {
         ValidateDeadline(interval);
+        if (InitializationFailed) return false; // Survival cannot hide a failed setup.
         try { await child.Exit.WaitAsync(interval, token).ConfigureAwait(false); return false; }
         catch (TimeoutException) { return Observe().State == OwnedProcessState.Running; }
     }
@@ -196,22 +224,29 @@ internal sealed class OwnedHarnessProcess : IDisposable, IAsyncDisposable
     {
         readonly Process process;
         readonly CancellationTokenSource outputStop = new();
-        readonly Task stdout, stderr;
+        Task stdout = Task.CompletedTask, stderr = Task.CompletedTask;
         readonly TaskCompletionSource cleanup = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        public Task<int> Exit { get; }
+        public Task<int> Exit { get; private set; } = new TaskCompletionSource<int>().Task;
         public Task Cleanup => cleanup.Task;
         internal SystemChild(ProcessStartInfo start)
         {
             process = new() { StartInfo = start };
+        }
+        internal void Start()
+        {
             try
             {
                 if (!process.Start()) throw new InvalidOperationException("OwnedProcessStartFailed");
             }
             catch { process.Dispose(); outputStop.Dispose(); throw; }
+        }
+        internal void Initialize()
+        {
+            // Establish exit observation before any redirected stream accessor can fail.
+            Exit = ObserveExit();
             // Start both drains immediately. Fixed buffers, no retained output, no line/read-to-end buffering.
             stdout = Discard(process.StandardOutput.BaseStream, outputStop.Token);
             stderr = Discard(process.StandardError.BaseStream, outputStop.Token);
-            Exit = ObserveExit();
         }
         async Task<int> ObserveExit()
         {
@@ -242,9 +277,10 @@ internal sealed class OwnedHarnessProcess : IDisposable, IAsyncDisposable
             Exception? failure = null;
             void Release(Action action) { try { action(); } catch (Exception error) { failure ??= error; } }
             Release(outputStop.Cancel);
-            Release(process.StandardInput.Dispose);
-            Release(process.StandardOutput.Dispose);
-            Release(process.StandardError.Dispose);
+            // Evaluate getters inside Release too: partial setup must not skip later releases.
+            Release(() => process.StandardInput.Dispose());
+            Release(() => process.StandardOutput.Dispose());
+            Release(() => process.StandardError.Dispose());
             Release(process.Dispose); // Close our pipe ends even if descendants retain theirs.
             _ = ReleaseOutput(failure);
             if (failure is not null) throw new IOException("OwnedProcessResourceCleanupFailed");

@@ -1,5 +1,16 @@
 # PR #4 Acceptance & OpenCode V2 Readiness Review
 
+> 2026-10-27 R1 implementation follow-up: owner/backend allocation now precedes OS Start;
+> post-start setup failure returns the original owner via a sanitized typed exception.
+> Exit observation precedes stream setup; partial cleanup remains owned and repeated
+> disposal retains failure evidence. Five additional Fake Facts are authored, all NotRun.
+> Current intended count: 42 = 36 fake/metadata + 1 platform metadata + 5 opt-in OS.
+> See [updated ownership contract](../architecture/OWNED_HARNESS_PROCESS_LIFECYCLE.md).
+> R1/B3 below are historical findings against b2d7f13; authored fix is complete, execution
+> acceptance remains pending. Build/tests/process/socket remain NotRun under the hold.
+> Product priority is now Personal Alpha offline delivery; V2 research/implementation is
+> deferred and does not block that work. The original compatibility matrix is retained.
+
 日期：2026-10-27。狀態：**供 Architect 審核；Conditional Go 僅限離線審查與下一個契約研究增量，並非 PR 驗收通過或執行授權。V2 operational integration：No-Go。**
 
 ## 1. 審查基準與方法
