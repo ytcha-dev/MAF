@@ -9,13 +9,26 @@
 
 ## Current development increment and next action
 
+**Personal Alpha scoped validation (2026-10-27):** source baseline `a780063` (R1 `b325d20`)
+was executed after the Owner confirmed clearance for this device's build/offline tests/CLI
+walkthrough. Solution build: 0 warnings/errors; new cases: 16/16 passed; four interactive
+demo scenarios verified. Existing scoped regression: **722 passed / 3 failed**; unchanged
+diagnostic rerun: 9/9 passed, overlapping and not a clean regression acceptance. See
+[actual evidence and remaining reliability limits](acceptance/PERSONAL_ALPHA_VALIDATION_V1_PILOT_RESULTS.md).
+No product code fix was justified. OS process tests and live execution remain unauthorized.
+[First V1 pilot preparation](plans/PERSONAL_ALPHA_V1_FIRST_LIVE_PILOT.md) identifies the exact
+recipient/configuration/ownership/receipt gaps, A/B product gate and next bounded preflight
+increment. Official 1.18.35 artifact metadata is pinned; no binary was downloaded/verified
+or started. Live remains Blocked; V2 and ProductionProtected changes remain out of scope.
+
 **Product Delivery First / Personal Alpha (2026-10-27):** R1 ownership handoff closure is
 authored (`b325d20`); five added fake cases and all execution validation remain NotRun.
 Primary development now prioritizes the [first useful offline CLI journey and product acceptance metrics](acceptance/PERSONAL_ALPHA_FIRST_USEFUL_WORKFLOW.md):
 one workspace/task, explicit offline confirmation, existing typed PCA -> Harness -> Reviewer
 handoff, stage visibility, session-only status/result and safe permission stopping.
 `--local demo` is ScriptedParticipants / NotLiveProvider; live submit remains unconditionally
-blocked. Build/tests are NotRun under the corporate hold. Product acceptance additionally
+blocked. Build/tests were NotRun at authoring; the scoped validation above supersedes only
+that increment's execution inventory, not general corporate restrictions. Product acceptance additionally
 requires fewer manual information transfers and less active coordination than the manual
 OpenCode/Reviewer baseline; that value is not yet proven. V2 review is retained, implementation
 deferred, and does not block Alpha. No Web/TUI/Registry or new orchestration framework.

@@ -1,5 +1,12 @@
 # Personal Alpha — First Useful Workflow
 
+> Validation follow-up：Owner 確認本輪 scoped execution clearance 後，於同一 baseline
+> `a780063` 完成 solution build（0 warnings/errors）、16/16 新 cases 與四種實際 CLI
+> walkthrough。既有 regression 為 722 passed / 3 failed；一次未改碼 diagnostic 9/9
+> 不抹除原失敗。OS/Live 仍 NotRun。下文 NotRun 為 authored baseline 的歷史狀態；
+> 當前證據與限制見 [validation results](PERSONAL_ALPHA_VALIDATION_V1_PILOT_RESULTS.md)，
+> live readiness 見 [V1 pilot plan](../plans/PERSONAL_ALPHA_V1_FIRST_LIVE_PILOT.md)。
+
 日期：2026-10-27。Product Delivery First：R1 authored closure 完成後，主要開發優先序轉向單一本機任務的可用流程。V2 保留既有相容性研究，不實作、不阻塞 Alpha。
 
 **本增量：Offline Demo 已實作，Build / Tests / Process / Socket 全部 NotRun。** 公司 execution hold 未解除，以下操作說明只供未來已核准環境使用，並非本次執行紀錄或 clearance。未聲稱 Live Success 或產品價值已獲使用者驗證。
