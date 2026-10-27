@@ -9,6 +9,17 @@
 
 ## Current development increment and next action
 
+**Product Delivery First / Personal Alpha (2026-10-27):** R1 ownership handoff closure is
+authored (`b325d20`); five added fake cases and all execution validation remain NotRun.
+Primary development now prioritizes the [first useful offline CLI journey and product acceptance metrics](acceptance/PERSONAL_ALPHA_FIRST_USEFUL_WORKFLOW.md):
+one workspace/task, explicit offline confirmation, existing typed PCA -> Harness -> Reviewer
+handoff, stage visibility, session-only status/result and safe permission stopping.
+`--local demo` is ScriptedParticipants / NotLiveProvider; live submit remains unconditionally
+blocked. Build/tests are NotRun under the corporate hold. Product acceptance additionally
+requires fewer manual information transfers and less active coordination than the manual
+OpenCode/Reviewer baseline; that value is not yet proven. V2 review is retained, implementation
+deferred, and does not block Alpha. No Web/TUI/Registry or new orchestration framework.
+
 **PR #4 / OpenCode V2 review (2026-10-27):** [Architect review package](acceptance/PR4_ACCEPTANCE_OPENCODE_V2_READINESS_REVIEW.md)
 compares main `6844033` with implementation head `b2d7f13`, records all 37 new intended
 cases as NotRun under the corporate hold, and distinguishes static findings from

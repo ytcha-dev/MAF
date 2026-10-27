@@ -10,7 +10,7 @@ using System.ClientModel;
 
 // Offline product boundary: return before native clients, DI or external composition.
 if (args.Contains("--local"))
-    return MAF.Host.LocalSoloConsole.Run(args, Console.Out, Console.Error);
+    return await MAF.Host.LocalSoloConsole.RunAsync(args, Console.Out, Console.Error);
 
 if (args.Contains("--help") || args.Length == 0)
 {
