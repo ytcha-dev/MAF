@@ -9,6 +9,22 @@
 
 ## Current development increment and next action
 
+**V1.19.2 pin / Fake Preflight (2026-10-27):** target is the Owner's installed 1.19.2,
+without downgrading or replacing historical 1.18.35 fixtures. Exact official release source
+and OpenAPI comparison found no breaking MAF-used HTTP contract; sharing behavior changed
+outside that surface. Optional exact version pin rejects before Create/Prompt and preserves
+legacy unpinned scope. Internal fake-only owned preflight performs bounded owner/endpoint/
+binary-description pairing and three discovery GETs, never live admission. Build: 0 warnings/
+errors; 35 new + 254 existing scoped + one 9-case timing run passed. OS/socket/live checks
+remain NotRun. See [compatibility, implementation and evidence](acceptance/OPENCODE_1_19_2_PIN_PREFLIGHT_RESULTS.md).
+[Live Evidence feasibility](plans/LIVE_EVIDENCE_FEASIBILITY_V1.md) finds the current offline
+journal cannot honestly encode live custody unchanged. Next: review/implement only the
+minimal per-operation evidence-profile/custody/receipt extension, retain Network denial,
+then separately authorize dedicated 1.19.2 process/socket proof and one actual task with
+automatic Reviewer handoff. Prior protected timing failures remain unresolved reliability
+evidence; this run did not weaken their 2s budgets or assertions. No V2/Registry/production
+trust changes or public execution route.
+
 **Personal Alpha scoped validation (2026-10-27):** source baseline `a780063` (R1 `b325d20`)
 was executed after the Owner confirmed clearance for this device's build/offline tests/CLI
 walkthrough. Solution build: 0 warnings/errors; new cases: 16/16 passed; four interactive

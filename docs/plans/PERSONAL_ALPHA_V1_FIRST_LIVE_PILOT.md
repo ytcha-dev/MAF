@@ -1,5 +1,12 @@
 # Personal Alpha — First OpenCode V1 ReadOnly Pilot
 
+> Target update — 2026-10-27：Owner 指定目前安裝版 **1.19.2** 為 pilot target，
+> 不要求降版。下文 1.18.35 artifact pin 保留為原計畫的歷史紀錄，不再是 target。
+> [1.19.2 source/spec compatibility、version pin 與 fake preflight evidence](../acceptance/OPENCODE_1_19_2_PIN_PREFLIGHT_RESULTS.md)
+> 已完成；真實 installed binary/endpoint/config 尚未驗證。
+> [Live Evidence feasibility](LIVE_EVIDENCE_FEASIBILITY_V1.md) 確認現有 offline journal
+> 不能直接表示 live custody，未修改 schema 或開啟 live submission。
+
 日期：2026-10-27。狀態：**Preparation only / Live Blocked**。本文件不授權下載、啟動 OpenCode、連線模型或將公司資料送出。V2、ProductionProtected、schema migration 皆不在範圍。
 
 ## 1. 最小 pilot

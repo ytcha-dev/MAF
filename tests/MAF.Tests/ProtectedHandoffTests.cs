@@ -33,8 +33,9 @@ public sealed class ProtectedHandoffTests(ITestOutputHelper output) : IDisposabl
     [Fact]
     public async Task FullNestedOfficialGraphUsesRealV4AdmissionReceiptAndEffects()
     {
+        using var timing = new OfflineCheckpointTiming(output.WriteLine);
         using var f = await Fixture(); Assert.Null(await f.F.Executions.GetAsync(f.Task.TaskId));
-        var run = await f.Flow().RunAsync(f.Task); Graph(run);
+        var run = await f.Flow().RunAsync(f.Task); timing.Observe(run.Outcome); Graph(run);
         Assert.Equal(HumanGateStatus.ReadyForHumanReview, run.Outcome.HumanGate);
         Assert.Equal(1, f.PcaCalls); Assert.Equal(1, f.ReviewCalls);
         var result = run.Outcome.ExternalResult!; var row = (await f.F.Executions.GetAsync(f.Task.TaskId))!;
@@ -194,7 +195,11 @@ public sealed class ProtectedHandoffTests(ITestOutputHelper output) : IDisposabl
     [InlineData("execution")] [InlineData("message")] [InlineData("session")]
     public async Task WrongTrustedHandoffMappingCannotRewriteOriginalExecutionOrReachReviewer(string variant)
     {
-        using var f = await Fixture(); await f.Flow().RunAsync(f.Task); f.Fake.Requests.Clear();
+        using var timing = new OfflineCheckpointTiming(output.WriteLine);
+        using var f = await Fixture(); var originalRun = await f.Flow().RunAsync(f.Task);
+        timing.Observe(originalRun.Outcome); timing.Mark("OriginalRunBeforeMappingInspection");
+        output.WriteLine($"ORIGINAL_RUN status={originalRun.Outcome.ExternalResult?.Status}; code={originalRun.Outcome.ExternalResult?.ErrorCode}; reviewerCalls={f.ReviewCalls}");
+        f.Fake.Requests.Clear();
         var original = (await f.F.Executions.GetAsync(f.Task.TaskId))!;
         var expected = variant switch
         {
