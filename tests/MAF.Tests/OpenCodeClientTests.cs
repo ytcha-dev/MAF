@@ -209,6 +209,7 @@ internal sealed class OpenCodeApiFixture(string root) : HttpMessageHandler
     public JsonElement[] PermissionRules { get; private set; } = [];
     public int Submissions { get; private set; }
     public int HealthStatus { get; init; } = 200;
+    public string? Version { get; init; } = "fixture"; // Existing historical fixtures stay unchanged.
     public bool StripSessionRules { get; init; }
     public bool InvalidSessionShape { get; init; }
     public bool DelayHealth { get; init; }
@@ -248,7 +249,7 @@ internal sealed class OpenCodeApiFixture(string root) : HttpMessageHandler
             {
                 await Task.Delay(Timeout.Infinite, cancellationToken);
             }
-            return HealthStatus == 200 ? Json(new { healthy = true, version = "fixture" })
+            return HealthStatus == 200 ? Json(new { healthy = true, version = Version })
                 : Json(new { error = "private-response" }, HealthStatus);
         }
         if (path == "/doc")

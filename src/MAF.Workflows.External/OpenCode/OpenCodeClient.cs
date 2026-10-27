@@ -24,12 +24,17 @@ public sealed class OpenCodeClient : IResumableExternalHarnessClient
     private readonly ConcurrentDictionary<string, byte> submitted = new();
     private readonly string approvedRoot;
     private readonly PermissionRule[] sessionRules;
+    private int versionValidated;
     public string Provider => "OpenCode";
-    public string Scope => DurableExecution.Hash(System.Text.Json.JsonSerializer.Serialize(new
+    private string ConfigurationScope => DurableExecution.Hash(System.Text.Json.JsonSerializer.Serialize(new
     {
         Origin = options.BaseUri.GetLeftPart(UriPartial.Authority), Root = DurableExecution.NormalizeRoot(approvedRoot),
         options.Agent, options.RequireReadApproval, Rules = sessionRules
     }));
+    // Preserve old durable scope bytes when unpinned; pinned handles cannot silently reattach
+    // through another version (or through the legacy unpinned profile).
+    public string Scope => options.ExpectedVersion is null ? ConfigurationScope :
+        DurableExecution.Hash(JsonSerializer.Serialize(new { ConfigurationScope, options.ExpectedVersion }));
     public ExternalExecutionHandle PrepareExecution() => new(Guid.NewGuid().ToString("N"), Provider,
         ExternalRequestId: NewMessageId());
     private static string NewMessageId() => "msg_" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString("x12")
@@ -88,6 +93,7 @@ public sealed class OpenCodeClient : IResumableExternalHarnessClient
     public async Task ValidateAsync(ExternalTaskRequest request, CancellationToken cancellationToken)
     {
         using var effect = access.Enter(ProviderEffect.Validate, request);
+        Volatile.Write(ref versionValidated, 0);
         string root;
         try
         {
@@ -110,10 +116,13 @@ public sealed class OpenCodeClient : IResumableExternalHarnessClient
                 throw new ExternalHarnessException("UnhealthyServer");
             }
             ServerVersion = health.RootElement.GetProperty("version").GetString();
+            if (options.ExpectedVersion is not null && ServerVersion != options.ExpectedVersion)
+                throw new ExternalHarnessException("OpenCodeVersionMismatch");
             using var schema = await SendAsync(HttpMethod.Get, "doc", null, request.TaskId, cancellationToken);
             VerifySchema(schema.RootElement);
             using var agents = await SendAsync(HttpMethod.Get, "agent" + Query(root), null, request.TaskId, cancellationToken);
             VerifyAgent(agents.RootElement);
+            Volatile.Write(ref versionValidated, 1);
         }
         catch (ExternalHarnessException error)
         {
@@ -124,6 +133,12 @@ public sealed class OpenCodeClient : IResumableExternalHarnessClient
         {
             throw new ExternalHarnessException("InvalidDiscoveryResponse");
         }
+    }
+
+    private void DemandValidatedVersion()
+    {
+        if (options.ExpectedVersion is not null && Volatile.Read(ref versionValidated) != 1)
+            throw new ExternalHarnessException("OpenCodeVersionNotValidated");
     }
 
     private static void VerifySchema(JsonElement schema)
@@ -190,6 +205,7 @@ public sealed class OpenCodeClient : IResumableExternalHarnessClient
         try
         {
             using var effect = access.Enter(ProviderEffect.CreateSession, request, workflowRunId, handle);
+            DemandValidatedVersion();
             return await CreateCoreAsync(request, workflowRunId, handle, cancellationToken);
         }
         catch (Exception error) when (error is JsonException or KeyNotFoundException or InvalidOperationException or ArgumentException)
@@ -265,6 +281,7 @@ public sealed class OpenCodeClient : IResumableExternalHarnessClient
     public async Task SubmitAsync(ExternalTaskRequest request, ExternalExecutionHandle handle, CancellationToken cancellationToken)
     {
         using var effect = access.Enter(ProviderEffect.SubmitPrompt, request, handle: handle);
+        DemandValidatedVersion();
         var binding = Bound(handle);
         if (binding.TaskId != request.TaskId || !submitted.TryAdd(handle.ExecutionId, 0))
         {

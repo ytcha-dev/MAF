@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <EmbeddedResource Include="Fixtures/opencode-1.19.2-discovery.json" />
     <Compile Include="../MAF.Acceptance/OpenCodeLauncher.cs" Link="Acceptance/OpenCodeLauncher.cs" />
   </ItemGroup>
 

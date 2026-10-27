@@ -6,10 +6,14 @@ namespace MAF.Workflows.External.OpenCode;
 public sealed record OpenCodeOptions(Uri BaseUri, string ApprovedProjectRoot, string Agent = "maf_readonly",
     bool AllowLoopbackHttp = false, string? Username = null, string? Password = null,
     int RequestTimeoutSeconds = 15, int ResponseLimitBytes = 1024 * 1024, int SummaryLimit = 32000,
-    bool RequireReadApproval = false)
+    bool RequireReadApproval = false, string? ExpectedVersion = null)
 {
     public void Validate()
     {
+        // Null retains historical schema-based fixtures; new pinned paths must explicitly select
+        // a reviewed V1 contract. Never infer a protocol from a successful POST or negotiate.
+        if (ExpectedVersion is not (null or "1.18.35" or "1.19.2"))
+            throw new ArgumentException("UnsupportedOpenCodeVersionPin");
         if (!BaseUri.IsAbsoluteUri || !BaseUri.IsLoopback || !string.IsNullOrEmpty(BaseUri.UserInfo)
             || BaseUri.AbsolutePath != "/" || !string.IsNullOrEmpty(BaseUri.Query) || !string.IsNullOrEmpty(BaseUri.Fragment)
             || BaseUri.Scheme != "https" && !(BaseUri.Scheme == "http" && AllowLoopbackHttp))
