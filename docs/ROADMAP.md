@@ -9,6 +9,24 @@
 
 ## Current development increment and next action
 
+**PR #4 / OpenCode V2 review (2026-10-27):** [Architect review package](acceptance/PR4_ACCEPTANCE_OPENCODE_V2_READINESS_REVIEW.md)
+compares main `6844033` with implementation head `b2d7f13`, records all 37 new intended
+cases as NotRun under the corporate hold, and distinguishes static findings from
+unreproduced risks. Conditional Go applies only to design review / a separately approved
+version-pinned offline contract increment; unconditional PR acceptance and V2 operational
+integration remain No-Go. Official V2 server/client/plugin contracts are breaking; no
+Adapter implementation, merge, process/socket activation or Production Trust change.
+
+**Owned Harness Process Lifecycle (2026-10-22):** small internal independently testable
+`OwnedHarnessProcess` implements explicit executable/environment selection, original-child
+observation, opt-in EOF shutdown, bounded stop and ownership-preserving unresolved outcomes.
+No runtime/public/live startup is connected. Windows original-handle termination is authored;
+Linux forced termination is deliberately unresolved pending a safe identity mechanism.
+Build, new fake/OS tests and full offline regression are **NotRun** under the corporate hold;
+implementation is not accepted as fully validated. See the [ownership contract and validation
+inventory](architecture/OWNED_HARNESS_PROCESS_LIFECYCLE.md). Next: independent validation and
+review; controlled OpenCode startup/preflight remains a separate milestone.
+
 **Offline downstream configuration binding:** internal `LabOpenCodeExecutionPlan` references
 the existing preparation without creating another execution identity/admission. It binds the
 expected recipient, canonical HTTPS endpoint and configuration SHA-256 digest, with explicit
