@@ -128,6 +128,7 @@ internal static class PersonalPipeline
         foreach (var l in o.Limitations.Where(IsPca)) b.AppendLine("  " + l);
         var r = o.ExternalResult;
         b.AppendLine($"[OpenCode] 狀態: {r?.Status.ToString() ?? "(未執行)"}   session: {r?.Handle.ExternalSessionId ?? "-"}   HTTP requests: {r?.Requests ?? 0}");
+        if (r?.ErrorCode is { } code) b.AppendLine($"  錯誤代碼: {code}{(Hints.TryGetValue(code, out var hint) ? " — " + hint : "")}");
         if (r is not null) { b.AppendLine("  摘要:"); foreach (var line in r.Summary.Split('\n')) b.AppendLine("    " + line); }
         b.AppendLine($"  來源候選: {r?.SourceCandidates.Length ?? 0}");
         var a = o.Review;
@@ -143,6 +144,21 @@ internal static class PersonalPipeline
         foreach (var l in o.Limitations.Where(l => !IsPca(l)).Distinct()) b.AppendLine("  - " + l);
         return b.ToString();
     }
+
+    // Common OpenCode discovery/session refusals and what to check locally.
+    static readonly Dictionary<string, string> Hints = new(StringComparer.Ordinal)
+    {
+        ["UnapprovedWorkspace"] = "--project 與 OpenCode 啟動目錄不一致或不是本機目錄。",
+        ["UnhealthyServer"] = "OpenCode server 回報不健康。",
+        ["UnsupportedServerApi"] = "OpenCode 版本的 API 不相容，請改用 opencode-ai@1.19.0。",
+        ["SessionPermissionUnsupported"] = "OpenCode 版本不支援 session 權限規則，請改用 opencode-ai@1.19.0。",
+        ["InvalidDiscoveryResponse"] = "OpenCode 回應格式無法解析，請改用 opencode-ai@1.19.0。",
+        ["InvalidAgentPolicy"] = "/agent 回應不是陣列。",
+        ["ReadOnlyAgentMissing"] = "OpenCode 沒有載入 maf_readonly agent：確認 opencode.json 在 OpenCode 啟動的資料夾、JSON 有效、agent 名稱正確。",
+        ["AgentAllowsDangerousTools"] = "maf_readonly 的有效權限不是 deny-all 後只開 read/glob/grep；檢查全域或專案設定是否額外開了工具。",
+        ["AgentAllowsExternalDirectories"] = "maf_readonly 的有效權限允許 external_directory；請設為 deny。",
+        ["TransportDisconnected"] = "連不上 OpenCode：確認 OPENCODE_BASE_URL 與 server 是否在跑。",
+    };
 
     static bool IsPca(string l) => l.StartsWith(PipelineBriefing.PlanPrefix, StringComparison.Ordinal)
         || l.StartsWith(PipelineBriefing.FocusPrefix, StringComparison.Ordinal) || l.StartsWith(PipelineBriefing.RiskPrefix, StringComparison.Ordinal);

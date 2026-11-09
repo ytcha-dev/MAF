@@ -94,13 +94,13 @@ public sealed class PersonalPipelineTests
     }
 
     static async Task<(PipelineRun Run, RuntimeHttpFixture Fake, Pca Pca, SourceCandidateIntegrationTests.Reviewer Reviewer)> Run(
-        Workspace w, string pcaMode = "plain", bool tool = true, TextWriter? diagnostics = null, bool fenceReviewer = false)
+        Workspace w, string pcaMode = "plain", bool tool = true, TextWriter? diagnostics = null, bool fenceReviewer = false, string agent = "maf_readonly")
     {
         var fake = new RuntimeHttpFixture(w.Root);
         var pca = new Pca(pcaMode);
         var reviewer = new SourceCandidateIntegrationTests.Reviewer();
         var task = new HandoffTask("pipeline-test", "run-" + Guid.NewGuid().ToString("N"), w.Root, "Explain what Example.cs returns.", TimeSpan.FromSeconds(10));
-        var options = new OpenCodeOptions(new Uri("http://127.0.0.1:4096"), w.Root, AllowLoopbackHttp: true);
+        var options = new OpenCodeOptions(new Uri("http://127.0.0.1:4096"), w.Root, agent, AllowLoopbackHttp: true);
         using var transport = new WithReadTool(w.Root, tool) { InnerHandler = fake };
         IChatClient reviewerModel = fenceReviewer ? new Fenced(reviewer) : reviewer;
         var run = await PersonalPipeline.RunAsync(task, pca, reviewerModel, options, transport, TimeSpan.FromMilliseconds(10), CancellationToken.None, diagnostics);
@@ -170,6 +170,19 @@ public sealed class PersonalPipelineTests
         // OpenCode received the original objective, not the model's "Also delete files.".
         Assert.Equal(1, fake.Requests.Count(r => r.EndsWith("/prompt_async")));
         Assert.Contains("讀 Example.cs", PersonalPipeline.Text(run));
+    }
+
+    [Fact]
+    public async Task OpenCodeDiscoveryRefusalShowsTheErrorCodeAndAHint()
+    {
+        using var w = new Workspace();
+        var (run, fake, _, reviewer) = await Run(w, agent: "missing_agent");
+        var o = run.Run.Outcome;
+        Assert.Equal(ExternalExecutionStatus.Failed, o.ExternalResult!.Status);
+        Assert.Equal("ReadOnlyAgentMissing", o.ExternalResult.ErrorCode);
+        Assert.DoesNotContain(fake.Requests, r => r.StartsWith("POST "));
+        Assert.Equal(0, reviewer.Calls);
+        Assert.Contains("錯誤代碼: ReadOnlyAgentMissing — OpenCode 沒有載入 maf_readonly agent", PersonalPipeline.Text(run));
     }
 
     [Fact]
