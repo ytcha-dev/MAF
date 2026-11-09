@@ -73,7 +73,7 @@ PCA（理解專案、提出任務簡報）
 
 ## 已知限制
 
-- **OpenCode 版本**：來源擷取只校準 OpenCode `1.18.35`／`1.19.0` 的 read 工具格式。npm 最新版是 1.19.5，用新版時 Reviewer 會拿不到來源，結果固定是 `NeedsHumanReview`。請安裝 `opencode-ai@1.19.0`。
+- **OpenCode 版本**：來源擷取接受 `1.18.x`／`1.19.x`（見 R2）。其他版本 Reviewer 會拿不到來源，結果固定是 `NeedsHumanReview`。
 - **每階段上限 2 分鐘**（`--stage-timeout` 10–120 秒，沿用既有 `HandoffValidation`）。大型任務請縮小 objective。
 - 尚未用真實 LLM 跑過；真模型是否穩定產生合法 JSON 簡報、是否乖乖用 read 工具，要用你的模型實測。
 - 每次執行都在記憶體內，不支援中斷後續跑；不寫 SQLite。
@@ -102,3 +102,15 @@ PCA（理解專案、提出任務簡報）
 - 包了程式碼框的 Reviewer 回覆仍通過嚴格驗證。
 
 完整 regression **1647 通過、0 失敗、3 略過**；建置 0 警告／錯誤。demo（真實 OpenCode 1.19.0，PCA 回覆刻意包 `<think>` 與 ```json）跑到 `ReadyForHumanReview`，exit 0。**還沒有用真模型重跑。**
+
+## R2：真模型首次完整跑通，放寬 OpenCode 版本線（2026-11-09）
+
+**觀察**：補上 `maf_readonly` agent 後，Owner 用 `Qwen3.5-122B-A10B` 對真實專案 `A02S6` 跑通四個角色：PCA `Proposed`（計畫、7 個重點檔案、5 個風險）→ OpenCode `Completed`（486 HTTP requests，回覆帶檔案路徑）→ Reviewer `Completed` → Human Gate。這是**第一次以真模型完成多 Agent 分工與交接**。但 `來源候選: 0`，Reviewer 判 `InsufficientEvidence`，Human Gate 為 `NeedsHumanReview`。
+
+**原因**：Owner 的 OpenCode 是 1.19.4；來源擷取原本只接受 `1.18.35`／`1.19.0` 兩個精確版本，其他版本一律回傳 0 筆。
+
+**比對**：在容器以真實 OpenCode 1.19.0 與 1.19.4 server 跑同一流程，擷取 `/session/{id}/message` 的 read 工具 part，欄位結構完全相同（part、state、input、metadata、display 各層 key 一致）。
+
+**修正**：版本檢查改為 `^1\.(18|19)\.\d{1,4}$`。格式其餘部分仍嚴格檢查，任何不符都整批不採用；MAF 仍會獨立重讀每個候選檔案並比對 anchor 與 digest，所以版本放寬不會產生假證據，最壞情況是退回 `NeedsHumanReview`。
+
+**驗證**：真實 OpenCode 1.19.4 由 `來源候選: 0 / InsufficientEvidence` 變為 `來源候選: 1 / SufficientEvidence`。新增 11 個版本案例（含 1.20.0、1.17.9、`1.19.4-beta` 等拒絕案例）以及 1.19.4／1.19.5 的既有來源整合案例。完整 regression **1661 通過、0 失敗、3 略過**；建置 0 警告／錯誤。真模型的 1.19.4 重跑待 Owner 執行。

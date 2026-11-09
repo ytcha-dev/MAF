@@ -9,10 +9,15 @@ namespace MAF.Workflows.External.OpenCode;
 // One concrete versioned ReadTool shape. Proposals only; no local reads, requests or trust grants.
 internal static class OpenCodeReadSources
 {
+    internal static bool SupportedVersion(string? version)
+        => version is not null && System.Text.RegularExpressions.Regex.IsMatch(version, @"^1\.(18|19)\.\d{1,4}$");
+
     internal static ImmutableArray<UntrustedSourceLocation> Extract(IEnumerable<JsonElement> messages,
         ExternalExecutionHandle handle, string root, string? version)
     {
-        if (version is not ("1.18.35" or "1.19.0")) return [];
+        // 1.18.x/1.19.x share the calibrated read-tool shape (1.19.0 vs 1.19.4 compared on real servers).
+        // Any shape drift still fails closed below; MAF re-reads every candidate independently.
+        if (!SupportedVersion(version)) return [];
         try
         {
             var result = ImmutableArray.CreateBuilder<UntrustedSourceLocation>();

@@ -150,9 +150,9 @@ internal static class PersonalPipeline
     {
         ["UnapprovedWorkspace"] = "--project 與 OpenCode 啟動目錄不一致或不是本機目錄。",
         ["UnhealthyServer"] = "OpenCode server 回報不健康。",
-        ["UnsupportedServerApi"] = "OpenCode 版本的 API 不相容，請改用 opencode-ai@1.19.0。",
-        ["SessionPermissionUnsupported"] = "OpenCode 版本不支援 session 權限規則，請改用 opencode-ai@1.19.0。",
-        ["InvalidDiscoveryResponse"] = "OpenCode 回應格式無法解析，請改用 opencode-ai@1.19.0。",
+        ["UnsupportedServerApi"] = "OpenCode 版本的 API 不相容，請改用 opencode-ai 1.18.x 或 1.19.x。",
+        ["SessionPermissionUnsupported"] = "OpenCode 版本不支援 session 權限規則，請改用 opencode-ai 1.18.x 或 1.19.x。",
+        ["InvalidDiscoveryResponse"] = "OpenCode 回應格式無法解析，請改用 opencode-ai 1.18.x 或 1.19.x。",
         ["InvalidAgentPolicy"] = "/agent 回應不是陣列。",
         ["ReadOnlyAgentMissing"] = "OpenCode 沒有載入 maf_readonly agent：確認 opencode.json 在 OpenCode 啟動的資料夾、JSON 有效、agent 名稱正確。",
         ["AgentAllowsDangerousTools"] = "maf_readonly 的有效權限不是 deny-all 後只開 read/glob/grep；檢查全域或專案設定是否額外開了工具。",

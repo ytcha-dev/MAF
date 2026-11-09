@@ -185,6 +185,13 @@ public sealed class PersonalPipelineTests
         Assert.Contains("錯誤代碼: ReadOnlyAgentMissing — OpenCode 沒有載入 maf_readonly agent", PersonalPipeline.Text(run));
     }
 
+    [Theory]
+    [InlineData("1.18.0", true)] [InlineData("1.18.35", true)] [InlineData("1.19.0", true)] [InlineData("1.19.4", true)]
+    [InlineData("1.20.0", false)] [InlineData("1.17.9", false)] [InlineData("2.19.0", false)] [InlineData("1.19", false)]
+    [InlineData("1.19.4-beta", false)] [InlineData("synthetic", false)] [InlineData(null, false)]
+    public void SourceExtractionAcceptsOnlyTheCalibratedMinorLines(string? version, bool ok)
+        => Assert.Equal(ok, MAF.Workflows.External.OpenCode.OpenCodeReadSources.SupportedVersion(version));
+
     [Fact]
     public async Task FencedReviewerReplyStillReachesTheStrictReviewerValidation()
     {

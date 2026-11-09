@@ -134,7 +134,7 @@ public sealed class SourceCandidateIntegrationTests(ITestOutputHelper output) : 
         f.Fake.Requests.Count(x => x.StartsWith("GET ")), f.Fake.Requests.Count(x => x.EndsWith("/abort"))];
 
     [Theory]
-    [InlineData(1, "1.18.35", false)] [InlineData(1, "1.19.0", false)]
+    [InlineData(1, "1.18.35", false)] [InlineData(1, "1.19.0", false)] [InlineData(1, "1.19.4", false)] [InlineData(1, "1.19.5", false)]
     [InlineData(2, "1.19.0", false)] [InlineData(2, "1.19.0", true)]
     public async Task GuardedHttpMetadataBecomesIndependentlyVerifiedAndObservedSources(int count, string version, bool relative)
     {

@@ -34,7 +34,7 @@ S2D-D：獨立 Lab child 重用既有 OpenCode protocol／官方 Workflow，不�
 
 `--pipeline` 用官方 Workflow 串起四個角色：**PCA**（理解專案、提出簡報）→ **OpenCode**（唯讀執行）→ **Evidence Reviewer**（自己重新讀原始碼，審查 OpenCode 的證據）→ **Human Gate**（彙整給你判斷）。這是個人、單一操作者、明確 opt-in 的唯讀路徑，不經過 production trust 鏈；`--external-task`／`--local submit` 仍維持封鎖。驗證紀錄見 [Personal Pipeline MVP 結果](docs/acceptance/PERSONAL_PIPELINE_MVP_RESULTS.md)。
 
-**1. 安裝 OpenCode 1.19.0**（來源擷取只校準 1.18.35／1.19.0，新版會讓 Reviewer 拿不到來源）：
+**1. 安裝 OpenCode 1.18.x 或 1.19.x**（來源擷取只接受這兩條版本線；其他版本 Reviewer 會拿不到來源）。已經裝了 1.19.x 就不用重裝：
 
 ```powershell
 npm install -g opencode-ai@1.19.0
