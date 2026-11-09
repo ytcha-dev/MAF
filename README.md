@@ -74,7 +74,8 @@ $env:AI_MODEL = '<模型名稱>'
 $secureKey = Read-Host 'API key' -AsSecureString
 $env:AI_API_KEY = [System.Net.NetworkCredential]::new('', $secureKey).Password
 
-Start-Process opencode -ArgumentList 'serve','--hostname','127.0.0.1','--port','4096' -WorkingDirectory 'C:\Projects\MyApp'
+# 直接啟動原生 opencode.exe；只打 opencode 會走 npm 的 .ps1／.cmd shim，可能被公司政策擋下。
+Start-Process "$(npm prefix -g)\node_modules\opencode-ai\bin\opencode.exe" -ArgumentList 'serve','--hostname','127.0.0.1','--port','4096' -WorkingDirectory 'C:\Projects\MyApp'
 
 $env:OPENCODE_BASE_URL = 'http://127.0.0.1:4096'
 $env:OPENCODE_ALLOW_LOOPBACK_HTTP = '1'
@@ -83,9 +84,11 @@ dotnet run --project src/MAF.Host -- --project 'C:\Projects\MyApp' --pipeline '�
 
 選項：`--stage-timeout <10-120>`（每個角色的秒數上限，預設 120）、`--output text|json`。`AI_REVIEWER_MODEL` 可讓 Reviewer 用不同模型（預設同 `AI_MODEL`）。退出碼：`0` ReadyForHumanReview、`3` NeedsHumanReview、`5` WaitingForApproval、`1` Blocked、`2` 參數錯誤。
 
+PCA 只回傳計畫、重點檔案與風險；任務範圍一律沿用你輸入的原始值，模型無法擴大。PCA 或 Reviewer 的回覆無法解析時，原始回覆會印到 stderr，方便判斷問題。
+
 輸出會列出每個角色的結果、官方 Workflow 的實際交接順序（`Invoked PCA → … → Completed HumanGate`）、OpenCode 摘要與 session、Reviewer 獨立驗證過的檔案行號，以及限制。
 
-**不需要模型就能看到效果**：`scripts/pipeline-demo/run-demo.sh`（Linux／macOS／WSL，需要 .NET 10 與 Node）會啟動真實 OpenCode 1.19.0，並用本機 scripted endpoint 扮演三個模型，從頭跑一次完整流程。
+**選用的展示腳本（一般使用不需要）**：`scripts/pipeline-demo/run-demo.sh`（Linux／macOS／WSL，需要 .NET 10 與 Node）會啟動真實 OpenCode 1.19.0，並用本機 scripted endpoint 扮演三個模型，從頭跑一次完整流程。
 
 ## 系統用途
 

@@ -82,3 +82,23 @@ PCA（理解專案、提出任務簡報）
 ## 完整離線 regression
 
 `dotnet test tests/MAF.Tests`（Linux 容器、.NET SDK 10.0.114）：**1638 通過、0 失敗、3 略過**（既有 3 個 live OpenCode 案例，預設略過）。原本 1624 + 新增 14。
+
+## R1：第一次真模型實跑後的修正（2026-11-09）
+
+**觀察**：Owner 在個人 Windows 機器用公司 OpenAI-compatible 模型 `Qwen3.5-122B-A10B` 第一次實跑。四個階段依序被官方 Workflow 呼叫，但 PCA 是 `Failed / InvalidTaskBrief`，OpenCode 與 Reviewer 照設計 `Skipped`，Human Gate 是 `Blocked`，沒有送出任何 OpenCode HTTP request。
+
+**原因**：pipeline 原本重用共用的 `TaskBriefingAdapter`，它要求模型逐字回填 taskId／workspace／objective、不准多欄位、每條限制 ≤256 字。這是給 scripted 測試模型的嚴格協定；真模型常用 ```json 包住回覆、帶 `<think>`，或加入額外欄位，就被整份退件。
+
+**修正**（共用的 `TaskBriefingAdapter` 及其嚴格測試不變）：
+
+- 新增 pipeline 專用的 `PipelineBriefing`：PCA 只回傳 `plan`／`focusFiles`／`risks`。taskId、workspace、objective、ReadOnly 一律由程式填入原始值，模型的額外欄位（例如自己寫的 `objective`）被忽略，**無法擴大範圍**。
+- 計畫／重點檔案／風險會被截斷到既有上限，並顯示在輸出的 `[PCA]` 區塊。
+- `JsonReplyCleaner` 包在 PCA 與 Reviewer 的 chat client 外面：只對最終文字回覆去掉 `<think>` 與程式碼框；工具呼叫不變，Reviewer 既有的嚴格驗證也不變。
+- 解析失敗時，PCA（或 Reviewer 判定 `ReviewUnavailable` 時）的原始回覆前 800 字會印到 stderr（已遮蔽敏感內容），方便判斷是模型格式還是內容問題。
+
+**驗證**：新增 9 個案例，`PersonalPipelineTests` 共 23 個全部通過，包含：
+- 帶 `<think>` 與 ```json 的 PCA 回覆被接受，模型自寫的 objective 無效。
+- 無法解析的 PCA 回覆 → OpenCode 0 request、Blocked，stderr 印出原始回覆。
+- 包了程式碼框的 Reviewer 回覆仍通過嚴格驗證。
+
+完整 regression **1647 通過、0 失敗、3 略過**；建置 0 警告／錯誤。demo（真實 OpenCode 1.19.0，PCA 回覆刻意包 `<think>` 與 ```json）跑到 `ReadyForHumanReview`，exit 0。**還沒有用真模型重跑。**

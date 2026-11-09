@@ -63,7 +63,7 @@ internal static class PipelineConsole
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; stop.Cancel(); };
         Console.Error.WriteLine($"Pipeline started: PCA({pcaModel}) -> OpenCode({options.Agent}) -> Reviewer({reviewerModel}) -> HumanGate");
         using var transport = new HttpClientHandler();
-        var result = await PersonalPipeline.RunAsync(task, pca, reviewer, options, transport, TimeSpan.FromSeconds(1), stop.Token);
+        var result = await PersonalPipeline.RunAsync(task, pca, reviewer, options, transport, TimeSpan.FromSeconds(1), stop.Token, Console.Error);
         Console.WriteLine(settings.Json ? PersonalPipeline.Json(result) : PersonalPipeline.Text(result));
         return PersonalPipeline.ExitCode(result.Run.Outcome);
     }

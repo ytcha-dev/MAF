@@ -1,7 +1,6 @@
 using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
-using MAF.Agents.Comprehension;
 using MAF.Agents.Review;
 using MAF.Core;
 using MAF.Core.Policy;
@@ -21,8 +20,11 @@ internal sealed record PipelineRun(HandoffRun Run, ExternalExecutionHandle Handl
 internal static class PersonalPipeline
 {
     internal static async Task<PipelineRun> RunAsync(HandoffTask task, IChatClient pcaClient, IChatClient reviewerClient,
-        OpenCodeOptions options, HttpMessageHandler transport, TimeSpan pollInterval, CancellationToken token)
+        OpenCodeOptions options, HttpMessageHandler transport, TimeSpan pollInterval, CancellationToken token, TextWriter? diagnostics = null)
     {
+        diagnostics ??= TextWriter.Null;
+        var pcaModel = new JsonReplyCleaner(pcaClient);
+        var reviewerModel = new JsonReplyCleaner(reviewerClient);
         var tools = new ProjectTools(task.Workspace);
         if (tools.Root != task.Workspace) throw new ArgumentException("Workspace must be a canonical absolute directory.");
         var request = new ExternalTaskRequest(task.TaskId, task.Workspace, task.Objective, task.StageTimeout);
@@ -32,10 +34,15 @@ internal static class PersonalPipeline
         var handle = client.PrepareExecution();
         var delegation = new Delegation(access, client, handle, request, task.WorkflowRunId, pollInterval);
         var sources = new VerifiedSourceMode(new BoundedSourceReader(task.Workspace, TimeProvider.System));
-        var flow = new ControlledHandoffWorkflow(new TaskBriefingAdapter(pcaClient, tools),
+        var flow = new ControlledHandoffWorkflow(new PipelineBriefing(pcaModel, tools, diagnostics),
             intent => intent == request ? PolicyOutcome.Allow : PolicyOutcome.Deny, // Exact original intent only.
-            delegation, new NativeEvidenceReviewer(reviewerClient).ReviewAsync, handle, TimeProvider.System, sources);
+            delegation, new NativeEvidenceReviewer(reviewerModel).ReviewAsync, handle, TimeProvider.System, sources);
         var run = await flow.RunAsync(task, token);
+        if (run.Outcome.Review?.Status == EvidenceAssessmentStatus.ReviewUnavailable && reviewerModel.LastFinalText is { } raw)
+        {
+            diagnostics.WriteLine("[Reviewer] 回應未通過檢查（格式、未讀過的 reference 或被拒的用語），前 800 字：");
+            diagnostics.WriteLine(ProjectTools.Redact(raw.Length > 800 ? raw[..800] : raw));
+        }
         // The shared Workflow labels itself offline; this route is a live personal run, so say that instead.
         var limitations = run.Outcome.Limitations.Select(l => l == OfflineLabel ? LiveLabel : l).ToImmutableArray();
         return new(run with { Outcome = run.Outcome with { Limitations = limitations } }, handle);
@@ -118,6 +125,7 @@ internal static class PersonalPipeline
         foreach (var h in Handoffs(pipeline.Run)) b.AppendLine("  " + h);
         b.AppendLine();
         b.AppendLine($"[PCA] 任務簡報: {o.Comprehension}");
+        foreach (var l in o.Limitations.Where(IsPca)) b.AppendLine("  " + l);
         var r = o.ExternalResult;
         b.AppendLine($"[OpenCode] 狀態: {r?.Status.ToString() ?? "(未執行)"}   session: {r?.Handle.ExternalSessionId ?? "-"}   HTTP requests: {r?.Requests ?? 0}");
         if (r is not null) { b.AppendLine("  摘要:"); foreach (var line in r.Summary.Split('\n')) b.AppendLine("    " + line); }
@@ -132,9 +140,12 @@ internal static class PersonalPipeline
         b.AppendLine($"[Human Gate] {o.HumanGate}{(o.ReasonCode is null ? "" : "   原因: " + o.ReasonCode)}");
         b.AppendLine();
         b.AppendLine("[限制]");
-        foreach (var l in o.Limitations.Distinct()) b.AppendLine("  - " + l);
+        foreach (var l in o.Limitations.Where(l => !IsPca(l)).Distinct()) b.AppendLine("  - " + l);
         return b.ToString();
     }
+
+    static bool IsPca(string l) => l.StartsWith(PipelineBriefing.PlanPrefix, StringComparison.Ordinal)
+        || l.StartsWith(PipelineBriefing.FocusPrefix, StringComparison.Ordinal) || l.StartsWith(PipelineBriefing.RiskPrefix, StringComparison.Ordinal);
 
     internal static string Json(PipelineRun pipeline) => JsonSerializer.Serialize(new
     {

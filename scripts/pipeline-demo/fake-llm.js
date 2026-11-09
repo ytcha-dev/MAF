@@ -27,11 +27,10 @@ http.createServer((req, res) => {
     log.push(`${r.model} stream=${!!r.stream} messages=${msgs.length} tools=${(r.tools || []).length} toolResults=${toolResults.length}`);
     console.error(log[log.length - 1]);
     if (r.model === 'pca') {
-      const user = text(msgs.filter(m => m.role === 'user').pop().content);
-      const t = JSON.parse(user.slice(user.indexOf('Task data: ') + 11));
-      return send(res, chat(r.model, { role: 'assistant', content: JSON.stringify({ taskId: t.taskId, workspace: t.workspace,
-        objective: t.objective, intention: 'ReadOnly', status: 'Proposed', sourceReferences: [],
-        limitations: ['PCA: OpenCode should read src/Calculator.cs and report the Add method.'] }) }));
+      // Wrapped like reasoning models often reply; MAF strips <think> and the code fence.
+      return send(res, chat(r.model, { role: 'assistant', content: '<think>plan the task</think>\n```json\n' + JSON.stringify({
+        plan: 'Read src/Calculator.cs and report what Add returns, with line numbers.',
+        focusFiles: ['src/Calculator.cs'], risks: ['Single small file; little context.'] }) + '\n```' }));
     }
     if (r.model === 'reviewer') {
       const user = text(msgs.filter(m => m.role === 'user').pop().content);

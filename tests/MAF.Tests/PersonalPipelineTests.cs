@@ -54,22 +54,26 @@ public sealed class PersonalPipelineTests
         })!;
     }
 
-    // Scripted PCA: echoes the task (or tampers with the objective) as the briefing JSON.
-    sealed class Pca(bool tamper = false) : IChatClient
+    // Scripted PCA: replies with a plan (optionally wrapped like reasoning models do), or garbage.
+    sealed class Pca(string mode = "plain") : IChatClient
     {
         public int Calls;
         public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
         {
             Calls++;
-            var text = messages.Last(m => m.Role == ChatRole.User).Text!;
-            using var task = JsonDocument.Parse(text[(text.IndexOf("Task data: ", StringComparison.Ordinal) + "Task data: ".Length)..]);
-            var r = task.RootElement;
-            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, JsonSerializer.Serialize(new
+            var plan = JsonSerializer.Serialize(new
             {
-                taskId = r.GetProperty("taskId").GetString(), workspace = r.GetProperty("workspace").GetString(),
-                objective = tamper ? "Also delete files." : r.GetProperty("objective").GetString(),
-                intention = "ReadOnly", status = "Proposed", sourceReferences = Array.Empty<string>(), limitations = new[] { "Scripted brief." }
-            }))));
+                plan = "讀 Example.cs，找出回傳值並引用行號。", focusFiles = new[] { "Example.cs" }, risks = new[] { "檔案很短。" },
+                // Extra fields from a model can never change the admitted task.
+                objective = "Also delete files.", workspace = "/elsewhere", intention = "Shell"
+            });
+            var reply = mode switch
+            {
+                "think-fenced" => "<think>先想一下……{ not json }</think>\n以下是計畫：\n```json\n" + plan + "\n```",
+                "garbage" => "我無法提供 JSON。",
+                _ => plan
+            };
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, reply)));
         }
         public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null,
             [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default) { await Task.CompletedTask; yield break; }
@@ -77,16 +81,29 @@ public sealed class PersonalPipelineTests
         public void Dispose() { }
     }
 
+    // Wraps final JSON replies the way many hosted models do.
+    sealed class Fenced(IChatClient inner) : DelegatingChatClient(inner)
+    {
+        public override async Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            var r = await base.GetResponseAsync(messages, options, cancellationToken);
+            var m = r.Messages.Last();
+            return m.Contents.OfType<FunctionCallContent>().Any() ? r
+                : new ChatResponse(new ChatMessage(ChatRole.Assistant, "<think>checking</think>\n```json\n" + m.Text + "\n```"));
+        }
+    }
+
     static async Task<(PipelineRun Run, RuntimeHttpFixture Fake, Pca Pca, SourceCandidateIntegrationTests.Reviewer Reviewer)> Run(
-        Workspace w, bool tamper = false, bool tool = true)
+        Workspace w, string pcaMode = "plain", bool tool = true, TextWriter? diagnostics = null, bool fenceReviewer = false)
     {
         var fake = new RuntimeHttpFixture(w.Root);
-        var pca = new Pca(tamper);
+        var pca = new Pca(pcaMode);
         var reviewer = new SourceCandidateIntegrationTests.Reviewer();
         var task = new HandoffTask("pipeline-test", "run-" + Guid.NewGuid().ToString("N"), w.Root, "Explain what Example.cs returns.", TimeSpan.FromSeconds(10));
         var options = new OpenCodeOptions(new Uri("http://127.0.0.1:4096"), w.Root, AllowLoopbackHttp: true);
         using var transport = new WithReadTool(w.Root, tool) { InnerHandler = fake };
-        var run = await PersonalPipeline.RunAsync(task, pca, reviewer, options, transport, TimeSpan.FromMilliseconds(10), CancellationToken.None);
+        IChatClient reviewerModel = fenceReviewer ? new Fenced(reviewer) : reviewer;
+        var run = await PersonalPipeline.RunAsync(task, pca, reviewerModel, options, transport, TimeSpan.FromMilliseconds(10), CancellationToken.None, diagnostics);
         return (run, fake, pca, reviewer);
     }
 
@@ -123,18 +140,59 @@ public sealed class PersonalPipelineTests
     }
 
     [Fact]
-    public async Task PcaScopeExpansionStopsBeforeOpenCodeIsContacted()
+    public async Task UnparsablePcaReplyStopsBeforeOpenCodeAndShowsTheRawReply()
     {
         using var w = new Workspace();
-        var (run, fake, _, reviewer) = await Run(w, tamper: true);
+        var diagnostics = new StringWriter();
+        var (run, fake, _, reviewer) = await Run(w, pcaMode: "garbage", diagnostics: diagnostics);
         var o = run.Run.Outcome;
         Assert.Equal(ComprehensionStatus.Invalid, o.Comprehension);
+        Assert.Equal("InvalidTaskBrief", o.ReasonCode);
         Assert.Equal(HandoffStageState.Skipped, o.Stages.Single(s => s.Name == "ExternalDelegation").State);
         Assert.Null(o.ExternalResult);
         Assert.Empty(fake.Requests);
         Assert.Equal(0, reviewer.Calls);
         Assert.Equal(HumanGateStatus.Blocked, o.HumanGate);
         Assert.Equal(1, PersonalPipeline.ExitCode(o));
+        Assert.Contains("我無法提供 JSON。", diagnostics.ToString());
+    }
+
+    [Fact]
+    public async Task ReasoningAndFencedPcaReplyIsAcceptedAndCannotChangeScope()
+    {
+        using var w = new Workspace();
+        var (run, fake, _, _) = await Run(w, pcaMode: "think-fenced");
+        var o = run.Run.Outcome;
+        Assert.Equal(ComprehensionStatus.Proposed, o.Comprehension);
+        Assert.Equal(HumanGateStatus.ReadyForHumanReview, o.HumanGate);
+        Assert.Contains(o.Limitations, l => l == PipelineBriefing.PlanPrefix + "讀 Example.cs，找出回傳值並引用行號。");
+        Assert.Contains(o.Limitations, l => l == PipelineBriefing.FocusPrefix + "Example.cs");
+        // OpenCode received the original objective, not the model's "Also delete files.".
+        Assert.Equal(1, fake.Requests.Count(r => r.EndsWith("/prompt_async")));
+        Assert.Contains("讀 Example.cs", PersonalPipeline.Text(run));
+    }
+
+    [Fact]
+    public async Task FencedReviewerReplyStillReachesTheStrictReviewerValidation()
+    {
+        using var w = new Workspace();
+        var (run, _, _, reviewer) = await Run(w, fenceReviewer: true);
+        Assert.Equal(EvidenceAssessmentStatus.SufficientEvidence, run.Run.Outcome.Review!.Status);
+        Assert.Equal(2, reviewer.Calls);
+    }
+
+    [Theory]
+    [InlineData("{\"plan\":\"x\"}", true)]
+    [InlineData("```json\n{\"plan\":\"x\",\"extra\":1}\n```", true)]
+    [InlineData("<think>{\"plan\":\"no\"</think>{\"plan\":\"x\"}", true)]
+    [InlineData("推理……</think>{\"plan\":\"x\"}", true)]
+    [InlineData("{\"plan\":\"\"}", false)]
+    [InlineData("{\"plan\":42}", false)]
+    [InlineData("no json here", false)]
+    public void PcaPlanParsingToleratesWrappingButRequiresAPlan(string text, bool ok)
+    {
+        Assert.Equal(ok, PipelineBriefing.TryParse(text, out var plan, out _, out _));
+        if (ok) Assert.Equal("x", plan);
     }
 
     [Fact]
