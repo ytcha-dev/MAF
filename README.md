@@ -30,6 +30,63 @@ S2D-A 修正 S2C eager test directory，新增單次 PersonalLab offline admissi
 
 S2D-D：獨立 Lab child 重用既有 OpenCode protocol／官方 Workflow，不借用 protected synthetic authority；19 focused、15 相容性、52 provenance/recipient、14 protected guard 結果通過（有重疊，97 unique）。見 [S2D-D 結果](docs/acceptance/LOCAL_SOLO_MVP_S2D_D_INDEPENDENT_LAB_RUNTIME_RESULTS.md)。Network、公開提交及真模型仍封鎖；公司 execution hold 未解除。
 
+## 多 Agent Pipeline（個人唯讀 MVP）— 可直接使用
+
+`--pipeline` 用官方 Workflow 串起四個角色：**PCA**（理解專案、提出簡報）→ **OpenCode**（唯讀執行）→ **Evidence Reviewer**（自己重新讀原始碼，審查 OpenCode 的證據）→ **Human Gate**（彙整給你判斷）。這是個人、單一操作者、明確 opt-in 的唯讀路徑，不經過 production trust 鏈；`--external-task`／`--local submit` 仍維持封鎖。驗證紀錄見 [Personal Pipeline MVP 結果](docs/acceptance/PERSONAL_PIPELINE_MVP_RESULTS.md)。
+
+**1. 安裝 OpenCode 1.19.0**（來源擷取只校準 1.18.35／1.19.0，新版會讓 Reviewer 拿不到來源）：
+
+```powershell
+npm install -g opencode-ai@1.19.0
+```
+
+**2. 在要分析的專案根目錄放 `opencode.json`**，讓 OpenCode 也用你的 OpenAI-compatible 模型。`{env:...}` 讓 key 只留在環境變數：
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "company/<模型名稱>",
+  "provider": {
+    "company": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Company LLM",
+      "options": { "baseURL": "{env:AI_BASE_URL}", "apiKey": "{env:AI_API_KEY}" },
+      "models": { "<模型名稱>": { "name": "<模型名稱>", "tool_call": true } }
+    }
+  },
+  "permission": { "*": "deny", "read": "allow", "glob": "allow", "grep": "allow", "external_directory": "deny" },
+  "agent": {
+    "maf_readonly": {
+      "description": "Approved read-only repository analysis",
+      "mode": "primary",
+      "permission": { "*": "deny", "read": "allow", "glob": "allow", "grep": "allow", "external_directory": "deny" }
+    }
+  },
+  "lsp": false, "formatter": false, "share": "disabled", "autoupdate": false
+}
+```
+
+**3. 啟動 OpenCode server 與 pipeline**（同一個 PowerShell 視窗設定的變數，兩邊都會繼承）：
+
+```powershell
+$env:AI_BASE_URL = 'https://<公司 LLM>/v1'
+$env:AI_MODEL = '<模型名稱>'
+$secureKey = Read-Host 'API key' -AsSecureString
+$env:AI_API_KEY = [System.Net.NetworkCredential]::new('', $secureKey).Password
+
+Start-Process opencode -ArgumentList 'serve','--hostname','127.0.0.1','--port','4096' -WorkingDirectory 'C:\Projects\MyApp'
+
+$env:OPENCODE_BASE_URL = 'http://127.0.0.1:4096'
+$env:OPENCODE_ALLOW_LOOPBACK_HTTP = '1'
+dotnet run --project src/MAF.Host -- --project 'C:\Projects\MyApp' --pipeline '說明主要進入點在哪裡，引用檔案與行號。'
+```
+
+選項：`--stage-timeout <10-120>`（每個角色的秒數上限，預設 120）、`--output text|json`。`AI_REVIEWER_MODEL` 可讓 Reviewer 用不同模型（預設同 `AI_MODEL`）。退出碼：`0` ReadyForHumanReview、`3` NeedsHumanReview、`5` WaitingForApproval、`1` Blocked、`2` 參數錯誤。
+
+輸出會列出每個角色的結果、官方 Workflow 的實際交接順序（`Invoked PCA → … → Completed HumanGate`）、OpenCode 摘要與 session、Reviewer 獨立驗證過的檔案行號，以及限制。
+
+**不需要模型就能看到效果**：`scripts/pipeline-demo/run-demo.sh`（Linux／macOS／WSL，需要 .NET 10 與 Node）會啟動真實 OpenCode 1.19.0，並用本機 scripted endpoint 扮演三個模型，從頭跑一次完整流程。
+
 ## 系統用途
 
 PCA 讓你指定一個本機專案，以繁體中文提問，取得結合實際程式碼與檔案行號的說明。

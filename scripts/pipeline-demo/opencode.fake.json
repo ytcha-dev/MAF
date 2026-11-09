@@ -1,0 +1,10 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "fake/coder",
+  "small_model": "fake/coder",
+  "provider": { "fake": { "npm": "@ai-sdk/openai-compatible", "name": "Fake", "options": { "baseURL": "http://127.0.0.1:4100/v1", "apiKey": "unused" }, "models": { "coder": { "name": "coder", "tool_call": true } } } },
+  "permission": { "*": "deny", "read": "allow", "glob": "allow", "grep": "allow", "external_directory": "deny" },
+  "agent": { "maf_readonly": { "description": "Approved read-only repository analysis", "mode": "primary", "model": "fake/coder",
+    "permission": { "*": "deny", "read": "allow", "glob": "allow", "grep": "allow", "external_directory": "deny" } } },
+  "lsp": false, "formatter": false, "share": "disabled", "autoupdate": false
+}

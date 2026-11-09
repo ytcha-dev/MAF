@@ -9,6 +9,14 @@
 
 ## Current development increment and next action
 
+**Personal Pipeline MVP (2026-11-09) — usable:** explicit `--pipeline` opt-in composes the existing
+official four-stage Workflow (PCA → OpenCode read-only → Evidence Reviewer → Human gate) for
+single-operator personal use, reusing `TaskBriefingAdapter`, `OpenCodeClient`/`OpenCodeExecutor`,
+`VerifiedSourceMode` and `NativeEvidenceReviewer`. It deliberately bypasses the production trust
+chain; `--external-task` and `--local submit` remain blocked. 14 new tests pass, and a real
+OpenCode 1.19.0 end-to-end run with scripted model endpoints reached `ReadyForHumanReview`.
+See [results](acceptance/PERSONAL_PIPELINE_MVP_RESULTS.md). Next: one run against the owner's real LLM.
+
 **Offline downstream configuration binding:** internal `LabOpenCodeExecutionPlan` references
 the existing preparation without creating another execution identity/admission. It binds the
 expected recipient, canonical HTTPS endpoint and configuration SHA-256 digest, with explicit
